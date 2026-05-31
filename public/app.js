@@ -652,6 +652,23 @@ async function saveTileForm(e) {
   }
 }
 
+function generateSsoKey() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let key = '';
+  if (window.crypto && window.crypto.getRandomValues) {
+    const array = new Uint32Array(32);
+    window.crypto.getRandomValues(array);
+    for (let i = 0; i < 32; i++) {
+      key += chars[array[i] % chars.length];
+    }
+  } else {
+    for (let i = 0; i < 32; i++) {
+      key += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+  }
+  document.getElementById('tile_sso_key').value = key;
+}
+
 async function deleteTile(id) {
   if (!confirm('Möchten Sie diesen Dienst wirklich unwiderruflich löschen?')) return;
   try {
