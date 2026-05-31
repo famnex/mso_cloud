@@ -183,13 +183,39 @@ router.get('/userinfo', (req, res) => {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Zugehöriger Benutzer existiert nicht mehr.' });
     }
 
-    // 3. Standard-OIDC Claims zurückgeben
+    // 3. Vornamen und Nachnamen intelligent aus Benutzername oder E-Mail extrahieren
+    let firstname = user.username;
+    let lastname = user.username;
+
+    if (user.username.includes('.')) {
+      const parts = user.username.split('.');
+      firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      lastname = parts.slice(1).join(' ');
+      lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+    } else if (user.email && user.email.includes('@')) {
+      const prefix = user.email.split('@')[0];
+      if (prefix.includes('.')) {
+        const parts = prefix.split('.');
+        firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        lastname = parts.slice(1).join(' ');
+        lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+      }
+    }
+
+    if (user.username.toLowerCase() === 'admin') {
+      firstname = 'System';
+      lastname = 'Administrator';
+    }
+
+    // 4. Standard-OIDC Claims zurückgeben
     const claims = {
       sub: String(user.id),
       username: user.username,
       preferred_username: user.username,
       email: user.email || '',
-      name: user.username,
+      name: `${firstname} ${lastname}`,
+      given_name: firstname,
+      family_name: lastname,
       role: user.role,
       groups: JSON.parse(user.groups || '[]')
     };
