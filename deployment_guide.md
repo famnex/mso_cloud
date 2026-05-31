@@ -1,12 +1,16 @@
 # MSO Cloud Launcher - Deployment-Guide (Linux Server)
 
-Dieser Guide beschreibt Schritt für Schritt, wie Sie den neu entwickelten MSO Cloud Launcher auf einem Linux-Server mit **PM2** und **Nginx** in Betrieb nehmen und unter der Subdomain **`novus.mso-hef.de`** erreichbar machen.
+Dieser Guide beschreibt Schritt für Schritt, wie Sie den neu entwickelten MSO Cloud Launcher auf einem Linux-Server mit **PM2** und **Apache** in Betrieb nehmen.
+
+Es werden zwei Bereitstellungsoptionen unterstützt:
+1. **Option A (Empfohlen bei bestehendem Server)**: Bereitstellung als Unterverzeichnis unter **`https://cloud.mso-hef.de/novus/`** (Erfordert **keine** DNS-Änderungen und **keine** neuen SSL-Zertifikate!).
+2. **Option B**: Bereitstellung als eigenständige Subdomain unter **`https://novus.mso-hef.de`**.
 
 ---
 
 ## 1. System-Voraussetzungen auf dem Linux-Server
 
-Stellen Sie sicher, dass Git, Node.js (Version 18 oder höher), npm und Nginx auf dem Server installiert sind.
+Stellen Sie sicher, dass Git, Node.js (Version 18 oder höher), npm und Apache auf dem Server installiert sind.
 
 ```bash
 # System-Pakete aktualisieren
@@ -18,10 +22,6 @@ sudo apt install git curl -y
 # Node.js (LTS Version) über NodeSource einrichten
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install nodejs -y
-
-# Installationen prüfen
-node -v  # Sollte >= 18.x sein
-npm -v
 
 # PM2 global installieren
 sudo npm install -g pm2
@@ -60,90 +60,80 @@ pm2 start ecosystem.config.js
 
 # Autostart bei System-Neustarts konfigurieren
 pm2 startup
-```
-*Hinweis: Der `pm2 startup` Befehl gibt am Ende einen Befehl aus, den Sie kopieren und mit `sudo` ausführen müssen (z.B. `sudo env PATH=... pm2 startup systemd ...`).*
+# Kopieren Sie den ausgegebenen Befehl in das Terminal und führen Sie ihn aus.
 
-```bash
-# PM2-Prozess-Liste speichern, damit sie nach Neustarts geladen wird
+# PM2-Prozess-Liste speichern
 pm2 save
 ```
 
-### Nützliche PM2-Befehle:
-* **Status prüfen**: `pm2 status`
-* **Logs live verfolgen**: `pm2 logs mso-cloud`
-* **Neustarten**: `pm2 restart mso-cloud`
-* **Stoppen**: `pm2 stop mso-cloud`
+---
+
+## 4. Option A: Bereitstellung unter `https://cloud.mso-hef.de/novus/` (Keine DNS-Änderung!)
+
+Da das System vollständig mit **relativen Pfaden** aufgebaut ist, kann es nahtlos als Unterordner hinter dem bereits existierenden Apache-Webserver betrieben werden.
+
+### A. Apache Proxy-Module aktivieren
+```bash
+sudo a2enmod proxy
+sudo a2enmod proxy_http
+sudo a2enmod rewrite
+sudo systemctl restart apache2
+```
+
+### B. Konfiguration in den bestehenden SSL-VirtualHost einbinden
+Öffnen Sie die existierende SSL-Konfigurationsdatei für `cloud.mso-hef.de` (häufig unter `/etc/apache2/sites-available/` zu finden, z.B. `000-default-le-ssl.conf` oder `cloud-le-ssl.conf`):
+```bash
+sudo nano /etc/apache2/sites-available/cloud-le-ssl.conf
+```
+
+Fügen Sie innerhalb des `<VirtualHost *:443>`-Blocks (für HTTPS) folgende Zeilen hinzu:
+```apache
+    # Automatisch einen abschließenden Slash erzwingen, falls er fehlt (wichtig für relative Pfade)
+    Redirect temp /novus /novus/
+
+    # Proxy-Weiterleitung für den MSO-Cloud Launcher (Port 8080)
+    ProxyPreserveHost On
+    ProxyPass /novus/ http://127.0.0.1:8080/
+    ProxyPassReverse /novus/ http://127.0.0.1:8080/
+```
+
+### C. Apache testen und neu laden
+```bash
+sudo apache2ctl configtest
+# Wenn "Syntax OK" erscheint:
+sudo systemctl reload apache2
+```
+*Sie können das Portal nun sofort unter **`https://cloud.mso-hef.de/novus/`** aufrufen. Es ist direkt per SSL gesichert und benötigt keine weiteren Einstellungen.*
 
 ---
 
-## 4. Nginx Reverse Proxy für `novus.mso-hef.de` einrichten
+## 5. Option B: Bereitstellung unter einer neuen Subdomain `https://novus.mso-hef.de`
 
-Nginx leitet den Traffic von Port 80 (und später 443 für HTTPS) an den Node.js-Dienst weiter, der intern auf Port `8080` lauscht.
+Wenn Sie stattdessen eine eigene Subdomain nutzen möchten (erfordert DNS-Eintrag):
 
-### A. Nginx-Konfigurationsdatei erstellen
+### A. VirtualHost-Datei erstellen
 ```bash
-sudo nano /etc/nginx/sites-available/novus
+sudo nano /etc/apache2/sites-available/novus.conf
 ```
 
-### B. Folgende Konfiguration einfügen
-*(Ersetzen Sie `novus.mso-hef.de` durch Ihre tatsächliche Subdomain)*:
-```nginx
-server {
-    listen 80;
-    server_name novus.mso-hef.de;
-
-    # Erhöhtes Upload-Limit für Schülerausweis-Fotos
-    client_max_body_size 10M;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        
-        # Wichtig für WebSockets / langlebige Verbindungen
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        
-        # Header für IP- und Protokollweitergabe
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+Inhalt einfügen:
+```apache
+<VirtualHost *:80>
+    ServerName novus.mso-hef.de
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:8080/
+    ProxyPassReverse / http://127.0.0.1:8080/
+    ErrorLog ${APACHE_LOG_DIR}/novus_error.log
+    CustomLog ${APACHE_LOG_DIR}/novus_access.log combined
+</VirtualHost>
 ```
 
-### C. Konfiguration aktivieren & Nginx testen
+### B. Aktivieren und SSL generieren
 ```bash
-# Symbolischen Link setzen, um die Seite freizuschalten
-sudo ln -s /etc/nginx/sites-available/novus /etc/nginx/sites-enabled/
+sudo a2ensite novus.conf
+sudo systemctl reload apache2
 
-# Nginx Syntax prüfen
-sudo nginx -t
-
-# Nginx neu starten
-sudo systemctl restart nginx
+# SSL-Zertifikat über Certbot beantragen
+sudo apt install python3-certbot-apache -y
+sudo certbot --apache -d novus.mso-hef.de
 ```
-
----
-
-## 5. SSL-Zertifikat (HTTPS) via Let's Encrypt einrichten
-
-Um Passwörter und LDAP-Verbindungen abzusichern, ist HTTPS zwingend erforderlich.
-
-```bash
-# Certbot installieren
-sudo apt install certbot python3-certbot-nginx -y
-
-# SSL-Zertifikat beantragen und automatisch in Nginx einbinden lassen
-sudo certbot --nginx -d novus.mso-hef.de
-```
-*Folgen Sie den Anweisungen im Terminal. Certbot richtet automatisch eine Weiterleitung von HTTP auf HTTPS ein und kümmert sich um die automatische Verlängerung des Zertifikats.*
-
----
-
-## 6. Erstinstallation durchführen
-Sobald DNS-Einträge auf die IP des Linux-Servers zeigen und HTTPS eingerichtet ist:
-1. Rufen Sie **`https://novus.mso-hef.de`** im Browser auf.
-2. Der Server erkennt, dass noch keine Datenbank vorhanden ist, und leitet Sie auf den Setup-Assistenten um.
-3. Richten Sie Ihr Admin-Konto ein – fertig!
