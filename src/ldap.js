@@ -54,8 +54,8 @@ async function authenticate(username, password) {
     loginUser = username + upnSuffix;
   }
 
-  // Suchfilter zusammensetzen
-  const userFilter = `(&(objectClass=user)(${userAttr}=${username}))`;
+  // Suchfilter zusammensetzen (sucht sowohl nach sAMAccountName als auch nach dem UPN / E-Mail!)
+  const userFilter = `(&(objectClass=user)(|(${userAttr}=${username})(userPrincipalName=${loginUser})))`;
 
   return new Promise((resolve, reject) => {
     let client;
@@ -93,6 +93,9 @@ async function authenticate(username, password) {
 
         res.on('searchEntry', (entry) => {
           userEntry = entry.object;
+          // WICHTIG: In ldapjs liegt der DN auf dem entry-Objekt, nicht auf dem entry.object!
+          // Wir müssen ihn explizit als String extrahieren!
+          userEntry.dn = entry.dn.toString();
         });
 
         res.on('error', (err) => {
@@ -107,7 +110,7 @@ async function authenticate(username, password) {
           }
 
           // 3. User-Bind ausführen (das vom User eingegebene Passwort verifizieren)
-          const userDn = userEntry.dn || userEntry.objectName;
+          const userDn = userEntry.dn;
           
           client.bind(userDn, password, (err) => {
             if (err) {
