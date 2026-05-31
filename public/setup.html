@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>MSO Cloud - Erstinstallation</title>
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+  <!-- FONTS & ICONS -->
+  <script src="https://kit.fontawesome.com/a974660f94.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <div class="setup-container">
+    <div class="setup-panel glass-panel">
+      
+      <div class="setup-header">
+        <div class="setup-logo">
+          <i class="fa-solid fa-cloud-bolt"></i>
+        </div>
+        <h2 style="font-weight:700; font-size:1.8rem; letter-spacing:-0.5px;">MSO Cloud</h2>
+        <p style="color: var(--text-secondary); margin-top:5px;">Erstinstallations-Assistent</p>
+      </div>
+
+      <!-- Step dots -->
+      <div class="step-indicator">
+        <div class="indicator-dot active" id="dot-1"></div>
+        <div class="indicator-dot" id="dot-2"></div>
+        <div class="indicator-dot" id="dot-3"></div>
+      </div>
+
+      <!-- ALERT BOX -->
+      <div id="setup-alert" class="alert alert-danger" style="display: none;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="alert-message">Ein Fehler ist aufgetreten.</span>
+      </div>
+
+      <!-- STEP 1: WELCOME & DATABASES -->
+      <div class="setup-step active" id="step-1">
+        <h3 style="margin-bottom: 15px; font-weight:600;">Willkommen</h3>
+        <p style="color: var(--text-secondary); line-height:1.6; margin-bottom: 25px;">
+          Vielen Dank, dass Sie sich für den Neuaufbau des MSO Cloud Launchers entschieden haben. 
+          Dieses Skript wird die SQLite-Datenbank initialisieren und das System vorbereiten.
+        </p>
+        
+        <div class="form-group">
+          <label for="db-path">Datenbank-Speicherort (Standard)</label>
+          <input type="text" id="db-path" class="form-control" value="data/mso_cloud.db" readonly disabled>
+          <p style="font-size:0.75rem; color: var(--text-secondary); margin-top: 5px; line-height: 1.4;">
+            <i class="fa-solid fa-circle-info"></i> Die Datenbankdatei wird automatisch im Projektordner erstellt und verschlüsselt strukturiert.
+          </p>
+        </div>
+
+        <div style="text-align: right; margin-top: 30px;">
+          <button class="btn btn-primary" onclick="nextStep(2)">
+            Weiter <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: ADMIN PROFILE -->
+      <div class="setup-step" id="step-2">
+        <h3 style="margin-bottom: 15px; font-weight:600;">Administrator einrichten</h3>
+        <p style="color: var(--text-secondary); line-height:1.6; margin-bottom: 20px;">
+          Erstellen Sie den ersten Administrator-Account. Mit diesem Konto können Sie sich im Backend anmelden und Einstellungen verwalten.
+        </p>
+
+        <div class="form-group">
+          <label for="admin-user">Benutzername</label>
+          <input type="text" id="admin-user" class="form-control" placeholder="z.B. admin" required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="admin-email">E-Mail-Adresse</label>
+          <input type="email" id="admin-email" class="form-control" placeholder="z.B. admin@mso-hef.de" required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="admin-password">Passwort</label>
+          <input type="password" id="admin-password" class="form-control" placeholder="••••••••" required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="admin-password-confirm">Passwort bestätigen</label>
+          <input type="password" id="admin-password-confirm" class="form-control" placeholder="••••••••" required autocomplete="off">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+          <button class="btn btn-secondary" onclick="prevStep(1)">
+            <i class="fa-solid fa-arrow-left"></i> Zurück
+          </button>
+          <button class="btn btn-primary" onclick="validateAdminStep()">
+            Weiter <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: INSTALL RECAP -->
+      <div class="setup-step" id="step-3">
+        <h3 style="margin-bottom: 15px; font-weight:600;">Installation bereit</h3>
+        <p style="color: var(--text-secondary); line-height:1.6; margin-bottom: 25px;">
+          Das System ist bereit zur Initialisierung. Beim Klick auf "Installieren" wird die Datenbank eingerichtet, das Admin-Konto erstellt und Beispiel-Dienstkacheln vorkonfiguriert.
+        </p>
+
+        <div class="glass-panel" style="padding: 20px; margin-bottom: 25px; background: rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+            <span style="color: var(--text-secondary);">Administrator:</span>
+            <span id="recap-username" style="font-weight:600;">-</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color: var(--text-secondary);">E-Mail:</span>
+            <span id="recap-email" style="font-weight:600;">-</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+          <button class="btn btn-secondary" id="install-back-btn" onclick="prevStep(2)">
+            <i class="fa-solid fa-arrow-left"></i> Zurück
+          </button>
+          <button class="btn btn-primary" id="install-btn" onclick="runInstallation()">
+            <i class="fa-solid fa-check"></i> Jetzt Installieren
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+
+    function nextStep(step) {
+      document.getElementById(`step-${currentStep}`).classList.remove('active');
+      document.getElementById(`dot-${currentStep}`).classList.remove('active');
+      
+      currentStep = step;
+      
+      document.getElementById(`step-${currentStep}`).classList.add('active');
+      document.getElementById(`dot-${currentStep}`).classList.add('active');
+    }
+
+    function prevStep(step) {
+      nextStep(step);
+    }
+
+    function validateAdminStep() {
+      const user = document.getElementById('admin-user').value.trim();
+      const email = document.getElementById('admin-email').value.trim();
+      const pass = document.getElementById('admin-password').value;
+      const passConf = document.getElementById('admin-password-confirm').value;
+      const alertBox = document.getElementById('setup-alert');
+      const alertMsg = document.getElementById('alert-message');
+
+      alertBox.style.display = 'none';
+
+      if (!user || !email || !pass || !passConf) {
+        alertMsg.innerText = 'Bitte füllen Sie alle Felder aus.';
+        alertBox.style.display = 'flex';
+        return;
+      }
+
+      if (pass !== passConf) {
+        alertMsg.innerText = 'Die Passwörter stimmen nicht überein.';
+        alertBox.style.display = 'flex';
+        return;
+      }
+
+      if (pass.length < 6) {
+        alertMsg.innerText = 'Das Passwort muss mindestens 6 Zeichen lang sein.';
+        alertBox.style.display = 'flex';
+        return;
+      }
+
+      // Daten für Recap setzen
+      document.getElementById('recap-username').innerText = user;
+      document.getElementById('recap-email').innerText = email;
+
+      nextStep(3);
+    }
+
+    async function runInstallation() {
+      const user = document.getElementById('admin-user').value.trim();
+      const email = document.getElementById('admin-email').value.trim();
+      const pass = document.getElementById('admin-password').value;
+      const alertBox = document.getElementById('setup-alert');
+      const alertMsg = document.getElementById('alert-message');
+      
+      const installBtn = document.getElementById('install-btn');
+      const backBtn = document.getElementById('install-back-btn');
+
+      installBtn.disabled = true;
+      backBtn.disabled = true;
+      installBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Installiere...';
+
+      try {
+        const response = await fetch('/api/setup/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, email: email, password: pass })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Erfolg! Zeige schöne Meldung und leite um
+          document.querySelector('.setup-panel').innerHTML = `
+            <div style="text-align: center; padding: 20px; animation: fadeIn 0.5s ease;">
+              <div style="font-size: 4rem; color: var(--success-color); margin-bottom: 20px;">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <h2 style="font-weight:700; margin-bottom:15px;">Installation erfolgreich!</h2>
+              <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 25px;">
+                Der MSO Cloud Launcher wurde erfolgreich initialisiert. Sie werden in wenigen Sekunden auf die Startseite weitergeleitet.
+              </p>
+              <div style="font-size: 1.5rem; color: var(--accent-color);">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+              </div>
+            </div>
+          `;
+          setTimeout(() => {
+            window.location.href = '/index.html';
+          }, 3000);
+        } else {
+          throw new Error(data.error || 'Fehler bei der Installation');
+        }
+      } catch (err) {
+        alertMsg.innerText = err.message;
+        alertBox.style.display = 'flex';
+        
+        installBtn.disabled = false;
+        backBtn.disabled = false;
+        installBtn.innerHTML = '<i class="fa-solid fa-check"></i> Jetzt Installieren';
+        nextStep(2); // zurück zum Formular
+      }
+    }
+  </script>
+</body>
+</html>

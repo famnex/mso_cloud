@@ -1,0 +1,26 @@
+{
+  "name": "mso-cloud-launcher",
+  "version": "1.0.0",
+  "description": "Modernisiertes Launcher- und Lobby-System für die MSO Cloud",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "update": "node src/updater.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "jsonwebtoken": "^9.0.2",
+    "ldapjs": "^3.0.7",
+    "nodemailer": "^6.9.16"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Antigravity",
+  "license": "MIT"
+}

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>MSO Cloud - Die digitalen Dienste der MSO</title>
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+  <!-- FONTS & ICONS -->
+  <script src="https://kit.fontawesome.com/a974660f94.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-section">
+      <img src="logo.png" class="logo-img" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
+      <span class="logo-text">Die digitalen Dienste der MSO</span>
+    </div>
+    
+    <div class="nav-controls">
+      <!-- Dark/Light Toggle -->
+      <button class="btn-icon" id="theme-toggle" title="Design umschalten">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+
+      <!-- Auth State Section -->
+      <div id="auth-section">
+        <button class="btn btn-primary" onclick="openModal('login-modal')">
+          <i class="fa-solid fa-right-to-bracket"></i> Anmelden
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN MAINVIEW -->
+  <main id="main-view">
+    <div class="jumbotron">
+      <h1 id="jumbo-title">Willkommen im MSO Cloud Portal</h1>
+      <p id="jumbo-desc">Auf dieser Auswahlseite erhalten Sie einen Überblick über die digitalen Dienste der Modellschule Obersberg.</p>
+    </div>
+
+    <!-- TILES GRID -->
+    <div class="tiles-grid" id="tiles-container">
+      <!-- Dynamisch gerenderte Kacheln per app.js -->
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
+        <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: var(--accent-color);"></i>
+        <p style="margin-top: 15px;">Dienste werden geladen...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ADMIN VIEW (Standardmäßig ausgeblendet) -->
+  <main id="admin-view" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+      <div>
+        <h2 style="font-weight:700; font-size:1.8rem; letter-spacing:-0.5px;">Administration</h2>
+        <p style="color:var(--text-secondary); margin-top:5px;">Konfigurieren Sie Dienste, LDAP, SMTP und Benutzer.</p>
+      </div>
+      <button class="btn btn-secondary" onclick="closeAdminView()">
+        <i class="fa-solid fa-arrow-left-long"></i> Zurück zum Portal
+      </button>
+    </div>
+
+    <div class="admin-layout">
+      <!-- Sidebar Tabs -->
+      <div class="admin-sidebar glass-panel">
+        <ul class="admin-nav-list">
+          <li class="admin-nav-item active" onclick="switchTab('tab-tiles', this)">
+            <i class="fa-solid fa-cubes"></i> Dienste (Kacheln)
+          </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-ldap', this)">
+            <i class="fa-solid fa-network-wired"></i> LDAP-Einstellungen
+          </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-smtp', this)">
+            <i class="fa-solid fa-envelope-open-text"></i> E-Mail (SMTP)
+          </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-mapping', this)">
+            <i class="fa-solid fa-diagram-project"></i> LDAP-Mappings
+          </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-users', this)">
+            <i class="fa-solid fa-users-gear"></i> Benutzerverwaltung
+          </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-system', this)">
+            <i class="fa-solid fa-gears"></i> System & Updates
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tab Contents -->
+      <div class="admin-content-panel glass-panel">
+        <div id="admin-alert" class="alert" style="display:none;"></div>
+
+        <!-- TAB: Diente (Kacheln) -->
+        <div class="admin-tab active" id="tab-tiles">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="font-weight:600;">Dienst-Kacheln verwalten</h3>
+            <button class="btn btn-primary" onclick="openTileForm()">
+              <i class="fa-solid fa-plus"></i> Neuer Dienst
+            </button>
+          </div>
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Titel</th>
+                  <th>Beschreibung</th>
+                  <th>Icon</th>
+                  <th>Sichtbarkeit</th>
+                  <th>SSO-Typ</th>
+                  <th>Reihenfolge</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="admin-tiles-table-body">
+                <!-- Dynamisch -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB: LDAP -->
+        <div class="admin-tab" id="tab-ldap">
+          <h3 style="font-weight:600; margin-bottom:20px;">LDAP / Active Directory Anbindung</h3>
+          <form id="ldap-form" onsubmit="saveLdapConfig(event)">
+            <div class="form-group">
+              <label>LDAP-Authentifizierung aktivieren</label>
+              <label class="switch">
+                <input type="checkbox" id="ldap_enabled" value="1">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="ldap_url">LDAP Server-URL</label>
+              <input type="text" id="ldap_url" class="form-control" placeholder="ldap://192.168.1.10:389">
+            </div>
+            <div class="form-group">
+              <label for="ldap_base_dn">Base DN (Suchverzeichnis)</label>
+              <input type="text" id="ldap_base_dn" class="form-control" placeholder="OU=Users,DC=mso-hef,DC=de">
+            </div>
+            <div class="form-group">
+              <label for="ldap_bind_dn">Bind DN (Service Reader Account)</label>
+              <input type="text" id="ldap_bind_dn" class="form-control" placeholder="CN=LdapReader,OU=ServiceAccounts,DC=mso-hef,DC=de">
+            </div>
+            <div class="form-group">
+              <label for="ldap_bind_password">Bind Passwort</label>
+              <input type="password" id="ldap_bind_password" class="form-control" placeholder="Original-Passwort">
+            </div>
+            <div class="form-group">
+              <label for="ldap_user_filter">Benutzer-Suchfilter</label>
+              <input type="text" id="ldap_user_filter" class="form-control" placeholder="(&(objectClass=user)(sAMAccountName={{username}}))">
+            </div>
+            <div style="display:flex; gap:15px; margin-top:30px;">
+              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+              <button type="button" class="btn btn-secondary" onclick="testLdapConnection()"><i class="fa-solid fa-circle-question"></i> Verbindung testen</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB: SMTP -->
+        <div class="admin-tab" id="tab-smtp">
+          <h3 style="font-weight:600; margin-bottom:20px;">E-Mail & SMTP Einstellungen</h3>
+          <form id="smtp-form" onsubmit="saveSmtpConfig(event)">
+            <div class="form-group">
+              <label for="smtp_host">SMTP-Server Hostname</label>
+              <input type="text" id="smtp_host" class="form-control" placeholder="smtp.mso-hef.de">
+            </div>
+            <div class="form-group">
+              <label for="smtp_port">SMTP-Port</label>
+              <input type="number" id="smtp_port" class="form-control" placeholder="587" min="1" max="65535">
+            </div>
+            <div class="form-group">
+              <label>Sichere Verbindung (SSL/TLS auf Port 465)</label>
+              <label class="switch">
+                <input type="checkbox" id="smtp_secure" value="1">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="smtp_user">SMTP-Benutzername (Optional)</label>
+              <input type="text" id="smtp_user" class="form-control" placeholder="Absender-Account">
+            </div>
+            <div class="form-group">
+              <label for="smtp_password">SMTP-Passwort (Optional)</label>
+              <input type="password" id="smtp_password" class="form-control" placeholder="SMTP-Passwort">
+            </div>
+            <div class="form-group">
+              <label for="smtp_from">Absender-E-Mailadresse (Sender From)</label>
+              <input type="email" id="smtp_from" class="form-control" placeholder="no-reply@mso-hef.de">
+            </div>
+            <div style="display:flex; gap:15px; margin-top:30px;">
+              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+              <button type="button" class="btn btn-secondary" onclick="testSmtpConnection()"><i class="fa-solid fa-circle-question"></i> Verbindung testen</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB: MAPPINGS -->
+        <div class="admin-tab" id="tab-mapping">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="font-weight:600;">LDAP Gruppen-Mappings</h3>
+            <button class="btn btn-primary" onclick="openMappingForm()">
+              <i class="fa-solid fa-plus"></i> Neues Mapping
+            </button>
+          </div>
+          <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:20px; line-height:1.5;">
+            Hier weisen Sie Active-Directory/LDAP Gruppen (DNs) lokalen MSO Cloud Sicherheitsgruppen zu. 
+            Meldet sich ein LDAP-User an, erhält er automatisch Zugriff auf Dienste, die für die lokalen Zielgruppen freigegeben sind.
+          </p>
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>LDAP-Gruppe (DN)</th>
+                  <th>Zugeordnete MSO-Gruppe</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="admin-mappings-table-body">
+                <!-- Dynamisch -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB: USERS -->
+        <div class="admin-tab" id="tab-users">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="font-weight:600;">Benutzerverwaltung</h3>
+            <button class="btn btn-primary" onclick="openUserForm()">
+              <i class="fa-solid fa-user-plus"></i> Lokalen Benutzer anlegen
+            </button>
+          </div>
+          <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:20px;">
+            Liste aller lokalen Administratoren, Benutzer sowie gecachten LDAP-Benutzerkonten.
+          </p>
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Benutzername</th>
+                  <th>E-Mail</th>
+                  <th>Typ</th>
+                  <th>Rolle</th>
+                  <th>Gruppen</th>
+                  <th>Erstellt am</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-table-body">
+                <!-- Dynamisch -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB: SYSTEM & UPDATES -->
+        <div class="admin-tab" id="tab-system">
+          <h3 style="font-weight:600; margin-bottom:20px;">Systemwartung & GitHub-Updates</h3>
+          
+          <div class="glass-panel" style="padding: 25px; background: rgba(0,0,0,0.15); margin-bottom: 25px;">
+            <h4 style="font-weight:600; margin-bottom:15px;">System-Informationen</h4>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:0.95rem;">
+              <div><span style="color:var(--text-secondary);">Programmversion:</span> <strong style="color:var(--accent-color);">v1.0.0 (Modernized Edition)</strong></div>
+              <div><span style="color:var(--text-secondary);">Node.js Version:</span> <strong id="info-node-version">-</strong></div>
+              <div><span style="color:var(--text-secondary);">Prozess-Manager:</span> <strong>PM2 (Eco-Mode: Fork)</strong></div>
+              <div><span style="color:var(--text-secondary);">Datenbank-Engine:</span> <strong>SQLite (WAL Mode)</strong></div>
+            </div>
+          </div>
+
+          <div class="glass-panel" style="padding: 25px; border-color: var(--accent-color); background: rgba(46, 139, 250, 0.05);">
+            <h4 style="font-weight:600; margin-bottom:10px;"><i class="fa-brands fa-github"></i> GitHub Auto-Updater</h4>
+            <p style="color:var(--text-secondary); font-size:0.9rem; line-height:1.5; margin-bottom:20px;">
+              Dieser Updater holt automatisch den neuesten Entwicklungsstand aus Ihrem GitHub Repository. 
+              Anschließend werden neue npm-Abhängigkeiten installiert, ausstehende SQL-Datenbankmigrationen ausgeführt und die PM2-Instanz nahtlos neu geladen.
+            </p>
+            <button class="btn btn-primary" id="update-system-btn" onclick="triggerSystemUpdate()">
+              <i class="fa-solid fa-cloud-arrow-down"></i> GitHub-Update ausführen
+            </button>
+            <div id="update-loader" style="display:none; margin-top:20px; align-items:center; gap:15px; color:var(--accent-color);">
+              <i class="fa-solid fa-spinner fa-spin fa-lg"></i>
+              <span>Update läuft im Hintergrund. Die Anwendung startet in Kürze neu...</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: LOGIN -->
+  <div class="modal" id="login-modal">
+    <div class="modal-content glass-panel">
+      <span class="close-btn" onclick="closeModal('login-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px; text-align:center;">Anmelden</h3>
+      
+      <div id="login-alert" class="alert alert-danger" style="display:none;"></div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="login-username">Benutzername oder E-Mail</label>
+          <input type="text" id="login-username" class="form-control" placeholder="Nutzername" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Passwort</label>
+          <input type="password" id="login-password" class="form-control" placeholder="Passwort" required autocomplete="off">
+        </div>
+        
+        <div style="text-align: right; margin-bottom: 20px;">
+          <a href="#" style="font-size:0.8rem; color: var(--accent-color); text-decoration:none;" onclick="openPasswordResetRequest()">Passwort vergessen?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+          <i class="fa-solid fa-right-to-bracket"></i> Einloggen
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PASSWORD RESET REQUEST -->
+  <div class="modal" id="reset-request-modal">
+    <div class="modal-content glass-panel">
+      <span class="close-btn" onclick="closeModal('reset-request-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:15px; text-align:center;">Passwort vergessen</h3>
+      <p style="color:var(--text-secondary); font-size:0.85rem; line-height:1.5; margin-bottom:20px; text-align:center;">
+        Geben Sie die E-Mail-Adresse Ihres lokalen Accounts ein. Wir senden Ihnen einen sicheren Link zum Festlegen eines neuen Passworts.
+      </p>
+
+      <div id="reset-request-alert" class="alert" style="display:none;"></div>
+
+      <form id="reset-request-form" onsubmit="handleResetRequest(event)">
+        <div class="form-group">
+          <label for="reset-email">Ihre E-Mail-Adresse</label>
+          <input type="email" id="reset-email" class="form-control" placeholder="z.B. user@mso-hef.de" required autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:10px;">
+          <i class="fa-solid fa-paper-plane"></i> Reset-Mail senden
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RESET PASSWORD (ACTUAL WORK) -->
+  <div class="modal" id="reset-password-modal">
+    <div class="modal-content glass-panel">
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:15px; text-align:center;">Neues Passwort festlegen</h3>
+      
+      <div id="reset-password-alert" class="alert" style="display:none;"></div>
+
+      <form id="reset-password-form" onsubmit="handlePasswordResetExecute(event)">
+        <input type="hidden" id="reset-token-field">
+        <div class="form-group">
+          <label for="reset-new-password">Neues Passwort</label>
+          <input type="password" id="reset-new-password" class="form-control" placeholder="Minds. 6 Zeichen" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="reset-new-password-confirm">Neues Passwort bestätigen</label>
+          <input type="password" id="reset-new-password-confirm" class="form-control" placeholder="Minds. 6 Zeichen" required autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:10px;">
+          <i class="fa-solid fa-lock-open"></i> Passwort speichern
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE / EDIT TILE (KACHEL) -->
+  <div class="modal" id="tile-modal">
+    <div class="modal-content glass-panel modal-content-large">
+      <span class="close-btn" onclick="closeModal('tile-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:25px;" id="tile-modal-title">Neuer Dienst</h3>
+      
+      <form id="tile-form" onsubmit="saveTileForm(event)">
+        <input type="hidden" id="tile-id-field">
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+          
+          <div>
+            <div class="form-group">
+              <label for="tile_title">Dienst-Name (Titel)</label>
+              <input type="text" id="tile_title" class="form-control" required placeholder="z.B. Moodle">
+            </div>
+
+            <div class="form-group">
+              <label for="tile_description">Beschreibung (Untertitel)</label>
+              <textarea id="tile_description" class="form-control" rows="3" placeholder="Kurzbeschreibung"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="tile_icon">Icon-Klasse (FontAwesome 6)</label>
+              <input type="text" id="tile_icon" class="form-control" required placeholder="z.B. fa-graduation-cap">
+              <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
+                Icons finden Sie auf fontawesome.com. Nutzen Sie Klassen wie `fa-graduation-cap` oder `fa-ticket`.
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label for="tile_link">Ziel-URL (Link)</label>
+              <input type="text" id="tile_link" class="form-control" required placeholder="https://...">
+            </div>
+            
+            <div class="form-group">
+              <label for="tile_sort_order">Sortier-Reihenfolge</label>
+              <input type="number" id="tile_sort_order" class="form-control" value="0">
+            </div>
+          </div>
+
+          <div>
+            <div class="form-group">
+              <label for="tile_visibility">Sichtbarkeit im Portal</label>
+              <select id="tile_visibility" class="form-control" onchange="toggleTileGroupsSelect()">
+                <option value="public">Öffentlich (Für jeden sichtbar)</option>
+                <option value="logged_in">Nur angemeldet (Jeder eingeloggte User)</option>
+                <option value="groups">Sicherheitsgruppen (Nur für ausgewählte Gruppen)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="tile-groups-wrapper" style="display:none;">
+              <label for="tile_groups">Erlaubte lokale Sicherheitsgruppen (Mehrfachauswahl)</label>
+              <input type="text" id="tile_groups" class="form-control" placeholder="z.B. Lehrer, Admin, Schueler">
+              <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
+                Kommagetrennte Liste der lokalen MSO-Gruppen, die Zugriff erhalten sollen.
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label for="tile_sso_type">SSO-Verfahren (Single Sign-On)</label>
+              <select id="tile_sso_type" class="form-control" onchange="toggleTileSsoFields()">
+                <option value="none">Kein SSO (Direkte Weiterleitung)</option>
+                <option value="query">URL-Query Parameter (HMAC Signiert)</option>
+                <option value="jwt">Signed JSON Web Token (JWT Redirect)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="tile-sso-key-wrapper" style="display:none;">
+              <label for="tile_sso_key">SSO Signierschlüssel (Geheimnis)</label>
+              <input type="text" id="tile_sso_key" class="form-control" placeholder="Sicherer kryptographischer Schlüssel">
+              <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
+                Diesen Schlüssel teilen Sie mit dem Zielserver, um die Herkunft der Anmeldung zu verifizieren.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:30px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('tile-modal')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: LDAP MAPPING FORM -->
+  <div class="modal" id="mapping-modal">
+    <div class="modal-content glass-panel">
+      <span class="close-btn" onclick="closeModal('mapping-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px;">Neues LDAP-Mapping</h3>
+      
+      <form id="mapping-form" onsubmit="saveMappingForm(event)">
+        <div class="form-group">
+          <label for="map_ldap_dn">LDAP-Gruppe Distinguished Name (DN)</label>
+          <input type="text" id="map_ldap_dn" class="form-control" required placeholder="CN=Lehrer_MSO,OU=Groups,DC=mso-hef,DC=de">
+        </div>
+        <div class="form-group">
+          <label for="map_local_group">Lokale Zielgruppe</label>
+          <input type="text" id="map_local_group" class="form-control" required placeholder="z.B. Lehrer">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:25px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('mapping-modal')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Hinzufügen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: USER FORM -->
+  <div class="modal" id="user-modal">
+    <div class="modal-content glass-panel">
+      <span class="close-btn" onclick="closeModal('user-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px;" id="user-modal-title">Neuer Benutzer</h3>
+      
+      <form id="user-form" onsubmit="saveUserForm(event)">
+        <input type="hidden" id="user-id-field">
+        
+        <div class="form-group">
+          <label for="user_username">Benutzername</label>
+          <input type="text" id="user_username" class="form-control" required placeholder="Username" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="user_email">E-Mailadresse</label>
+          <input type="email" id="user_email" class="form-control" required placeholder="user@mso-hef.de" autocomplete="off">
+        </div>
+        <div class="form-group" id="user-pass-group">
+          <label for="user_password">Passwort</label>
+          <input type="password" id="user_password" class="form-control" placeholder="Minds. 6 Zeichen" autocomplete="off">
+          <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;" id="user-pass-hint">
+            Lassen Sie das Passwort beim Bearbeiten leer, um es unverändert zu lassen.
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="user_role">Hauptrolle</label>
+          <select id="user_role" class="form-control">
+            <option value="user">Benutzer (Standard)</option>
+            <option value="admin">Administrator</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="user_groups">Sicherheitsgruppen (Kommagetrennt)</label>
+          <input type="text" id="user_groups" class="form-control" placeholder="z.B. Lehrer, Mitarbeiter">
+        </div>
+        
+        <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:25px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('user-modal')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOOLTIP ELEMENT -->
+  <div id="tooltip" class="tooltip-custom"></div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script src="app.js"></script>
+</body>
+</html>
