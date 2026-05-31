@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. URL auf Passwort-Reset-Tokens prüfen
   checkPasswordResetToken();
 
+  // 5. URL auf OAuth-Redirects prüfen
+  checkOauthRedirect();
+
   // Tooltip initialisieren
   initTooltips();
 });
@@ -122,6 +125,11 @@ async function handleLogin(e) {
       closeModal('login-modal');
       // Login-Formular leeren
       document.getElementById('login-form').reset();
+      
+      if (data.oauth_redirect) {
+        window.location.href = 'api/oauth/authorize';
+        return;
+      }
       
       await checkAuthStatus();
       await loadTiles();
@@ -299,6 +307,15 @@ function checkPasswordResetToken() {
   }
 }
 
+function checkOauthRedirect() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('login_redirect') === 'oauth') {
+    if (!currentUser) {
+      openModal('login-modal');
+    }
+  }
+}
+
 function openPasswordResetRequest() {
   closeModal('login-modal');
   openModal('reset-request-modal');
@@ -439,6 +456,8 @@ function loadAdminTabContent(tabId) {
     loadAdminTiles();
   } else if (tabId === 'tab-ldap' || tabId === 'tab-smtp') {
     loadAdminConfig();
+  } else if (tabId === 'tab-oauth') {
+    loadOauthClientConfig();
   } else if (tabId === 'tab-mapping') {
     loadAdminLdapMappings();
   } else if (tabId === 'tab-users') {
@@ -827,6 +846,80 @@ async function testSmtpConnection() {
   } catch (err) {
     showAdminAlert(err.message, 'danger');
   }
+}
+
+/* --- TAB: OAuth 2.0 SSO --- */
+async function loadOauthClientConfig() {
+  try {
+    // 1. Dynamische Endpunkt-URLs im Hinweis-Bereich anzeigen
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+    const fullBaseUrl = `${protocol}//${host}${basePath}`;
+
+    document.getElementById('moodle-oauth-auth-url').innerText = `${fullBaseUrl}/api/oauth/authorize`;
+    document.getElementById('moodle-oauth-token-url').innerText = `${fullBaseUrl}/api/oauth/token`;
+    document.getElementById('moodle-oauth-user-url').innerText = `${fullBaseUrl}/api/oauth/userinfo`;
+
+    // 2. Client-Konfiguration vom Server abfragen
+    const res = await fetch('api/admin/oauth-client');
+    const client = await res.json();
+
+    if (client) {
+      document.getElementById('oauth_client_id').value = client.client_id || '';
+      document.getElementById('oauth_client_secret').value = client.client_secret || '';
+      document.getElementById('oauth_redirect_uri').value = client.redirect_uri || '';
+    }
+  } catch (err) {
+    showAdminAlert('OAuth 2.0-Konfiguration konnte nicht geladen werden: ' + err.message, 'danger');
+  }
+}
+
+async function saveOauthClientConfig(e) {
+  e.preventDefault();
+  const body = {
+    client_id: document.getElementById('oauth_client_id').value.trim(),
+    client_secret: document.getElementById('oauth_client_secret').value.trim(),
+    redirect_uri: document.getElementById('oauth_redirect_uri').value.trim()
+  };
+
+  try {
+    const res = await fetch('api/admin/oauth-client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAdminAlert(data.message, 'success');
+      loadOauthClientConfig();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+function generateOauthClientId() {
+  document.getElementById('oauth_client_id').value = 'moodle_' + Math.random().toString(36).substring(2, 10);
+}
+
+function generateOauthClientSecret() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let key = '';
+  if (window.crypto && window.crypto.getRandomValues) {
+    const array = new Uint32Array(32);
+    window.crypto.getRandomValues(array);
+    for (let i = 0; i < 32; i++) {
+      key += chars[array[i] % chars.length];
+    }
+  } else {
+    for (let i = 0; i < 32; i++) {
+      key += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+  }
+  document.getElementById('oauth_client_secret').value = key;
 }
 
 /* --- TAB: LDAP Mappings --- */

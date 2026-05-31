@@ -128,6 +128,45 @@ router.post('/config/test-smtp', async (req, res) => {
   }
 });
 
+/* ==========================================================================
+   1b. OAuth 2.0 Client Konfiguration
+   ========================================================================== */
+
+/**
+ * Holt die aktuellen Moodle OAuth-Client Zugangsdaten.
+ */
+router.get('/oauth-client', (req, res) => {
+  try {
+    const client = db.prepare("SELECT * FROM oauth_clients WHERE client_name = 'Moodle'").get();
+    res.json(client || null);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Speichert die OAuth-Client Zugangsdaten.
+ */
+router.post('/oauth-client', (req, res) => {
+  try {
+    const { client_id, client_secret, redirect_uri } = req.body;
+
+    if (!client_id || !client_secret || !redirect_uri) {
+      return res.status(400).json({ error: 'Client-ID, Client-Secret und Redirect-URI sind Pflichtfelder.' });
+    }
+
+    db.prepare(`
+      UPDATE oauth_clients
+      SET client_id = ?, client_secret = ?, redirect_uri = ?
+      WHERE client_name = 'Moodle'
+    `).run(client_id.trim(), client_secret.trim(), redirect_uri.trim());
+
+    res.json({ success: true, message: 'OAuth 2.0 SSO Konfiguration erfolgreich aktualisiert.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 /* ==========================================================================
    2. Kacheln (Tiles)

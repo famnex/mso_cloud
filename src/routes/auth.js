@@ -44,7 +44,8 @@ router.post('/login', async (req, res) => {
           groups: groups,
           isLdap: false
         };
-        return res.json({ success: true, user: req.session.user });
+        const isOauth = !!req.session.oauthQuery;
+        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
       }
     }
 
@@ -95,7 +96,8 @@ router.post('/login', async (req, res) => {
           isLdap: true
         };
 
-        return res.json({ success: true, user: req.session.user });
+        const isOauth = !!req.session.oauthQuery;
+        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
       }
     }
 

@@ -87,6 +87,48 @@ Speichert zeitlich begrenzte Sicherheits-Tokens für lokale Passwort-Resets.
 
 ---
 
+### Tabelle: `oauth_clients`
+Speichert alle registrierten OAuth 2.0 Clients (z. B. Moodle).
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
+| `client_name` | TEXT | Anzeigename des Clients (z. B. 'Moodle') |
+| `client_id` | TEXT (UNIQUE) | Eindeutige Client-ID für das SSO |
+| `client_secret` | TEXT | Geheimer Registrierungsschlüssel für den Token-Austausch |
+| `redirect_uri` | TEXT | Die erlaubte Redirect-URI (Callback-URL) des Clients |
+| `created_at` | DATETIME | Registrierungszeitpunkt |
+
+---
+
+### Tabelle: `oauth_codes`
+Verwaltet temporäre, einweg-verwendbare Authorization Codes.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
+| `code` | TEXT (UNIQUE) | 32-stelliger Authorization Code |
+| `user_id` | INTEGER (FK) | Verweis auf den autorisierten Benutzer (`users.id`) |
+| `client_id` | TEXT | Verweis auf den anfordernden Client |
+| `redirect_uri` | TEXT | Callback-URL (muss mit der Client-URI übereinstimmen) |
+| `expires_at` | DATETIME | Ablaufzeitpunkt (10 Minuten ab Generierung) |
+| `used` | INTEGER | Flag zur einmaligen Verwendung (`0` = aktiv, `1` = verbraucht) |
+
+---
+
+### Tabelle: `oauth_tokens`
+Speichert generierte Access Tokens (Bearer) für API-Zugriffe (z. B. /userinfo).
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
+| `access_token` | TEXT (UNIQUE) | 64-stelliges zufälliges Bearer Access Token |
+| `user_id` | INTEGER (FK) | Verweis auf den Benutzer (`users.id`) |
+| `client_id` | TEXT | Verweis auf den Client |
+| `expires_at` | DATETIME | Ablaufzeitpunkt (1 Stunde ab Generierung) |
+
+---
+
 ### Tabelle: `applied_migrations`
 Erfasst alle erfolgreich importierten Datenbank-Migrationsdateien.
 

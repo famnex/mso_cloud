@@ -76,6 +76,9 @@
           <li class="admin-nav-item" onclick="switchTab('tab-smtp', this)">
             <i class="fa-solid fa-envelope-open-text"></i> E-Mail (SMTP)
           </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-oauth', this)">
+            <i class="fa-solid fa-shield-halved"></i> OAuth 2.0 SSO
+          </li>
           <li class="admin-nav-item" onclick="switchTab('tab-mapping', this)">
             <i class="fa-solid fa-diagram-project"></i> LDAP-Mappings
           </li>
@@ -240,6 +243,69 @@
             <div style="display:flex; gap:15px; margin-top:30px;">
               <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
               <button type="button" class="btn btn-secondary" onclick="testSmtpConnection()"><i class="fa-solid fa-circle-question"></i> Verbindung testen</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB: OAUTH -->
+        <div class="admin-tab" id="tab-oauth">
+          <h3 style="font-weight:600; margin-bottom:10px;">OAuth 2.0 / OpenID Connect SSO</h3>
+          <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:25px;">
+            Richten Sie MSO Cloud als Identity Provider (IdP) ein, damit Moodle und andere Dienste sich über MSO Cloud per Single Sign-On authentifizieren können.
+          </p>
+
+          <form id="oauth-client-form" onsubmit="saveOauthClientConfig(event)">
+            <div class="form-group">
+              <label for="oauth_client_id" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <span>OAuth 2.0 Client-ID</span>
+                <button type="button" class="btn btn-secondary" onclick="generateOauthClientId()" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Generieren</button>
+              </label>
+              <input type="text" id="oauth_client_id" class="form-control" required placeholder="z. B. moodle_client">
+            </div>
+
+            <div class="form-group">
+              <label for="oauth_client_secret" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <span>OAuth 2.0 Client-Secret (Geheimnis)</span>
+                <button type="button" class="btn btn-secondary" onclick="generateOauthClientSecret()" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px;"><i class="fa-solid fa-key"></i> Generieren</button>
+              </label>
+              <input type="text" id="oauth_client_secret" class="form-control" required placeholder="Sicheres Client-Geheimnis">
+            </div>
+
+            <div class="form-group">
+              <label for="oauth_redirect_uri">Erlaubte Redirect-URI (Callback-URL)</label>
+              <input type="url" id="oauth_redirect_uri" class="form-control" required placeholder="https://cloud.mso-hef.de/moodle/admin/oauth2callback.php">
+              <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
+                Kopieren Sie die Redirect-URI / Callback-URL aus den Moodle-OAuth2-Diensteinstellungen hier hinein.
+              </p>
+            </div>
+
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-top: 25px; margin-bottom: 25px;">
+              <h4 style="font-weight:600; font-size:0.95rem; margin-bottom:10px; color:var(--accent-color);"><i class="fa-solid fa-circle-info"></i> Moodle OAuth 2.0 Konfigurationseinstellungen</h4>
+              <p style="font-size:0.8rem; line-height:1.4; color:var(--text-secondary); margin-bottom:10px;">
+                Tragen Sie in Moodle unter <em>Website-Administration -> Server -> OAuth 2-Dienste</em> einen neuen <strong>benutzerdefinierten Dienst</strong> mit folgenden URLs ein:
+              </p>
+              <table style="width:100%; font-size:0.8rem; border-collapse:collapse; color:var(--text-secondary);">
+                <tr>
+                  <td style="padding:4px 0; font-weight:600; width:180px;">Authorization Endpoint:</td>
+                  <td style="padding:4px 0;"><code id="moodle-oauth-auth-url">https://cloud.mso-hef.de/novus/api/oauth/authorize</code></td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0; font-weight:600;">Token Endpoint:</td>
+                  <td style="padding:4px 0;"><code id="moodle-oauth-token-url">https://cloud.mso-hef.de/novus/api/oauth/token</code></td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0; font-weight:600;">Userinfo Endpoint:</td>
+                  <td style="padding:4px 0;"><code id="moodle-oauth-user-url">https://cloud.mso-hef.de/novus/api/oauth/userinfo</code></td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 0; font-weight:600;">Scopes:</td>
+                  <td style="padding:4px 0;"><code>openid profile email</code></td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="display:flex; gap:15px; margin-top:30px;">
+              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
             </div>
           </form>
         </div>
