@@ -597,19 +597,25 @@ async function loadAdminConfig() {
 
     // LDAP Felder
     document.getElementById('ldap_enabled').checked = cfg.ldap_enabled === '1';
-    document.getElementById('ldap_url').value = cfg.ldap_url;
-    document.getElementById('ldap_base_dn').value = cfg.ldap_base_dn;
-    document.getElementById('ldap_bind_dn').value = cfg.ldap_bind_dn;
-    document.getElementById('ldap_bind_password').value = cfg.ldap_bind_password;
-    document.getElementById('ldap_user_filter').value = cfg.ldap_user_filter;
+    document.getElementById('ldap_url').value = cfg.ldap_url || '';
+    document.getElementById('ldap_port').value = cfg.ldap_port || '389';
+    document.getElementById('ldap_secure').checked = cfg.ldap_secure === '1';
+    document.getElementById('ldap_tls_verify').checked = cfg.ldap_tls_verify === '1';
+    document.getElementById('ldap_base_dn').value = cfg.ldap_base_dn || '';
+    document.getElementById('ldap_bind_dn').value = cfg.ldap_bind_dn || '';
+    document.getElementById('ldap_bind_password').value = cfg.ldap_bind_password || '';
+    document.getElementById('ldap_user_attribute').value = cfg.ldap_user_attribute || 'sAMAccountName';
+    document.getElementById('ldap_mail_attribute').value = cfg.ldap_mail_attribute || 'mail';
+    document.getElementById('ldap_name_attribute').value = cfg.ldap_name_attribute || 'displayName';
+    document.getElementById('ldap_upn_suffix').value = cfg.ldap_upn_suffix || '';
 
     // SMTP Felder
-    document.getElementById('smtp_host').value = cfg.smtp_host;
-    document.getElementById('smtp_port').value = cfg.smtp_port;
+    document.getElementById('smtp_host').value = cfg.smtp_host || '';
+    document.getElementById('smtp_port').value = cfg.smtp_port || '587';
     document.getElementById('smtp_secure').checked = cfg.smtp_secure === '1';
-    document.getElementById('smtp_user').value = cfg.smtp_user;
-    document.getElementById('smtp_password').value = cfg.smtp_password;
-    document.getElementById('smtp_from').value = cfg.smtp_from;
+    document.getElementById('smtp_user').value = cfg.smtp_user || '';
+    document.getElementById('smtp_password').value = cfg.smtp_password || '';
+    document.getElementById('smtp_from').value = cfg.smtp_from || 'no-reply@mso-hef.de';
 
   } catch (err) {
     showAdminAlert('Konfiguration konnte nicht geladen werden.', 'danger');
@@ -621,10 +627,16 @@ async function saveLdapConfig(e) {
   const body = {
     ldap_enabled: document.getElementById('ldap_enabled').checked ? '1' : '0',
     ldap_url: document.getElementById('ldap_url').value.trim(),
+    ldap_port: document.getElementById('ldap_port').value,
+    ldap_secure: document.getElementById('ldap_secure').checked ? '1' : '0',
+    ldap_tls_verify: document.getElementById('ldap_tls_verify').checked ? '1' : '0',
     ldap_base_dn: document.getElementById('ldap_base_dn').value.trim(),
     ldap_bind_dn: document.getElementById('ldap_bind_dn').value.trim(),
     ldap_bind_password: document.getElementById('ldap_bind_password').value,
-    ldap_user_filter: document.getElementById('ldap_user_filter').value.trim()
+    ldap_user_attribute: document.getElementById('ldap_user_attribute').value.trim(),
+    ldap_mail_attribute: document.getElementById('ldap_mail_attribute').value.trim(),
+    ldap_name_attribute: document.getElementById('ldap_name_attribute').value.trim(),
+    ldap_upn_suffix: document.getElementById('ldap_upn_suffix').value.trim()
   };
 
   try {
@@ -644,6 +656,9 @@ async function saveLdapConfig(e) {
 async function testLdapConnection() {
   const body = {
     ldap_url: document.getElementById('ldap_url').value.trim(),
+    ldap_port: document.getElementById('ldap_port').value,
+    ldap_secure: document.getElementById('ldap_secure').checked ? '1' : '0',
+    ldap_tls_verify: document.getElementById('ldap_tls_verify').checked ? '1' : '0',
     ldap_base_dn: document.getElementById('ldap_base_dn').value.trim(),
     ldap_bind_dn: document.getElementById('ldap_bind_dn').value.trim(),
     ldap_bind_password: document.getElementById('ldap_bind_password').value

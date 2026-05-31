@@ -2,27 +2,36 @@ const ldap = require('ldapjs');
 const { db, getConfig } = require('./db');
 
 /**
- * Erstellt einen LDAP-Client basierend auf den aktuellen Datenbank-Konfigurationen.
+ * Erstellt einen LDAP-Client basierend auf den detaillierten Datenbank-Konfigurationen.
  */
-function createLdapClient() {
-  const url = getConfig('ldap_url');
-  if (!url) {
-    throw new Error('LDAP-URL ist nicht konfiguriert.');
+function createLdapClient(overrideConfig = null) {
+  // Erlaubt das Testen mit ungespeicherten Werten
+  const host = overrideConfig ? overrideConfig.ldap_url : getConfig('ldap_url', '127.0.0.1');
+  const port = overrideConfig ? overrideConfig.ldap_port : getConfig('ldap_port', '389');
+  const secure = overrideConfig ? (overrideConfig.ldap_secure === '1') : (getConfig('ldap_secure') === '1');
+  const tlsVerify = overrideConfig ? (overrideConfig.ldap_tls_verify === '1') : (getConfig('ldap_tls_verify') === '1');
+
+  if (!host) {
+    throw new Error('LDAP-Server Host/URL ist nicht konfiguriert.');
   }
 
-  // Wichtig bei Active Directory: Option, Verbindungs-Timeouts zu handhaben
+  const proto = secure ? 'ldaps://' : 'ldap://';
+  const fullUrl = `${proto}${host}:${port}`;
+
+  console.log(`Verbinde mit LDAP unter: ${fullUrl} (Secure: ${secure}, Verify Cert: ${tlsVerify})`);
+
   return ldap.createClient({
-    url: url,
+    url: fullUrl,
     timeout: 5000,
-    connectTimeout: 5000
+    connectTimeout: 5000,
+    tlsOptions: {
+      rejectUnauthorized: tlsVerify // Verifiziert das SSL-Zertifikat nur, wenn gewünscht (wichtig bei selbstsignierten DCs!)
+    }
   });
 }
 
 /**
  * Führt eine LDAP-Authentifizierung durch und gibt das Benutzerprofil sowie Gruppen zurück.
- * @param {string} username Benutzername
- * @param {string} password Passwort
- * @returns {Promise<{username: string, email: string, roles: string[], name: string}|null>}
  */
 async function authenticate(username, password) {
   const enabled = getConfig('ldap_enabled') === '1';
@@ -34,9 +43,19 @@ async function authenticate(username, password) {
   const bindDn = getConfig('ldap_bind_dn');
   const bindPassword = getConfig('ldap_bind_password');
   const baseDn = getConfig('ldap_base_dn');
-  const userFilterTpl = getConfig('ldap_user_filter', '(&(objectClass=user)(sAMAccountName={{username}}))');
+  const userAttr = getConfig('ldap_user_attribute', 'sAMAccountName');
+  const mailAttr = getConfig('ldap_mail_attribute', 'mail');
+  const nameAttr = getConfig('ldap_name_attribute', 'displayName');
+  const upnSuffix = getConfig('ldap_upn_suffix', '');
 
-  const userFilter = userFilterTpl.replace('{{username}}', username);
+  // Loginname anpassen, falls UPN-Suffix konfiguriert ist
+  let loginUser = username;
+  if (upnSuffix && !username.includes('@')) {
+    loginUser = username + upnSuffix;
+  }
+
+  // Suchfilter zusammensetzen
+  const userFilter = `(&(objectClass=user)(${userAttr}=${username}))`;
 
   return new Promise((resolve, reject) => {
     let client;
@@ -48,7 +67,6 @@ async function authenticate(username, password) {
 
     client.on('error', (err) => {
       console.error('LDAP Client-Fehler:', err);
-      // Nicht direkt rejecten, falls wir uns im Suchprozess befinden
     });
 
     // 1. Mit Service-Account (Reader) binden, um den User zu suchen
@@ -61,7 +79,7 @@ async function authenticate(username, password) {
       const opts = {
         filter: userFilter,
         scope: 'sub',
-        attributes: ['dn', 'mail', 'cn', 'memberOf', 'displayName']
+        attributes: ['dn', mailAttr, nameAttr, 'memberOf', 'cn']
       };
 
       let userEntry = null;
@@ -98,8 +116,8 @@ async function authenticate(username, password) {
             }
 
             // Bind war erfolgreich! LDAP-Benutzerdaten sammeln
-            const email = userEntry.mail || '';
-            const displayName = userEntry.displayName || userEntry.cn || username;
+            const email = userEntry[mailAttr] || '';
+            const displayName = userEntry[nameAttr] || userEntry.cn || username;
             
             // Gruppen verarbeiten (LDAP gibt Gruppen als String oder Array zurück)
             let memberOf = userEntry.memberOf || [];
@@ -127,8 +145,6 @@ async function authenticate(username, password) {
 
 /**
  * Gleicht die LDAP-Gruppen-DNs mit den in der SQLite-Datenbank konfigurierten Mappings ab.
- * @param {string[]} ldapGroups Array von Gruppen-DNs
- * @returns {string[]} Liste lokaler Gruppen
  */
 function mapLdapGroupsToLocal(ldapGroups) {
   if (!ldapGroups || ldapGroups.length === 0) return [];
@@ -138,8 +154,6 @@ function mapLdapGroupsToLocal(ldapGroups) {
     const assignedLocalGroups = new Set();
 
     for (const mapping of mappings) {
-      // Prüfen, ob die LDAP-Gruppe des Nutzers mit dem Mapping übereinstimmt
-      // Case-Insensitive Vergleich
       const match = ldapGroups.some(group => 
         group.toLowerCase() === mapping.ldap_group_dn.toLowerCase() ||
         group.toLowerCase().includes(mapping.ldap_group_dn.toLowerCase())
@@ -158,18 +172,13 @@ function mapLdapGroupsToLocal(ldapGroups) {
 }
 
 /**
- * Testet die LDAP-Verbindung mit den angegebenen Verbindungsparametern.
- * Hilfreich für das Admin-Backend!
+ * Testet die LDAP-Verbindung live mit den angegebenen Verbindungsparametern.
  */
 async function testConnection(config) {
   return new Promise((resolve, reject) => {
     let client;
     try {
-      client = ldap.createClient({
-        url: config.ldap_url,
-        timeout: 5000,
-        connectTimeout: 5000
-      });
+      client = createLdapClient(config);
     } catch (err) {
       return reject(new Error('Client-Erstellung fehlgeschlagen: ' + err.message));
     }

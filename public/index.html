@@ -123,34 +123,82 @@
         <div class="admin-tab" id="tab-ldap">
           <h3 style="font-weight:600; margin-bottom:20px;">LDAP / Active Directory Anbindung</h3>
           <form id="ldap-form" onsubmit="saveLdapConfig(event)">
-            <div class="form-group">
+            
+            <div class="form-group" style="margin-bottom:25px;">
               <label>LDAP-Authentifizierung aktivieren</label>
               <label class="switch">
                 <input type="checkbox" id="ldap_enabled" value="1">
                 <span class="slider"></span>
               </label>
             </div>
+
             <div class="form-group">
-              <label for="ldap_url">LDAP Server-URL</label>
-              <input type="text" id="ldap_url" class="form-control" placeholder="ldap://192.168.1.10:389">
+              <label for="ldap_url">LDAP Server-URL (Host / IP) *</label>
+              <input type="text" id="ldap_url" class="form-control" placeholder="z.B. 10.37.128.41" required>
             </div>
-            <div class="form-group">
-              <label for="ldap_base_dn">Base DN (Suchverzeichnis)</label>
-              <input type="text" id="ldap_base_dn" class="form-control" placeholder="OU=Users,DC=mso-hef,DC=de">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+              <div class="form-group">
+                <label for="ldap_port">Port *</label>
+                <input type="number" id="ldap_port" class="form-control" value="389" min="1" max="65535" required>
+              </div>
+              <div style="display:flex; flex-direction:column; justify-content:center; gap:10px;">
+                <label style="display:flex; align-items:center; gap:10px; font-size:0.85rem; font-weight:600; cursor:pointer;">
+                  <input type="checkbox" id="ldap_secure" value="1" style="width:16px; height:16px;"> SSL/TLS verwenden
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; font-size:0.85rem; font-weight:600; cursor:pointer;">
+                  <input type="checkbox" id="ldap_tls_verify" value="1" style="width:16px; height:16px;"> SSL Zertifikat überprüfen
+                </label>
+              </div>
             </div>
+
+            <h4 style="font-weight:600; border-bottom:1px solid var(--panel-border); padding-bottom:8px; margin-bottom:15px; margin-top:30px; font-size:1.1rem; color:var(--accent-color);">Bind-Einstellungen</h4>
+
             <div class="form-group">
-              <label for="ldap_bind_dn">Bind DN (Service Reader Account)</label>
-              <input type="text" id="ldap_bind_dn" class="form-control" placeholder="CN=LdapReader,OU=ServiceAccounts,DC=mso-hef,DC=de">
+              <label for="ldap_bind_dn">Bind DN (Benutzer zum Suchen) *</label>
+              <input type="text" id="ldap_bind_dn" class="form-control" placeholder="CN=Administrator,CN=Users,DC=mso,DC=local" required>
             </div>
+
             <div class="form-group">
-              <label for="ldap_bind_password">Bind Passwort</label>
+              <label for="ldap_bind_password">Bind Passwort *</label>
               <input type="password" id="ldap_bind_password" class="form-control" placeholder="Original-Passwort">
             </div>
+
+            <h4 style="font-weight:600; border-bottom:1px solid var(--panel-border); padding-bottom:8px; margin-bottom:15px; margin-top:30px; font-size:1.1rem; color:var(--accent-color);">Such- & Zuordnungs-Einstellungen</h4>
+
             <div class="form-group">
-              <label for="ldap_user_filter">Benutzer-Suchfilter</label>
-              <input type="text" id="ldap_user_filter" class="form-control" placeholder="(&(objectClass=user)(sAMAccountName={{username}}))">
+              <label for="ldap_base_dn">Search Base (Wo suchen?) *</label>
+              <input type="text" id="ldap_base_dn" class="form-control" placeholder="ou=mso,dc=mso,dc=local" required>
             </div>
-            <div style="display:flex; gap:15px; margin-top:30px;">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div class="form-group">
+                <label for="ldap_user_attribute">Benutzer-Attribut (Login Name) *</label>
+                <input type="text" id="ldap_user_attribute" class="form-control" value="sAMAccountName" required>
+              </div>
+              <div class="form-group">
+                <label for="ldap_mail_attribute">E-Mail-Attribut *</label>
+                <input type="text" id="ldap_mail_attribute" class="form-control" value="mail" required>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div class="form-group">
+                <label for="ldap_name_attribute">Anzeigenamen-Attribut *</label>
+                <input type="text" id="ldap_name_attribute" class="form-control" value="displayName" required>
+              </div>
+              <div class="form-group">
+                <label for="ldap_upn_suffix">UPN Suffix (Optional, z.B. @schule.local)</label>
+                <input type="text" id="ldap_upn_suffix" class="form-control" placeholder="z.B. @mso-hef.de">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="ldap_group_filter">Gruppen-Filter (Optional)</label>
+              <input type="text" id="ldap_group_filter" class="form-control" placeholder="z.B. (memberOf=CN=Lehrer,...)">
+            </div>
+
+            <div style="display:flex; gap:15px; margin-top:35px;">
               <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
               <button type="button" class="btn btn-secondary" onclick="testLdapConnection()"><i class="fa-solid fa-circle-question"></i> Verbindung testen</button>
             </div>

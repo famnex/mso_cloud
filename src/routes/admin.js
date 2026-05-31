@@ -33,10 +33,16 @@ router.get('/config', (req, res) => {
     const config = {
       ldap_enabled: getConfig('ldap_enabled', '0'),
       ldap_url: getConfig('ldap_url', ''),
+      ldap_port: getConfig('ldap_port', '389'),
+      ldap_secure: getConfig('ldap_secure', '0'),
+      ldap_tls_verify: getConfig('ldap_tls_verify', '0'),
       ldap_base_dn: getConfig('ldap_base_dn', ''),
       ldap_bind_dn: getConfig('ldap_bind_dn', ''),
       ldap_bind_password: getConfig('ldap_bind_password') ? '********' : '',
-      ldap_user_filter: getConfig('ldap_user_filter', '(&(objectClass=user)(sAMAccountName={{username}}))'),
+      ldap_user_attribute: getConfig('ldap_user_attribute', 'sAMAccountName'),
+      ldap_mail_attribute: getConfig('ldap_mail_attribute', 'mail'),
+      ldap_name_attribute: getConfig('ldap_name_attribute', 'displayName'),
+      ldap_upn_suffix: getConfig('ldap_upn_suffix', ''),
       
       smtp_host: getConfig('smtp_host', ''),
       smtp_port: getConfig('smtp_port', '587'),
@@ -58,7 +64,9 @@ router.get('/config', (req, res) => {
 router.post('/config', (req, res) => {
   try {
     const keys = [
-      'ldap_enabled', 'ldap_url', 'ldap_base_dn', 'ldap_bind_dn', 'ldap_user_filter',
+      'ldap_enabled', 'ldap_url', 'ldap_port', 'ldap_secure', 'ldap_tls_verify',
+      'ldap_base_dn', 'ldap_bind_dn', 'ldap_user_attribute', 'ldap_mail_attribute', 
+      'ldap_name_attribute', 'ldap_upn_suffix',
       'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from'
     ];
 
