@@ -144,7 +144,17 @@ async function authenticate(username, password) {
 }
 
 /**
+ * Hilfsfunktion zur Extraktion des Common Name (CN) aus einem Distinguished Name (DN).
+ * Z.B. "CN=Lehrer,OU=Groups,DC=mso,DC=local" -> "Lehrer"
+ */
+function getCNfromDN(dn) {
+  const match = dn.match(/cn=([^,]+)/i);
+  return match ? match[1].trim() : dn;
+}
+
+/**
  * Gleicht die LDAP-Gruppen-DNs mit den in der SQLite-Datenbank konfigurierten Mappings ab.
+ * Unterstützt sowohl die Eingabe vollständiger DNs als auch einfacher Gruppennamen (CN)!
  */
 function mapLdapGroupsToLocal(ldapGroups) {
   if (!ldapGroups || ldapGroups.length === 0) return [];
@@ -154,10 +164,17 @@ function mapLdapGroupsToLocal(ldapGroups) {
     const assignedLocalGroups = new Set();
 
     for (const mapping of mappings) {
-      const match = ldapGroups.some(group => 
-        group.toLowerCase() === mapping.ldap_group_dn.toLowerCase() ||
-        group.toLowerCase().includes(mapping.ldap_group_dn.toLowerCase())
-      );
+      const match = ldapGroups.some(group => {
+        const groupDN = group.toLowerCase();
+        const mappingDN = mapping.ldap_group_dn.toLowerCase();
+        
+        // 1. Exakter Treffer (falls der Nutzer den vollen DN hinterlegt hat)
+        if (groupDN === mappingDN) return true;
+        
+        // 2. CN extrahieren und vergleichen (erlaubt einfache Namen wie "Lehrer" statt vollem DN)
+        const cn = getCNfromDN(group).toLowerCase();
+        return cn === mappingDN;
+      });
 
       if (match) {
         assignedLocalGroups.add(mapping.local_group);
