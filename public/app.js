@@ -913,6 +913,7 @@ async function loadAdminUsers() {
         <td style="font-size:0.8rem; color:var(--text-secondary);">${new Date(user.created_at).toLocaleDateString('de-DE')}</td>
         <td class="actions-cell">
           <button class="btn btn-secondary btn-icon" onclick="openUserForm(${JSON.stringify(user).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-user-pen"></i></button>
+          ${user.is_ldap === 1 ? `<button class="btn btn-secondary btn-icon" onclick="syncLdapGroups(${user.id})" title="LDAP-Gruppen neu laden" style="color: var(--warn-color);"><i class="fa-solid fa-arrows-rotate"></i></button>` : ''}
           <button class="btn btn-danger btn-icon" onclick="deleteUser(${user.id})" title="Löschen" ${currentUser.id === user.id ? 'disabled' : ''}><i class="fa-solid fa-user-xmark"></i></button>
         </td>
       `;
@@ -928,25 +929,36 @@ function openUserForm(user = null) {
   document.getElementById('user-id-field').value = '';
   document.getElementById('user-modal-title').innerText = 'Neuer Benutzer';
   
-  // Passwortfeld standardmäßig erforderlich machen
+  // Standardmäßig alle Felder aktivieren
+  document.getElementById('user_username').disabled = false;
+  document.getElementById('user_email').disabled = false;
+  document.getElementById('user_password').disabled = false;
+  document.getElementById('user_groups').disabled = false;
+  
   document.getElementById('user_password').required = true;
   document.getElementById('user-pass-hint').style.display = 'none';
+  document.getElementById('user-pass-hint').innerText = 'Leer lassen, um das Passwort nicht zu ändern.';
 
   if (user) {
     document.getElementById('user-id-field').value = user.id;
     document.getElementById('user-modal-title').innerText = 'Benutzer bearbeiten';
     
     document.getElementById('user_username').value = user.username;
-    document.getElementById('user_username').disabled = true; // Username nicht editierbar
+    document.getElementById('user_username').disabled = true;
     document.getElementById('user_email').value = user.email || '';
     document.getElementById('user_role').value = user.role;
     document.getElementById('user_groups').value = (user.groups || []).join(', ');
     
-    // Passwort optional machen beim Editieren
     document.getElementById('user_password').required = false;
     document.getElementById('user-pass-hint').style.display = 'block';
-  } else {
-    document.getElementById('user_username').disabled = false;
+
+    if (user.is_ldap === 1) {
+      // LDAP-Benutzer: Nur Rolle ist editierbar!
+      document.getElementById('user_email').disabled = true;
+      document.getElementById('user_password').disabled = true;
+      document.getElementById('user_groups').disabled = true;
+      document.getElementById('user-pass-hint').innerText = 'LDAP-Benutzer: E-Mail, Passwort und Gruppen werden vom LDAP-Server bezogen.';
+    }
   }
 
   openModal('user-modal');
@@ -987,6 +999,29 @@ async function saveUserForm(e) {
     }
   } catch (err) {
     alert(err.message);
+  }
+}
+
+async function syncLdapGroups(userId) {
+  try {
+    const btn = document.querySelector(`button[onclick="syncLdapGroups(${userId})"]`);
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+      btn.disabled = true;
+    }
+
+    const res = await fetch(`api/admin/users/${userId}/sync-ldap`, { method: 'POST' });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAdminAlert('LDAP-Sicherheitsgruppen erfolgreich aktualisiert.');
+      loadAdminUsers();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    alert('Fehler beim Synchronisieren: ' + err.message);
+    loadAdminUsers();
   }
 }
 

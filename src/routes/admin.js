@@ -347,6 +347,21 @@ router.put('/users/:id', (req, res) => {
     const { id } = req.params;
     const { email, role, groups, password } = req.body;
 
+    const user = db.prepare('SELECT is_ldap FROM users WHERE id = ?').get(id);
+    if (!user) {
+      return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    }
+
+    if (user.is_ldap === 1) {
+      // WICHTIG: LDAP-Benutzer sind nicht frei bearbeitbar. Nur die Rolle (Hauptrolle) darf geändert werden!
+      if (!role) {
+        return res.status(400).json({ error: 'Rolle ist erforderlich.' });
+      }
+      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+      return res.json({ success: true, message: 'Rolle des LDAP-Benutzers erfolgreich aktualisiert.' });
+    }
+
+    // Lokaler Benutzer: Normaler Ablauf
     if (!email || !role) {
       return res.status(400).json({ error: 'E-Mail und Rolle sind erforderlich.' });
     }
@@ -372,6 +387,35 @@ router.put('/users/:id', (req, res) => {
     res.json({ success: true, message: 'Benutzer erfolgreich aktualisiert.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Synchronisiert die Gruppen eines LDAP-Benutzers manuell aus dem LDAP.
+ */
+router.post('/users/:id/sync-ldap', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = db.prepare('SELECT username, is_ldap FROM users WHERE id = ?').get(id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    }
+
+    if (user.is_ldap !== 1) {
+      return res.status(400).json({ error: 'Nur LDAP-Benutzer können synchronisiert werden.' });
+    }
+
+    // Gruppen vom LDAP-Server abfragen und mappen
+    const localGroups = await ldap.syncUserGroups(user.username);
+    const groupsJson = JSON.stringify(localGroups);
+
+    // In der lokalen DB speichern
+    db.prepare('UPDATE users SET groups = ? WHERE id = ?').run(groupsJson, id);
+
+    res.json({ success: true, message: 'LDAP-Gruppen erfolgreich synchronisiert.', groups: localGroups });
+  } catch (error) {
+    res.status(500).json({ error: 'LDAP-Gruppen-Sync fehlgeschlagen: ' + error.message });
   }
 });
 

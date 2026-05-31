@@ -232,7 +232,98 @@ async function testConnection(config) {
   });
 }
 
+/**
+ * Holt die aktuellen LDAP-Gruppen eines Benutzers und map-t diese auf lokale Gruppen.
+ * Verwendet den Reader-Account (kein User-Passwort erforderlich).
+ */
+async function syncUserGroups(username) {
+  const enabled = getConfig('ldap_enabled') === '1';
+  if (!enabled) {
+    throw new Error('LDAP ist in den Einstellungen deaktiviert.');
+  }
+
+  const bindDn = getConfig('ldap_bind_dn');
+  const bindPassword = getConfig('ldap_bind_password');
+  const baseDn = getConfig('ldap_base_dn');
+  const userAttr = getConfig('ldap_user_attribute', 'sAMAccountName');
+  const upnSuffix = getConfig('ldap_upn_suffix', '');
+
+  let loginUser = username;
+  if (upnSuffix && !username.includes('@')) {
+    loginUser = username + upnSuffix;
+  }
+
+  const userFilter = `(&(objectClass=user)(|(${userAttr}=${username})(userPrincipalName=${loginUser})))`;
+
+  return new Promise((resolve, reject) => {
+    let client;
+    try {
+      client = createLdapClient();
+    } catch (err) {
+      return reject(err);
+    }
+
+    client.on('error', (err) => {
+      console.error('LDAP Sync-Client-Fehler:', err);
+    });
+
+    client.bind(bindDn, bindPassword, (err) => {
+      if (err) {
+        client.destroy();
+        return reject(new Error('LDAP-Admin-Bind fehlgeschlagen: ' + err.message));
+      }
+
+      const opts = {
+        filter: userFilter,
+        scope: 'sub',
+        attributes: ['memberOf', 'memberof']
+      };
+
+      let memberOfRaw = null;
+
+      client.search(baseDn, opts, (err, res) => {
+        if (err) {
+          client.destroy();
+          return reject(new Error('LDAP-Suche fehlgeschlagen: ' + err.message));
+        }
+
+        res.on('searchEntry', (entry) => {
+          const attributes = entry.attributes || [];
+          for (const attr of attributes) {
+            const type = attr.type.toLowerCase();
+            if (type === 'memberof') {
+              memberOfRaw = attr.values || [];
+            }
+          }
+        });
+
+        res.on('error', (err) => {
+          client.destroy();
+          return reject(new Error('LDAP-Suchstrom-Fehler: ' + err.message));
+        });
+
+        res.on('end', (result) => {
+          client.destroy();
+
+          if (!memberOfRaw) {
+            return resolve([]); // Keine Gruppen gefunden oder Benutzer nicht gefunden
+          }
+
+          let memberOf = memberOfRaw;
+          if (typeof memberOf === 'string') {
+            memberOf = [memberOf];
+          }
+
+          const localRoles = mapLdapGroupsToLocal(memberOf);
+          resolve(localRoles);
+        });
+      });
+    });
+  });
+}
+
 module.exports = {
   authenticate,
-  testConnection
+  testConnection,
+  syncUserGroups
 };
