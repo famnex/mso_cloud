@@ -59,10 +59,10 @@ router.post('/run', (req, res) => {
     db.prepare(`
       INSERT INTO tiles (title, description, icon, link, visibility, allowed_groups, sort_order)
       VALUES 
-      ('Moodle', 'Das LMS der Modellschule Obersberg', 'fa-graduation-cap', 'https://cloud.mso-hef.de/moodle/login/index.php', 'public', '[]', 1),
-      ('Wissensdatenbank', 'Alles Wissenswerte zu unseren Diensten.', 'fa-brain', 'https://cloud.mso-hef.de/osticket23/kb/index.php', 'public', '[]', 2),
-      ('Schulkalender', 'Termine der Schule', 'fa-calendar', 'https://cloud.mso-hef.de/kalender_new', 'logged_in', '[]', 3),
-      ('Ticketsystem', 'Support-Anfragen für Hard- & Software', 'fa-ticket', 'https://cloud.mso-hef.de/osticket23', 'groups', '["Lehrer", "Admin"]', 4)
+      ('Moodle', 'Das LMS der Modellschule Obersberg', 'bi-graduation-cap-fill', 'https://cloud.mso-hef.de/moodle/login/index.php', 'public', '[]', 1),
+      ('Wissensdatenbank', 'Alles Wissenswerte zu unseren Diensten.', 'bi-book-half', 'https://cloud.mso-hef.de/osticket23/kb/index.php', 'public', '[]', 2),
+      ('Schulkalender', 'Termine der Schule', 'bi-calendar-event', 'https://cloud.mso-hef.de/kalender_new', 'logged_in', '[]', 3),
+      ('Ticketsystem', 'Support-Anfragen für Hard- & Software', 'bi-wrench-adjustable-circle-fill', 'https://cloud.mso-hef.de/osticket23', 'groups', '["Lehrer", "Admin"]', 4)
     `).run();
 
     res.json({ success: true, message: 'Installation erfolgreich abgeschlossen.' });

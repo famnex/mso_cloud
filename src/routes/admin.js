@@ -213,6 +213,42 @@ router.delete('/tiles/:id', (req, res) => {
   }
 });
 
+/**
+ * Holt eine eindeutige Liste aller in der Datenbank existierenden Gruppen.
+ */
+router.get('/groups', (req, res) => {
+  try {
+    const groups = new Set();
+
+    // 1. Aus den Benutzerdaten auslesen
+    const users = db.prepare('SELECT groups FROM users').all();
+    for (const user of users) {
+      try {
+        const userGroups = JSON.parse(user.groups || '[]');
+        if (Array.isArray(userGroups)) {
+          userGroups.forEach(g => {
+            if (g) groups.add(String(g).trim());
+          });
+        }
+      } catch (e) {
+        // Ignorieren bei Parsing-Fehlern
+      }
+    }
+
+    // 2. Aus den LDAP-Mappings auslesen
+    const mappings = db.prepare('SELECT DISTINCT local_group FROM ldap_mappings').all();
+    for (const mapping of mappings) {
+      if (mapping.local_group) {
+        groups.add(String(mapping.local_group).trim());
+      }
+    }
+
+    res.json(Array.from(groups).sort());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 /* ==========================================================================
    3. LDAP-Gruppen-Mappings

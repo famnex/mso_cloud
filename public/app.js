@@ -186,7 +186,7 @@ async function loadTiles() {
       tileCard.innerHTML = `
         <div class="tile-header">
           <div class="tile-icon-wrapper">
-            <i class="fa-solid ${tile.icon}"></i>
+            ${tile.icon && tile.icon.startsWith('bi-') ? `<i class="bi ${tile.icon}"></i>` : `<i class="fa-solid ${tile.icon || 'fa-cubes'}"></i>`}
           </div>
           <div class="status-dot" id="status-dot-${tile.id}" data-toggle="tooltip" title="Wird geprüft..."></div>
         </div>
@@ -461,6 +461,75 @@ function showAdminAlert(message, type = 'success') {
 }
 
 /* --- TAB: Kacheln --- */
+const POPULAR_ICONS = [
+  'bi-graduation-cap-fill', 'bi-book-half', 'bi-calendar-event', 'bi-chat-dots-fill',
+  'bi-cloud-fill', 'bi-envelope-fill', 'bi-file-earmark-text-fill', 'bi-gear-fill',
+  'bi-graph-up-arrow', 'bi-house-door-fill', 'bi-info-circle-fill', 'bi-journal-bookmark-fill',
+  'bi-link-45deg', 'bi-lock-fill', 'bi-people-fill', 'bi-person-badge-fill',
+  'bi-shield-lock-fill', 'bi-speedometer2', 'bi-tools', 'bi-wifi',
+  'bi-globe', 'bi-music-note-list', 'bi-play-btn-fill', 'bi-terminal-fill',
+  'bi-folder-fill', 'bi-hdd-network-fill', 'bi-kanban-fill', 'bi-list-check',
+  'bi-printer-fill', 'bi-server', 'bi-telephone-fill', 'bi-trophy-fill',
+  'bi-vector-pen', 'bi-wrench-adjustable-circle-fill', 'bi-pc-display-horizontal', 'bi-activity'
+];
+
+function initIconPicker(selectedIcon = 'bi-link-45deg') {
+  const grid = document.getElementById('tile-icon-picker-grid');
+  grid.innerHTML = '';
+  
+  POPULAR_ICONS.forEach(icon => {
+    const item = document.createElement('div');
+    item.className = `icon-picker-item ${icon === selectedIcon ? 'active' : ''}`;
+    item.innerHTML = `<i class="bi ${icon}"></i>`;
+    item.title = icon;
+    item.onclick = () => {
+      document.querySelectorAll('#tile-icon-picker-grid .icon-picker-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      document.getElementById('tile_icon').value = icon;
+      document.getElementById('tile-icon-preview').innerHTML = `<i class="bi ${icon}"></i>`;
+    };
+    grid.appendChild(item);
+  });
+
+  document.getElementById('tile_icon').value = selectedIcon;
+  if (selectedIcon.startsWith('bi-')) {
+    document.getElementById('tile-icon-preview').innerHTML = `<i class="bi ${selectedIcon}"></i>`;
+  } else {
+    document.getElementById('tile-icon-preview').innerHTML = `<i class="fa-solid ${selectedIcon}"></i>`;
+  }
+}
+
+async function loadGroupCheckboxes(selectedGroups = []) {
+  const container = document.getElementById('tile_groups_container');
+  container.innerHTML = '<span style="font-size:0.8rem; color:var(--text-secondary);"><i class="fa-solid fa-spinner fa-spin"></i> Lade Gruppen...</span>';
+  
+  try {
+    const res = await fetch('api/admin/groups');
+    const groups = await res.json();
+    
+    if (groups.length === 0) {
+      container.innerHTML = '<span style="font-size:0.8rem; color:var(--text-secondary); font-style:italic;">Keine Gruppen in der Datenbank gefunden.</span>';
+      return;
+    }
+    
+    container.innerHTML = '';
+    groups.forEach(group => {
+      const isChecked = selectedGroups.includes(group) ? 'checked' : '';
+      const div = document.createElement('div');
+      div.style.display = 'flex';
+      div.style.alignItems = 'center';
+      div.style.gap = '8px';
+      div.innerHTML = `
+        <input type="checkbox" id="grp_chk_${group}" value="${group}" ${isChecked} style="width:16px; height:16px; cursor:pointer;">
+        <label for="grp_chk_${group}" style="margin:0; font-size:0.9rem; cursor:pointer; user-select:none;">${group}</label>
+      `;
+      container.appendChild(div);
+    });
+  } catch (err) {
+    container.innerHTML = `<span style="font-size:0.8rem; color:var(--error-color);">Fehler beim Laden: ${err.message}</span>`;
+  }
+}
+
 async function loadAdminTiles() {
   const tbody = document.getElementById('admin-tiles-table-body');
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Dienste...</td></tr>';
@@ -475,10 +544,11 @@ async function loadAdminTiles() {
       const groupsLabel = tile.visibility === 'groups' ? ` (${allowedGroups.join(', ')})` : '';
       
       const tr = document.createElement('tr');
+      const isBi = tile.icon && tile.icon.startsWith('bi-');
       tr.innerHTML = `
         <td><strong>${tile.title}</strong></td>
         <td style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
-        <td><i class="fa-solid ${tile.icon}"></i> <code>${tile.icon}</code></td>
+        <td>${isBi ? `<i class="bi ${tile.icon}"></i>` : `<i class="fa-solid ${tile.icon || 'fa-cubes'}"></i>`} <code>${tile.icon}</code></td>
         <td><span class="user-badge" style="font-size:0.75rem;">${tile.visibility}${groupsLabel}</span></td>
         <td><code>${tile.sso_type}</code></td>
         <td>${tile.sort_order}</td>
@@ -499,23 +569,29 @@ function openTileForm(tile = null) {
   document.getElementById('tile-id-field').value = '';
   document.getElementById('tile-modal-title').innerText = 'Neuer Dienst';
   
+  let selectedIcon = 'bi-link-45deg';
+  let allowedGroups = [];
+
   if (tile) {
     document.getElementById('tile-id-field').value = tile.id;
     document.getElementById('tile-modal-title').innerText = 'Dienst bearbeiten';
     
     document.getElementById('tile_title').value = tile.title;
     document.getElementById('tile_description').value = tile.description || '';
-    document.getElementById('tile_icon').value = tile.icon;
     document.getElementById('tile_link').value = tile.link;
     document.getElementById('tile_sort_order').value = tile.sort_order;
     document.getElementById('tile_visibility').value = tile.visibility;
     
-    const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
-    document.getElementById('tile_groups').value = allowedGroups.join(', ');
+    selectedIcon = tile.icon || 'bi-link-45deg';
+    allowedGroups = JSON.parse(tile.allowed_groups || '[]');
     
     document.getElementById('tile_sso_type').value = tile.sso_type;
     document.getElementById('tile_sso_key').value = tile.sso_key || '';
   }
+
+  // Initialisiere die premium icon & group Selectors
+  initIconPicker(selectedIcon);
+  loadGroupCheckboxes(allowedGroups);
 
   toggleTileGroupsSelect();
   toggleTileSsoFields();
@@ -538,8 +614,8 @@ async function saveTileForm(e) {
   e.preventDefault();
   const id = document.getElementById('tile-id-field').value;
   
-  const groupsRaw = document.getElementById('tile_groups').value;
-  const allowedGroups = groupsRaw ? groupsRaw.split(',').map(g => g.trim()).filter(g => g) : [];
+  const checkboxes = document.querySelectorAll('#tile_groups_container input[type="checkbox"]:checked');
+  const allowedGroups = Array.from(checkboxes).map(chk => chk.value);
 
   const body = {
     title: document.getElementById('tile_title').value.trim(),

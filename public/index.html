@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="style.css">
   <!-- FONTS & ICONS -->
   <script src="https://kit.fontawesome.com/a974660f94.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body>
 
@@ -435,10 +436,18 @@
             </div>
 
             <div class="form-group">
-              <label for="tile_icon">Icon-Klasse (FontAwesome 6)</label>
-              <input type="text" id="tile_icon" class="form-control" required placeholder="z.B. fa-graduation-cap">
+              <label style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <span>Icon auswählen</span>
+                <span id="tile-icon-preview" style="font-size: 1.3rem; color: var(--accent-color); display: inline-flex; align-items: center; gap: 6px;">
+                  <i class="bi bi-question-circle"></i>
+                </span>
+              </label>
+              <input type="hidden" id="tile_icon" required value="bi-link-45deg">
+              <div id="tile-icon-picker-grid" class="icon-picker-grid" style="max-height: 120px; overflow-y: auto; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; text-align: center;">
+                <!-- Wird dynamisch mit Icons gefüllt -->
+              </div>
               <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
-                Icons finden Sie auf fontawesome.com. Nutzen Sie Klassen wie `fa-graduation-cap` oder `fa-ticket`.
+                Klicken Sie auf ein Icon in der Auswahl, um es für die Kachel zu übernehmen.
               </p>
             </div>
 
@@ -464,10 +473,12 @@
             </div>
 
             <div class="form-group" id="tile-groups-wrapper" style="display:none;">
-              <label for="tile_groups">Erlaubte lokale Sicherheitsgruppen (Mehrfachauswahl)</label>
-              <input type="text" id="tile_groups" class="form-control" placeholder="z.B. Lehrer, Admin, Schueler">
+              <label style="margin-bottom:8px; display:block;">Erlaubte lokale Sicherheitsgruppen (Mehrfachauswahl)</label>
+              <div id="tile_groups_container" style="max-height: 130px; overflow-y: auto; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Wird dynamisch mit Checkboxes aus der DB gefüllt -->
+              </div>
               <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
-                Kommagetrennte Liste der lokalen MSO-Gruppen, die Zugriff erhalten sollen.
+                Wählen Sie die lokalen Sicherheitsgruppen aus der Datenbank aus, die diesen Dienst sehen dürfen.
               </p>
             </div>
 
