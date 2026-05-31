@@ -40,13 +40,15 @@ app.use((req, res, next) => {
       const isStaticAsset = req.path.includes('.') && !isSetupPage; // JS, CSS, etc. zulassen
 
       if (!isSetupPage && !isSetupApi && !isStaticAsset) {
-        console.log(`Redirecting unauthorized path ${req.path} to /setup.html`);
-        return res.redirect('setup.html');
+        console.log(`Redirecting unauthorized path ${req.path} to setup.html`);
+        res.writeHead(302, { 'Location': 'setup.html' });
+        return res.end();
       }
     } else {
       // Wenn Setup abgeschlossen ist, blockiere den erneuten Aufruf der Setup-Seite
       if (req.path === '/setup.html') {
-        return res.redirect('index.html');
+        res.writeHead(302, { 'Location': 'index.html' });
+        return res.end();
       }
     }
   } catch (err) {
