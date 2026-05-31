@@ -92,9 +92,24 @@ async function authenticate(username, password) {
         }
 
         res.on('searchEntry', (entry) => {
-          userEntry = entry.object;
-          // WICHTIG: In ldapjs liegt der DN auf dem entry-Objekt, nicht auf dem entry.object!
-          // Wir müssen ihn explizit als String extrahieren!
+          // Da ldapjs v3 kein entry.object mehr bereitstellt, extrahieren wir die Attribute manuell
+          const obj = {};
+          const attributes = entry.attributes || [];
+          for (const attr of attributes) {
+            const type = attr.type;
+            const values = attr.values || [];
+            let val = '';
+            if (values.length === 1) {
+              val = values[0];
+            } else if (values.length > 1) {
+              val = values;
+            }
+            
+            // Sowohl unter dem Original-Schlüssel als auch in Kleinschreibung ablegen (für Case-Insensitivity)
+            obj[type] = val;
+            obj[type.toLowerCase()] = val;
+          }
+          userEntry = obj;
           userEntry.dn = entry.dn.toString();
         });
 
@@ -118,12 +133,12 @@ async function authenticate(username, password) {
               return resolve(null); // Passwort falsch oder Bind fehlgeschlagen
             }
 
-            // Bind war erfolgreich! LDAP-Benutzerdaten sammeln
-            const email = userEntry[mailAttr] || '';
-            const displayName = userEntry[nameAttr] || userEntry.cn || username;
+            // Bind war erfolgreich! LDAP-Benutzerdaten sammeln (unterstützt original- und kleingeschriebene Key-Varianten)
+            const email = userEntry[mailAttr] || userEntry[mailAttr.toLowerCase()] || '';
+            const displayName = userEntry[nameAttr] || userEntry[nameAttr.toLowerCase()] || userEntry.cn || userEntry.CN || username;
             
             // Gruppen verarbeiten (LDAP gibt Gruppen als String oder Array zurück)
-            let memberOf = userEntry.memberOf || [];
+            let memberOf = userEntry.memberOf || userEntry.memberof || [];
             if (typeof memberOf === 'string') {
               memberOf = [memberOf];
             }
