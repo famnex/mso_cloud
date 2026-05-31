@@ -41,12 +41,12 @@ app.use((req, res, next) => {
 
       if (!isSetupPage && !isSetupApi && !isStaticAsset) {
         console.log(`Redirecting unauthorized path ${req.path} to /setup.html`);
-        return res.redirect('/setup.html');
+        return res.redirect('setup.html');
       }
     } else {
       // Wenn Setup abgeschlossen ist, blockiere den erneuten Aufruf der Setup-Seite
       if (req.path === '/setup.html') {
-        return res.redirect('/index.html');
+        return res.redirect('index.html');
       }
     }
   } catch (err) {

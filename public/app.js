@@ -59,7 +59,7 @@ function setTheme(theme) {
    ========================================================================== */
 async function checkAuthStatus() {
   try {
-    const res = await fetch('/api/auth/me');
+    const res = await fetch('api/auth/me');
     const data = await res.json();
 
     if (data.logged_in) {
@@ -110,7 +110,7 @@ async function handleLogin(e) {
   alertBox.style.display = 'none';
 
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch('api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: user, password: pass })
@@ -136,7 +136,7 @@ async function handleLogin(e) {
 
 async function handleLogout() {
   try {
-    const res = await fetch('/api/auth/logout', { method: 'POST' });
+    const res = await fetch('api/auth/logout', { method: 'POST' });
     if (res.ok) {
       currentUser = null;
       renderAnonymousHeader();
@@ -160,7 +160,7 @@ async function loadTiles() {
   `;
 
   try {
-    const res = await fetch('/api/tiles');
+    const res = await fetch('api/tiles');
     const tiles = await res.json();
 
     if (tiles.length === 0) {
@@ -181,7 +181,7 @@ async function loadTiles() {
       tileCard.className = 'tile-card glass-panel';
       tileCard.id = `tile-card-${tile.id}`;
       // SSO-Gateway Link als Href nutzen
-      tileCard.href = `/api/tiles/sso/${tile.id}`;
+      tileCard.href = `api/tiles/sso/${tile.id}`;
       
       tileCard.innerHTML = `
         <div class="tile-header">
@@ -313,7 +313,7 @@ async function handleResetRequest(e) {
   alertBox.className = 'alert';
 
   try {
-    const res = await fetch('/api/auth/reset-request', {
+    const res = await fetch('api/auth/reset-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
@@ -354,7 +354,7 @@ async function handlePasswordResetExecute(e) {
   }
 
   try {
-    const res = await fetch('/api/auth/reset-password', {
+    const res = await fetch('api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, password: pass })
@@ -466,7 +466,7 @@ async function loadAdminTiles() {
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Dienste...</td></tr>';
 
   try {
-    const res = await fetch('/api/admin/tiles');
+    const res = await fetch('api/admin/tiles');
     const tiles = await res.json();
     
     tbody.innerHTML = '';
@@ -553,7 +553,7 @@ async function saveTileForm(e) {
     sso_key: document.getElementById('tile_sso_key').value.trim()
   };
 
-  const url = id ? `/api/admin/tiles/${id}` : '/api/admin/tiles';
+  const url = id ? `api/admin/tiles/${id}` : 'api/admin/tiles';
   const method = id ? 'PUT' : 'POST';
 
   try {
@@ -579,7 +579,7 @@ async function saveTileForm(e) {
 async function deleteTile(id) {
   if (!confirm('Möchten Sie diesen Dienst wirklich unwiderruflich löschen?')) return;
   try {
-    const res = await fetch(`/api/admin/tiles/${id}`, { method: 'DELETE' });
+    const res = await fetch(`api/admin/tiles/${id}`, { method: 'DELETE' });
     if (res.ok) {
       showAdminAlert('Dienst gelöscht.');
       loadAdminTiles();
@@ -592,7 +592,7 @@ async function deleteTile(id) {
 /* --- TABS: Config (LDAP & SMTP) --- */
 async function loadAdminConfig() {
   try {
-    const res = await fetch('/api/admin/config');
+    const res = await fetch('api/admin/config');
     const cfg = await res.json();
 
     // LDAP Felder
@@ -628,7 +628,7 @@ async function saveLdapConfig(e) {
   };
 
   try {
-    const res = await fetch('/api/admin/config', {
+    const res = await fetch('api/admin/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -652,7 +652,7 @@ async function testLdapConnection() {
   showAdminAlert('Teste LDAP-Verbindung...', 'warning');
 
   try {
-    const res = await fetch('/api/admin/config/test-ldap', {
+    const res = await fetch('api/admin/config/test-ldap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -680,7 +680,7 @@ async function saveSmtpConfig(e) {
   };
 
   try {
-    const res = await fetch('/api/admin/config', {
+    const res = await fetch('api/admin/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -705,7 +705,7 @@ async function testSmtpConnection() {
   showAdminAlert('Teste SMTP-Verbindung...', 'warning');
 
   try {
-    const res = await fetch('/api/admin/config/test-smtp', {
+    const res = await fetch('api/admin/config/test-smtp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -727,7 +727,7 @@ async function loadAdminLdapMappings() {
   tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Mappings...</td></tr>';
 
   try {
-    const res = await fetch('/api/admin/ldap-mappings');
+    const res = await fetch('api/admin/ldap-mappings');
     const mappings = await res.json();
 
     tbody.innerHTML = '';
@@ -760,7 +760,7 @@ async function saveMappingForm(e) {
   };
 
   try {
-    const res = await fetch('/api/admin/ldap-mappings', {
+    const res = await fetch('api/admin/ldap-mappings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -781,7 +781,7 @@ async function saveMappingForm(e) {
 async function deleteLdapMapping(id) {
   if (!confirm('Mapping löschen?')) return;
   try {
-    const res = await fetch(`/api/admin/ldap-mappings/${id}`, { method: 'DELETE' });
+    const res = await fetch(`api/admin/ldap-mappings/${id}`, { method: 'DELETE' });
     if (res.ok) {
       showAdminAlert('Mapping gelöscht.');
       loadAdminLdapMappings();
@@ -797,7 +797,7 @@ async function loadAdminUsers() {
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Benutzer...</td></tr>';
 
   try {
-    const res = await fetch('/api/admin/users');
+    const res = await fetch('api/admin/users');
     const users = await res.json();
 
     tbody.innerHTML = '';
@@ -876,7 +876,7 @@ async function saveUserForm(e) {
     password: document.getElementById('user_password').value
   };
 
-  const url = id ? `/api/admin/users/${id}` : '/api/admin/users';
+  const url = id ? `api/admin/users/${id}` : 'api/admin/users';
   const method = id ? 'PUT' : 'POST';
 
   try {
@@ -902,7 +902,7 @@ async function saveUserForm(e) {
 async function deleteUser(id) {
   if (!confirm('Diesen Benutzer wirklich löschen?')) return;
   try {
-    const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+    const res = await fetch(`api/admin/users/${id}`, { method: 'DELETE' });
     if (res.ok) {
       showAdminAlert('Benutzer gelöscht.');
       loadAdminUsers();
@@ -930,7 +930,7 @@ async function triggerSystemUpdate() {
   loader.style.display = 'flex';
 
   try {
-    const res = await fetch('/api/admin/system/update', { method: 'POST' });
+    const res = await fetch('api/admin/system/update', { method: 'POST' });
     const data = await res.json();
     
     if (res.ok) {

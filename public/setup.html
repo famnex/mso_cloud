@@ -193,7 +193,7 @@
       installBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Installiere...';
 
       try {
-        const response = await fetch('/api/setup/run', {
+        const response = await fetch('api/setup/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: user, email: email, password: pass })
@@ -218,7 +218,7 @@
             </div>
           `;
           setTimeout(() => {
-            window.location.href = '/index.html';
+            window.location.href = 'index.html';
           }, 3000);
         } else {
           throw new Error(data.error || 'Fehler bei der Installation');
