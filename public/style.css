@@ -810,3 +810,28 @@ input:checked + .slider:before {
   color: var(--accent-color);
   box-shadow: 0 0 8px var(--accent-glow);
 }
+
+/* SPH Autologin Key-Button */
+.tile-key-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+.tile-key-btn:hover {
+  background: rgba(245, 158, 11, 0.15); /* amber glow */
+  border-color: var(--warn-color);
+  color: var(--warn-color);
+  transform: scale(1.1);
+}
+.tile-key-btn i {
+  font-size: 0.85rem;
+}

@@ -212,24 +212,103 @@ router.post('/reset-password', (req, res) => {
 });
 
 /**
- * Gibt die temporär in der Session gespeicherten Anmeldedaten für das Autologin-Skript aus.
- * CORS ist für das Schulportal Hessen freigegeben.
+ * Hilfsfunktionen zur symmetrischen Ver- und Entschlüsselung der SPH-Passwörter.
+ */
+const ENCRYPTION_KEY = crypto.scryptSync(process.env.SESSION_SECRET || 'mso_cloud_default_secret_key_123!', 'salt', 32);
+const IV_LENGTH = 16;
+
+function encrypt(text) {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function decrypt(text) {
+  try {
+    const textParts = text.split(':');
+    const iv = Buffer.from(textParts.shift(), 'hex');
+    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+  } catch (err) {
+    console.error('Fehler bei der Entschlüsselung:', err);
+    return null;
+  }
+}
+
+/**
+ * Gibt den Status der hinterlegten Schulportal-Zugangsdaten für den aktuellen Benutzer aus.
  */
 router.get('/sph-credentials', (req, res) => {
-  // CORS-Header für das Schulportal Hessen setzen
-  res.setHeader('Access-Control-Allow-Origin', 'https://login.schulportal.hessen.de');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  const user = req.session.user;
 
-  if (req.session && req.session.user && req.session.plain_password) {
-    res.json({
-      logged_in: true,
-      username: req.session.user.username,
-      password: req.session.plain_password
-    });
-  } else {
-    res.status(401).json({ logged_in: false, error: 'Keine aktive MSO-Cloud Session oder Passwort nicht im Cache.' });
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  try {
+    const row = db.prepare('SELECT sph_username FROM user_sph_credentials WHERE user_id = ?').get(user.id);
+    if (row) {
+      res.json({ exists: true, username: row.sph_username });
+    } else {
+      res.json({ exists: false });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
+
+/**
+ * Speichert oder überschreibt die Schulportal-Zugangsdaten für den angemeldeten Benutzer.
+ */
+router.post('/sph-credentials', (req, res) => {
+  const user = req.session.user;
+  const { sph_username, sph_password } = req.body;
+
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  if (!sph_username || !sph_password) {
+    return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich.' });
+  }
+
+  try {
+    const encryptedPassword = encrypt(sph_password);
+    db.prepare(`
+      INSERT OR REPLACE INTO user_sph_credentials (user_id, sph_username, sph_password)
+      VALUES (?, ?, ?)
+    `).run(user.id, sph_username, encryptedPassword);
+
+    res.json({ success: true, message: 'Zugangsdaten erfolgreich gespeichert.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Löscht die hinterlegten Schulportal-Zugangsdaten des angemeldeten Benutzers.
+ */
+router.delete('/sph-credentials', (req, res) => {
+  const user = req.session.user;
+
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  try {
+    db.prepare('DELETE FROM user_sph_credentials WHERE user_id = ?').run(user.id);
+    res.json({ success: true, message: 'Zugangsdaten erfolgreich gelöscht.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.encrypt = encrypt;
+router.decrypt = decrypt;
 
 module.exports = router;

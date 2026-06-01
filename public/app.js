@@ -222,12 +222,20 @@ async function loadTiles() {
         tileCard.href = `api/tiles/sso/${tile.id}`;
       }
       
+      const isSph = tile.link && tile.link.includes('login.schulportal.hessen.de');
+      const keyBtnHtml = (isSph && currentUser) 
+        ? `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id})" title="Schulportal-Zugangsdaten hinterlegen"><i class="fa-solid fa-key"></i></button>`
+        : '';
+      
       tileCard.innerHTML = `
         <div class="tile-header">
           <div class="tile-icon-wrapper">
             ${renderIcon(tile.icon)}
           </div>
-          <div class="status-dot" id="status-dot-${tile.id}" data-toggle="tooltip" title="Wird geprüft..."></div>
+          <div style="display: flex; align-items: center; gap: 10px; z-index: 5;">
+            ${keyBtnHtml}
+            <div class="status-dot" id="status-dot-${tile.id}" data-toggle="tooltip" title="Wird geprüft..."></div>
+          </div>
         </div>
         <div class="tile-body">
           <h4 class="tile-title">${tile.title}</h4>
@@ -1355,4 +1363,90 @@ function initTooltips() {
       tooltip.style.opacity = '0';
     }
   });
+}
+
+/* ==========================================================================
+   8. SPH Autologin Zugangsdaten Management
+   ========================================================================== */
+let activeSphTileId = null;
+
+async function openSphCredentialsModal(event, tileId) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  activeSphTileId = tileId;
+  
+  // Modal anzeigen und Ladestatus setzen
+  document.getElementById('sph-credentials-status-loading').style.display = 'block';
+  document.getElementById('sph-credentials-existing').style.display = 'none';
+  document.getElementById('sph-credentials-form').style.display = 'none';
+  openModal('sph-credentials-modal');
+
+  try {
+    const res = await fetch('api/auth/sph-credentials');
+    const data = await res.json();
+
+    document.getElementById('sph-credentials-status-loading').style.display = 'none';
+
+    if (data.exists) {
+      document.getElementById('sph-credentials-username-display').innerText = data.username;
+      document.getElementById('sph-credentials-existing').style.display = 'block';
+    } else {
+      document.getElementById('sph-credentials-form').reset();
+      document.getElementById('sph-credentials-form').style.display = 'block';
+    }
+  } catch (err) {
+    console.error('Fehler beim Laden der SPH-Zugangsdaten:', err);
+    alert('Fehler beim Laden des Status.');
+    closeModal('sph-credentials-modal');
+  }
+}
+
+async function saveSphCredentials(e) {
+  e.preventDefault();
+  const username = document.getElementById('sph_user').value.trim();
+  const password = document.getElementById('sph_password').value;
+
+  try {
+    const res = await fetch('api/auth/sph-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sph_username: username, sph_password: password })
+    });
+
+    if (res.ok) {
+      alert('Zugangsdaten erfolgreich gespeichert.');
+      // Status neu abfragen, um das "Bereits hinterlegt"-Template anzuzeigen
+      await openSphCredentialsModal(null, activeSphTileId);
+    } else {
+      const data = await res.json();
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    alert('Fehler beim Speichern: ' + err.message);
+  }
+}
+
+async function deleteSphCredentials() {
+  if (!confirm('Möchtest du deine hinterlegten Schulportal-Zugangsdaten wirklich löschen? Der automatische Login wird damit deaktiviert.')) {
+    return;
+  }
+
+  try {
+    const res = await fetch('api/auth/sph-credentials', {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      alert('Zugangsdaten gelöscht.');
+      // Status neu abfragen, um das leere Formular-Template anzuzeigen
+      await openSphCredentialsModal(null, activeSphTileId);
+    } else {
+      const data = await res.json();
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    alert('Fehler beim Löschen: ' + err.message);
+  }
 }

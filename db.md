@@ -132,6 +132,18 @@ Speichert generierte Access Tokens (Bearer) für API-Zugriffe (z. B. /userinfo).
 
 ---
 
+### Tabelle: `user_sph_credentials`
+Speichert die optionalen Schulportal Hessen Zugangsdaten der Benutzer für das automatisierte Login-Script.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `user_id` (PK, FK) | INTEGER | ID des zugehörigen Benutzers (`users.id`) |
+| `sph_username` | TEXT | Benutzername für das Schulportal Hessen |
+| `sph_password` | TEXT | Passwort für das Schulportal Hessen (gesichert hinterlegt) |
+
+---
+
+
 ### Tabelle: `applied_migrations`
 Erfasst alle erfolgreich importierten Datenbank-Migrationsdateien.
 

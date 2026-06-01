@@ -144,6 +144,50 @@ router.get('/sso/:id', (req, res) => {
     // SSO Logik anwenden
     let redirectUrl = tile.link;
 
+    // SPH-Autologin prüfen: Falls der Link zum SPH führt und der User Zugangsdaten hinterlegt hat, Auto-POST senden
+    if (tile.link && tile.link.includes('login.schulportal.hessen.de') && user) {
+      try {
+        const sphCreds = db.prepare('SELECT * FROM user_sph_credentials WHERE user_id = ?').get(user.id);
+        if (sphCreds) {
+          const authRouter = require('./auth');
+          const decryptedPassword = authRouter.decrypt(sphCreds.sph_password);
+          
+          if (decryptedPassword) {
+            return res.send(`
+              <!DOCTYPE html>
+              <html lang="de">
+              <head>
+                <meta charset="UTF-8">
+                <title>Weiterleitung zum Schulportal Hessen...</title>
+                <style>
+                  body { font-family: sans-serif; background: #121212; color: #e0e0e0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                  .loader { border: 4px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 4px solid #3b82f6; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                  p { color: #a3a3a3; font-size: 1.1rem; }
+                </style>
+              </head>
+              <body>
+                <div class="loader"></div>
+                <p>Melde dich automatisch beim Schulportal Hessen an...</p>
+                
+                <form id="sph-login-form" method="POST" action="https://login.schulportal.hessen.de/?i=9743">
+                  <input type="hidden" name="user" value="${escapeHtml(sphCreds.sph_username)}">
+                  <input type="hidden" name="password" value="${escapeHtml(decryptedPassword)}">
+                </form>
+
+                <script>
+                  document.getElementById('sph-login-form').submit();
+                </script>
+              </body>
+              </html>
+            `);
+          }
+        }
+      } catch (err) {
+        console.error('Fehler bei der Vorbereitung des SPH-Autologins:', err);
+      }
+    }
+
     if (tile.sso_type === 'query' && user) {
       // SSO Typ A: URL Query Parameter mit HMAC Signatur
       const secret = tile.sso_key || 'default_secret_key';
@@ -185,71 +229,6 @@ router.get('/sso/:id', (req, res) => {
     console.error('Fehler im SSO-Redirect:', error);
     res.status(500).send('Fehler bei der SSO-Weiterleitung: ' + error.message);
   }
-});
-
-/**
- * Führt ein automatisiertes Login beim Schulportal Hessen durch, indem ein
- * Auto-Submit HTML-Formular an die Anmeldeschnittstelle gesendet wird.
- */
-router.get('/sph-autologin', (req, res) => {
-  const user = req.session.user;
-  const password = req.session.plain_password;
-
-  if (!user || !password) {
-    return res.status(401).send(`
-      <!DOCTYPE html>
-      <html lang="de">
-        <head>
-          <meta charset="UTF-8">
-          <title>Autologin fehlgeschlagen</title>
-          <style>
-            body { font-family: sans-serif; background: #121212; color: #e0e0e0; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .card { background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); text-align: center; max-width: 400px; border: 1px solid rgba(255,255,255,0.05); }
-            h2 { color: #f43f5e; margin-top: 0; font-weight: 600; }
-            p { line-height: 1.6; color: #a3a3a3; }
-            .btn { display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-top: 15px; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h2>Autologin nicht möglich</h2>
-            <p>Bitte melde dich zuerst im MSO Cloud Portal an, um das automatische Login für das Schulportal Hessen zu nutzen.</p>
-            <a href="/" class="btn">Zum Portal</a>
-          </div>
-        </body>
-      </html>
-    `);
-  }
-
-  // HTML-Formular für Auto-Submit generieren
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="de">
-    <head>
-      <meta charset="UTF-8">
-      <title>Weiterleitung zum Schulportal Hessen...</title>
-      <style>
-        body { font-family: sans-serif; background: #121212; color: #e0e0e0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .loader { border: 4px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 4px solid #3b82f6; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        p { color: #a3a3a3; font-size: 1.1rem; }
-      </style>
-    </head>
-    <body>
-      <div class="loader"></div>
-      <p>Melde dich automatisch beim Schulportal Hessen an...</p>
-      
-      <form id="sph-login-form" method="POST" action="https://login.schulportal.hessen.de/?i=9743">
-        <input type="hidden" name="user" value="${escapeHtml(user.username)}">
-        <input type="hidden" name="password" value="${escapeHtml(password)}">
-      </form>
-
-      <script>
-        document.getElementById('sph-login-form').submit();
-      </script>
-    </body>
-    </html>
-  `);
 });
 
 // Hilfsfunktion zum Escapen von HTML-Zeichen
