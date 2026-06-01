@@ -1544,6 +1544,18 @@ window.addEventListener('click', (e) => {
   }
 });
 
+// Tastaturnavigation (Pfeiltasten) für das News-Karussell im Modal
+window.addEventListener('keydown', (e) => {
+  const modal = document.getElementById('news-view-modal');
+  if (modal && modal.style.display === 'flex' && activeMessages.length > 1) {
+    if (e.key === 'ArrowRight') {
+      nextNewsSlide();
+    } else if (e.key === 'ArrowLeft') {
+      prevNewsSlide();
+    }
+  }
+});
+
 async function loadActiveMessages() {
   try {
     const res = await fetch('api/messages');
