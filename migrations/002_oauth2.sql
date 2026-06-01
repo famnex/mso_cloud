@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Initialen Standard-Client für Moodle anlegen (kann später im Admin-Bereich angepasst werden)
-INSERT OR IGNORE INTO oauth_clients (client_name, client_id, client_secret, redirect_uri)
-VALUES ('Moodle', 'moodle_client', 'moodle_secret_key_32_chars_long_123', 'https://cloud.mso-hef.de/moodle/admin/oauth2callback.php');
+-- Initialen Standard-Client für Moodle anlegen, falls noch überhaupt kein Moodle-Client existiert
+-- Dadurch werden die Einstellungen niemals überschrieben oder zurückgesetzt, falls sie geändert werden!
+INSERT INTO oauth_clients (client_name, client_id, client_secret, redirect_uri)
+SELECT 'Moodle', 'moodle_client', 'moodle_secret_key_32_chars_long_123', 'https://cloud.mso-hef.de/moodle/admin/oauth2callback.php'
+WHERE NOT EXISTS (SELECT 1 FROM oauth_clients WHERE client_name = 'Moodle');

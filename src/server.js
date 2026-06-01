@@ -13,16 +13,20 @@ const PORT = process.env.PORT || 8080;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session-Konfiguration
+const SqliteSessionStore = require('./sessionStore');
+
+// Session-Konfiguration (Persistent in SQLite mit 1 Jahr Laufzeit & Auto-Verlängerung)
 app.use(session({
   name: 'sid',
+  store: new SqliteSessionStore(),
   secret: process.env.SESSION_SECRET || 'mso-cloud-secure-session-key-3849',
   resave: false,
   saveUninitialized: false,
+  rolling: true, // Verlängert die Session-Laufzeit bei jeder Aktivität des Nutzers automatisch!
   cookie: {
     secure: false, // Auf true setzen, falls HTTPS genutzt wird
     httpOnly: true,
-    maxAge: 1000 * 60 * 60 * 24 // 24 Stunden Gültigkeit
+    maxAge: 1000 * 60 * 60 * 24 * 365 // 1 Jahr Gültigkeit (wird durch rolling:true stetig erneuert)
   }
 }));
 
