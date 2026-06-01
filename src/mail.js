@@ -20,7 +20,8 @@ function createTransporter() {
     port: port,
     secure: secure,
     connectionTimeout: 5000,
-    greetingTimeout: 5000
+    greetingTimeout: 5000,
+    requireTLS: !secure // Erzwingt TLS (STARTTLS) auf Ports wie 587/25
   };
 
   // Authentifizierung nur hinzufügen, wenn ein Benutzername hinterlegt ist (wichtig für schulinterne Open-Relays!)
@@ -109,7 +110,8 @@ async function testSmtpConnection(config) {
     port: parseInt(config.smtp_port, 10),
     secure: config.smtp_secure === '1',
     connectionTimeout: 5000,
-    greetingTimeout: 5000
+    greetingTimeout: 5000,
+    requireTLS: config.smtp_secure !== '1' // Erzwingt TLS (STARTTLS) wenn implizites SSL aus ist
   };
 
   if (config.smtp_user) {
