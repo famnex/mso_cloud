@@ -1751,6 +1751,19 @@ function openMessageForm() {
   document.getElementById('message-form').reset();
   document.getElementById('message-modal-title').innerHTML = '<i class="fa-solid fa-bullhorn" style="color: var(--accent-color);"></i> Nachricht erstellen';
   
+  // WYSIWYG Editor Zurücksetzen
+  isSourceView = false;
+  const wysiwyg = document.getElementById('editor-wysiwyg');
+  const textarea = document.getElementById('message_content');
+  const btn = document.getElementById('editor-source-btn');
+  
+  if (wysiwyg) {
+    wysiwyg.innerHTML = '';
+    wysiwyg.style.display = 'block';
+  }
+  if (textarea) textarea.style.display = 'none';
+  if (btn) btn.classList.remove('active');
+  
   // Start- und Endzeitpunkt auf jetzt + 7 Tage als Vorschlag setzen für den Typ "temporary"
   const now = new Date();
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -1782,6 +1795,19 @@ async function editMessage(id) {
     document.getElementById('message_content').value = msg.content;
     document.getElementById('message_type').value = msg.type;
     
+    // WYSIWYG Editor Befüllen
+    isSourceView = false;
+    const wysiwyg = document.getElementById('editor-wysiwyg');
+    const textarea = document.getElementById('message_content');
+    const btn = document.getElementById('editor-source-btn');
+    
+    if (wysiwyg) {
+      wysiwyg.innerHTML = msg.content || '';
+      wysiwyg.style.display = 'block';
+    }
+    if (textarea) textarea.style.display = 'none';
+    if (btn) btn.classList.remove('active');
+    
     document.getElementById('message_start_date').value = msg.start_date || '';
     document.getElementById('message_end_date').value = msg.end_date || '';
     
@@ -1811,6 +1837,14 @@ function toggleMessageTimeFields() {
 
 async function saveMessageForm(e) {
   e.preventDefault();
+  
+  // WYSIWYG mit Textarea synchronisieren vor dem Speichern
+  if (!isSourceView) {
+    const wysiwyg = document.getElementById('editor-wysiwyg');
+    if (wysiwyg) {
+      document.getElementById('message_content').value = wysiwyg.innerHTML;
+    }
+  }
   
   const id = document.getElementById('message_id').value;
   const title = document.getElementById('message_title').value.trim();
@@ -1874,5 +1908,73 @@ function formatDateTime(isoString) {
     return d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
   } catch (e) {
     return isoString;
+  }
+}
+
+/* WYSIWYG Editor-Hilfsfunktionen */
+let isSourceView = false;
+
+function formatEditor(command) {
+  if (isSourceView) return; // Im Quellcode-Modus keine Rich-Text-Befehle
+  
+  const wysiwyg = document.getElementById('editor-wysiwyg');
+  if (wysiwyg) wysiwyg.focus();
+  
+  if (command === 'createLink') {
+    const url = prompt('Link-URL eingeben (z.B. https://example.com):');
+    if (url) {
+      document.execCommand('createLink', false, url);
+    }
+  } else if (command === 'code') {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString() || 'Code hier einfügen...';
+    
+    // Prüfen, ob wir inline code oder block code wollen: wenn Zeilenumbrüche vorhanden sind, Block Code
+    const isMultiLine = selectedText.includes('\n') || selectedText.includes('\r');
+    
+    if (isMultiLine) {
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.textContent = selectedText;
+      pre.appendChild(code);
+      range.deleteContents();
+      range.insertNode(pre);
+      
+      // Leere Zeile nach dem Block einfügen, damit man im Editor danach weiterschreiben kann
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      pre.after(p);
+    } else {
+      const code = document.createElement('code');
+      code.textContent = selectedText;
+      range.deleteContents();
+      range.insertNode(code);
+    }
+  } else {
+    document.execCommand(command, false, null);
+  }
+}
+
+function toggleEditorSource() {
+  const wysiwyg = document.getElementById('editor-wysiwyg');
+  const textarea = document.getElementById('message_content');
+  const btn = document.getElementById('editor-source-btn');
+  
+  if (!isSourceView) {
+    // Wechsel zu Quellcode-Ansicht
+    textarea.value = wysiwyg.innerHTML;
+    wysiwyg.style.display = 'none';
+    textarea.style.display = 'block';
+    if (btn) btn.classList.add('active');
+    isSourceView = true;
+  } else {
+    // Wechsel zu WYSIWYG-Ansicht
+    wysiwyg.innerHTML = textarea.value;
+    textarea.style.display = 'none';
+    wysiwyg.style.display = 'block';
+    if (btn) btn.classList.remove('active');
+    isSourceView = false;
   }
 }

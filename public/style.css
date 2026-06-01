@@ -976,3 +976,98 @@ input:checked + .slider:before {
   from { opacity: 0; transform: translateY(-20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* WYSIWYG Nachrichteneditor */
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  padding: 8px 12px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.editor-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-radius: 4px;
+  width: 32px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.editor-btn:hover {
+  background: rgba(46, 139, 250, 0.15);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  transform: scale(1.05);
+}
+
+#editor-source-btn {
+  width: auto;
+  padding: 0 10px;
+  font-weight: 600;
+  display: flex;
+  gap: 6px;
+}
+
+#editor-source-btn.active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--warn-color);
+  color: var(--warn-color);
+}
+
+.editor-wysiwyg {
+  min-height: 180px;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  overflow-y: auto;
+  outline: none;
+  padding: 12px 15px;
+  line-height: 1.6;
+}
+
+.editor-wysiwyg:empty::before {
+  content: attr(placeholder);
+  color: var(--text-secondary);
+  opacity: 0.7;
+  cursor: text;
+}
+
+/* Frontend & Editor Code-Formatierung */
+.news-body pre, .editor-wysiwyg pre {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 10px 0;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+}
+
+.news-body code, .editor-wysiwyg code {
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  color: #f43f5e; /* Rose accent inline code */
+  background: rgba(244, 63, 94, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.news-body pre code, .editor-wysiwyg pre code {
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  display: block;
+}

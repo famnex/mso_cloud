@@ -719,8 +719,24 @@
         </div>
 
         <div class="form-group">
-          <label for="message_content">Inhalt (HTML erlaubt) *</label>
-          <textarea id="message_content" class="form-control" style="min-height: 120px; font-family: inherit; resize: vertical;" placeholder="z.B. Am kommenden Freitag kommt es ab 14:00 Uhr zu Wartungsarbeiten..." required></textarea>
+          <label>Inhalt (Formatierung & Code-Modus) *</label>
+          
+          <!-- WYSIWYG Editor Toolbar -->
+          <div class="editor-toolbar">
+            <button type="button" class="editor-btn" onclick="formatEditor('bold')" title="Fett"><i class="fa-solid fa-bold"></i></button>
+            <button type="button" class="editor-btn" onclick="formatEditor('italic')" title="Kursiv"><i class="fa-solid fa-italic"></i></button>
+            <button type="button" class="editor-btn" onclick="formatEditor('underline')" title="Unterstrichen"><i class="fa-solid fa-underline"></i></button>
+            <button type="button" class="editor-btn" onclick="formatEditor('insertUnorderedList')" title="Aufzählung"><i class="fa-solid fa-list-ul"></i></button>
+            <button type="button" class="editor-btn" onclick="formatEditor('createLink')" title="Link einfügen"><i class="fa-solid fa-link"></i></button>
+            <button type="button" class="editor-btn" onclick="formatEditor('code')" title="Code-Block einfügen"><i class="fa-solid fa-code"></i></button>
+            <button type="button" class="editor-btn" id="editor-source-btn" onclick="toggleEditorSource()" title="HTML-Quellcode bearbeiten"><i class="fa-solid fa-file-code"></i> Quellcode</button>
+          </div>
+
+          <!-- WYSIWYG Editor Rich-Text Area -->
+          <div id="editor-wysiwyg" class="form-control editor-wysiwyg" contenteditable="true" placeholder="Schreibe deine Nachricht hier..."></div>
+          
+          <!-- Hidden Raw Textarea for Form Submission & Source View -->
+          <textarea id="message_content" class="form-control editor-textarea" style="min-height: 180px; font-family: inherit; resize: vertical; display: none;" placeholder="Quellcode oder Roh-HTML hier bearbeiten..."></textarea>
         </div>
 
         <div class="form-group">
