@@ -230,7 +230,7 @@ async function loadTiles() {
       }
       
       const keyBtnHtml = (isSph && currentUser) 
-        ? `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id})" title="Schulportal-Zugangsdaten hinterlegen"><i class="fa-solid fa-key"></i></button>`
+        ? `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`
         : '';
       
       tileCard.innerHTML = `
