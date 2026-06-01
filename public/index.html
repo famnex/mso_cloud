@@ -17,7 +17,7 @@
     
     <!-- ANONYMOUS HEADER -->
     <div id="header-anonymous" style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-      <div class="logo-section" style="display: flex; align-items: center; gap: 15px;">
+      <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
         <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
         <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">Die digitalen Dienste der MSO</span>
       </div>
@@ -34,7 +34,7 @@
     <!-- AUTHENTICATED HEADER (Standardmäßig ausgeblendet) -->
     <div id="header-authenticated" style="width: 100%; display: none; justify-content: space-between; align-items: center;">
       <!-- Left Side: Logo & Tagline -->
-      <div class="logo-section" style="display: flex; align-items: center; gap: 15px;">
+      <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
         <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
         <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">Die digitalen Dienste der MSO</span>
       </div>
@@ -623,7 +623,7 @@
           </button>
         </div>
       </div>
-
+    </div>
   </main>
 
   <!-- SCHÜLERAUSWEIS VIEW (Neu) -->

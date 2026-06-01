@@ -2394,11 +2394,7 @@ function openStudentView() {
 }
 
 function closeStudentView() {
-  const mainView = document.getElementById('main-view');
-  const studentView = document.getElementById('student-view');
-
-  if (studentView) studentView.style.display = 'none';
-  if (mainView) mainView.style.display = 'block';
+  closeAllViews();
 }
 
 function clearStudentViewDOM() {
@@ -2809,11 +2805,21 @@ function openCardView() {
 }
 
 function closeCardView() {
+  closeAllViews();
+}
+
+function closeAllViews() {
   const mainView = document.getElementById('main-view');
+  const adminView = document.getElementById('admin-view');
+  const studentView = document.getElementById('student-view');
   const cardView = document.getElementById('card-view');
 
+  if (adminView) adminView.style.display = 'none';
+  if (studentView) studentView.style.display = 'none';
   if (cardView) cardView.style.display = 'none';
   if (mainView) mainView.style.display = 'block';
+
+  loadTiles();
 }
 
 
