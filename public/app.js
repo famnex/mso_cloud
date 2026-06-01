@@ -1502,20 +1502,34 @@ function renderAdminLogs(logs) {
   }
 
   tableBody.innerHTML = logs.map(log => {
-    // Level badge
+    // Level badge (ultra-robust inline styles to avoid conflicts)
     let levelBadge = '';
     if (log.level === 'error') {
-      levelBadge = `<span class="badge" style="background:rgba(239, 68, 68, 0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-xmark"></i> Error</span>`;
+      levelBadge = `
+        <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(239, 68, 68, 0.12) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
+          <i class="fa-solid fa-circle-xmark" style="font-size: 0.85rem !important; margin: 0 !important; color: #ef4444 !important; display: inline-block !important; line-height: 1 !important;"></i>
+          <span style="color: #ef4444 !important; line-height: 1 !important; font-weight: 600 !important;">Error</span>
+        </span>
+      `;
     } else if (log.level === 'warn') {
-      levelBadge = `<span class="badge" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-exclamation"></i> Warn</span>`;
+      levelBadge = `
+        <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(245, 158, 11, 0.12) !important; color: #f59e0b !important; border: 1px solid rgba(245, 158, 11, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
+          <i class="fa-solid fa-circle-exclamation" style="font-size: 0.85rem !important; margin: 0 !important; color: #f59e0b !important; display: inline-block !important; line-height: 1 !important;"></i>
+          <span style="color: #f59e0b !important; line-height: 1 !important; font-weight: 600 !important;">Warn</span>
+        </span>
+      `;
     } else {
-      levelBadge = `<span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-info"></i> Info</span>`;
+      levelBadge = `
+        <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(16, 185, 129, 0.12) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
+          <i class="fa-solid fa-circle-info" style="font-size: 0.85rem !important; margin: 0 !important; color: #10b981 !important; display: inline-block !important; line-height: 1 !important;"></i>
+          <span style="color: #10b981 !important; line-height: 1 !important; font-weight: 600 !important;">Info</span>
+        </span>
+      `;
     }
 
-    // Details button (disabled if details is null/empty)
-    const hasDetails = log.details && log.details !== 'null' && log.details !== '{}';
+    // Details button is ALWAYS enabled so long messages can be read in full
     const detailBtn = `
-      <button class="btn btn-secondary btn-sm" style="padding:4px 8px; display:inline-flex; align-items:center; justify-content:center;" onclick="openLogDetails(${log.id})" ${hasDetails ? '' : 'disabled'}>
+      <button class="btn btn-secondary btn-sm" style="padding:4px 8px; display:inline-flex; align-items:center; justify-content:center;" onclick="openLogDetails(${log.id})">
         <i class="fa-solid fa-magnifying-glass"></i>
       </button>
     `;
@@ -1587,18 +1601,37 @@ function openLogDetails(id) {
   // Badge in modal
   const modalBadge = document.getElementById('log-details-level-badge');
   if (log.level === 'error') {
-    modalBadge.innerHTML = `<span class="badge" style="background:rgba(239, 68, 68, 0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-xmark"></i> Error</span>`;
+    modalBadge.innerHTML = `
+      <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(239, 68, 68, 0.12) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
+        <i class="fa-solid fa-circle-xmark" style="font-size: 0.85rem !important; margin: 0 !important; color: #ef4444 !important; display: inline-block !important; line-height: 1 !important;"></i>
+        <span style="color: #ef4444 !important; line-height: 1 !important; font-weight: 600 !important;">Error</span>
+      </span>
+    `;
   } else if (log.level === 'warn') {
-    modalBadge.innerHTML = `<span class="badge" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-exclamation"></i> Warn</span>`;
+    modalBadge.innerHTML = `
+      <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(245, 158, 11, 0.12) !important; color: #f59e0b !important; border: 1px solid rgba(245, 158, 11, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
+        <i class="fa-solid fa-circle-exclamation" style="font-size: 0.85rem !important; margin: 0 !important; color: #f59e0b !important; display: inline-block !important; line-height: 1 !important;"></i>
+        <span style="color: #f59e0b !important; line-height: 1 !important; font-weight: 600 !important;">Warn</span>
+      </span>
+    `;
   } else {
-    modalBadge.innerHTML = `<span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-info"></i> Info</span>`;
+    modalBadge.innerHTML = `
+      <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(16, 185, 129, 0.12) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
+        <i class="fa-solid fa-circle-info" style="font-size: 0.85rem !important; margin: 0 !important; color: #10b981 !important; display: inline-block !important; line-height: 1 !important;"></i>
+        <span style="color: #10b981 !important; line-height: 1 !important; font-weight: 600 !important;">Info</span>
+      </span>
+    `;
   }
 
   // Format and highlight JSON
   const jsonElement = document.getElementById('log-details-json');
   try {
-    const parsed = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
-    jsonElement.innerText = JSON.stringify(parsed, null, 2);
+    if (!log.details || log.details === 'null' || log.details === '{}') {
+      jsonElement.innerText = JSON.stringify({ "status": "Keine zusätzlichen Details für diese Protokoll-Aktion vorhanden." }, null, 2);
+    } else {
+      const parsed = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+      jsonElement.innerText = JSON.stringify(parsed, null, 2);
+    }
   } catch (e) {
     jsonElement.innerText = log.details || '{}';
   }
