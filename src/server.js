@@ -70,6 +70,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use('/api/setup', require('./routes/setup'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tiles', require('./routes/tiles'));
+app.use('/api/messages', require('./routes/messages'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/oauth', require('./routes/oauth'));
 

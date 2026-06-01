@@ -44,6 +44,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 3. Kacheln laden und rendern
   await loadTiles();
 
+  // News-Nachrichten laden und rendern
+  await loadActiveMessages();
+
   // 4. URL auf Passwort-Reset-Tokens prüfen
   checkPasswordResetToken();
 
@@ -156,6 +159,7 @@ async function handleLogin(e) {
       
       await checkAuthStatus();
       await loadTiles();
+      await loadActiveMessages();
     } else {
       throw new Error(data.error || 'Fehler beim Anmelden.');
     }
@@ -173,6 +177,7 @@ async function handleLogout() {
       renderAnonymousHeader();
       closeAdminView();
       await loadTiles();
+      await loadActiveMessages();
     }
   } catch (err) {
     console.error('Logout fehlgeschlagen:', err);
@@ -525,6 +530,8 @@ function loadAdminTabContent(tabId) {
     loadAdminLdapMappings();
   } else if (tabId === 'tab-users') {
     loadAdminUsers();
+  } else if (tabId === 'tab-messages') {
+    loadAdminMessages();
   } else if (tabId === 'tab-system') {
     loadSystemInfo();
   }
@@ -1510,4 +1517,363 @@ function proceedToSchulportal() {
   
   closeModal('sph-info-modal');
   window.location.href = `api/tiles/sso/${activeSphTileId}`;
+}
+
+/* ==========================================================================
+   9. Dashboard News-Karussell (Messages)
+   ========================================================================== */
+let activeMessages = [];
+let currentMessageIndex = 0;
+
+async function loadActiveMessages() {
+  try {
+    const res = await fetch('api/messages');
+    if (!res.ok) throw new Error('Fehler beim Laden der Nachrichten.');
+    const messages = await res.json();
+    
+    // Gast-Bestätigungen aus localStorage filtern (nur relevant, wenn nicht eingeloggt)
+    const guestConfirmedIds = JSON.parse(localStorage.getItem('mso_confirmed_messages') || '[]');
+    activeMessages = messages.filter(msg => !guestConfirmedIds.includes(msg.id));
+    
+    renderNewsCarousel();
+  } catch (err) {
+    console.error('Fehler beim Laden der Dashboard-Nachrichten:', err);
+    const container = document.getElementById('news-carousel-container');
+    if (container) container.style.display = 'none';
+  }
+}
+
+function renderNewsCarousel() {
+  const container = document.getElementById('news-carousel-container');
+  if (!container) return;
+  
+  if (activeMessages.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  
+  // Sicherstellen, dass der Index nicht out of bounds ist
+  if (currentMessageIndex >= activeMessages.length) {
+    currentMessageIndex = 0;
+  }
+  
+  container.style.display = 'block';
+  
+  // Pfeiltasten anzeigen, wenn mehr als 1 Nachricht vorhanden ist
+  const showNav = activeMessages.length > 1;
+  const navPrev = showNav ? `<button class="news-nav-btn prev" onclick="prevNewsSlide()"><i class="fa-solid fa-chevron-left"></i></button>` : '';
+  const navNext = showNav ? `<button class="news-nav-btn next" onclick="nextNewsSlide()"><i class="fa-solid fa-chevron-right"></i></button>` : '';
+  
+  // Rendern der Indikator-Punkte
+  let dotsHtml = '';
+  if (showNav) {
+    dotsHtml = `<div class="news-dots">`;
+    for (let i = 0; i < activeMessages.length; i++) {
+      const activeClass = i === currentMessageIndex ? 'active' : '';
+      dotsHtml += `<div class="news-dot ${activeClass}" onclick="goToNewsSlide(${i})"></div>`;
+    }
+    dotsHtml += `</div>`;
+  }
+  
+  // Rendern der Slides
+  let slidesHtml = `<div class="news-carousel-track" style="transform: translateX(-${currentMessageIndex * 100}%);">`;
+  
+  activeMessages.forEach(msg => {
+    // Bestätigungs-Button nur für Typ 'until_confirmation' anzeigen
+    const showConfirm = msg.type === 'until_confirmation';
+    const confirmBtn = showConfirm 
+      ? `<button class="news-confirm-btn" onclick="confirmMessage(event, ${msg.id})"><i class="fa-solid fa-check"></i> Nicht mehr anzeigen</button>`
+      : '';
+      
+    slidesHtml += `
+      <div class="news-slide">
+        <h4 class="news-title">
+          <i class="fa-solid fa-bullhorn"></i> ${escapeHtml(msg.title)}
+        </h4>
+        <div class="news-body">
+          ${msg.content}
+        </div>
+        <div class="news-footer">
+          ${confirmBtn}
+        </div>
+      </div>
+    `;
+  });
+  
+  slidesHtml += `</div>`;
+  
+  container.innerHTML = `
+    ${navPrev}
+    ${slidesHtml}
+    ${navNext}
+    ${dotsHtml}
+  `;
+}
+
+function prevNewsSlide() {
+  if (activeMessages.length <= 1) return;
+  currentMessageIndex = (currentMessageIndex - 1 + activeMessages.length) % activeMessages.length;
+  updateNewsSlidePosition();
+}
+
+function nextNewsSlide() {
+  if (activeMessages.length <= 1) return;
+  currentMessageIndex = (currentMessageIndex + 1) % activeMessages.length;
+  updateNewsSlidePosition();
+}
+
+function goToNewsSlide(index) {
+  if (index < 0 || index >= activeMessages.length) return;
+  currentMessageIndex = index;
+  updateNewsSlidePosition();
+}
+
+function updateNewsSlidePosition() {
+  const track = document.querySelector('.news-carousel-track');
+  if (track) {
+    track.style.transform = `translateX(-${currentMessageIndex * 100}%)`;
+  }
+  
+  // Indikatoren aktualisieren
+  const dots = document.querySelectorAll('.news-dot');
+  dots.forEach((dot, idx) => {
+    if (idx === currentMessageIndex) {
+      dot.classList.add('active');
+    } else {
+      dot.classList.remove('active');
+    }
+  });
+}
+
+async function confirmMessage(event, messageId) {
+  event.stopPropagation();
+  event.preventDefault();
+  
+  try {
+    const res = await fetch(`api/messages/${messageId}/confirm`, {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    
+    if (data.success) {
+      if (data.guest) {
+        // Für Gäste im localStorage persistieren
+        const guestConfirmedIds = JSON.parse(localStorage.getItem('mso_confirmed_messages') || '[]');
+        if (!guestConfirmedIds.includes(messageId)) {
+          guestConfirmedIds.push(messageId);
+          localStorage.setItem('mso_confirmed_messages', JSON.stringify(guestConfirmedIds));
+        }
+      }
+      
+      // Bestätigte Nachricht aus der aktuellen Liste entfernen
+      activeMessages = activeMessages.filter(msg => msg.id !== messageId);
+      
+      // Index anpassen, falls wir am Ende waren
+      if (currentMessageIndex >= activeMessages.length && currentMessageIndex > 0) {
+        currentMessageIndex = activeMessages.length - 1;
+      }
+      
+      renderNewsCarousel();
+    } else {
+      throw new Error(data.error || 'Fehler beim Bestätigen.');
+    }
+  } catch (err) {
+    console.error('Fehler beim Bestätigen der Nachricht:', err);
+    alert('Fehler: ' + err.message);
+  }
+}
+
+function escapeHtml(unsafe) {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/* ==========================================================================
+   10. Admin Nachrichten-Verwaltung (News)
+   ========================================================================== */
+async function loadAdminMessages() {
+  try {
+    const res = await fetch('api/admin/messages');
+    if (!res.ok) throw new Error('Fehler beim Laden der Nachrichten.');
+    const messages = await res.json();
+    
+    const tbody = document.getElementById('admin-messages-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    if (messages.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-secondary);">Keine Nachrichten vorhanden.</td></tr>';
+      return;
+    }
+    
+    messages.forEach(msg => {
+      const typeLabel = msg.type === 'temporary' 
+        ? '<span class="badge badge-info">Zeitgesteuert</span>' 
+        : '<span class="badge badge-warning">Bis Bestätigung</span>';
+        
+      const timeSpan = msg.type === 'temporary'
+        ? `${formatDateTime(msg.start_date)} bis ${formatDateTime(msg.end_date)}`
+        : '<span style="color: var(--text-secondary); font-size: 0.85rem;">Permanente Anzeige bis Klick</span>';
+        
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight: 600; color: var(--accent-color);">${escapeHtml(msg.title)}</td>
+        <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(msg.content.replace(/<[^>]*>/g, ''))}</td>
+        <td>${typeLabel}</td>
+        <td>${timeSpan}</td>
+        <td>${formatDateTime(msg.created_at)}</td>
+        <td>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-secondary btn-sm" onclick="editMessage(${msg.id})" title="Bearbeiten">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteMessage(${msg.id})" title="Löschen">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('Fehler beim Laden der Admin-Nachrichten:', err);
+    showAdminAlert('Fehler: ' + err.message, 'danger');
+  }
+}
+
+function openMessageForm() {
+  document.getElementById('message_id').value = '';
+  document.getElementById('message-form').reset();
+  document.getElementById('message-modal-title').innerHTML = '<i class="fa-solid fa-bullhorn" style="color: var(--accent-color);"></i> Nachricht erstellen';
+  
+  // Start- und Endzeitpunkt auf jetzt + 7 Tage als Vorschlag setzen für den Typ "temporary"
+  const now = new Date();
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  
+  // datetime-local verlangt YYYY-MM-DDTHH:MM
+  const formatInputDate = (d) => {
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  
+  document.getElementById('message_start_date').value = formatInputDate(now);
+  document.getElementById('message_end_date').value = formatInputDate(nextWeek);
+  
+  toggleMessageTimeFields();
+  openModal('message-modal');
+}
+
+async function editMessage(id) {
+  try {
+    const res = await fetch('api/admin/messages');
+    if (!res.ok) throw new Error('Fehler beim Laden der Nachrichtendaten.');
+    const messages = await res.json();
+    const msg = messages.find(m => m.id === id);
+    
+    if (!msg) throw new Error('Nachricht nicht gefunden.');
+    
+    document.getElementById('message_id').value = msg.id;
+    document.getElementById('message_title').value = msg.title;
+    document.getElementById('message_content').value = msg.content;
+    document.getElementById('message_type').value = msg.type;
+    
+    document.getElementById('message_start_date').value = msg.start_date || '';
+    document.getElementById('message_end_date').value = msg.end_date || '';
+    
+    document.getElementById('message-modal-title').innerHTML = '<i class="fa-solid fa-bullhorn" style="color: var(--accent-color);"></i> Nachricht bearbeiten';
+    
+    toggleMessageTimeFields();
+    openModal('message-modal');
+  } catch (err) {
+    alert('Fehler beim Laden der Nachrichtendaten: ' + err.message);
+  }
+}
+
+function toggleMessageTimeFields() {
+  const type = document.getElementById('message_type').value;
+  const timeFields = document.getElementById('message-time-fields');
+  
+  if (type === 'temporary') {
+    timeFields.style.display = 'grid';
+    document.getElementById('message_start_date').required = true;
+    document.getElementById('message_end_date').required = true;
+  } else {
+    timeFields.style.display = 'none';
+    document.getElementById('message_start_date').required = false;
+    document.getElementById('message_end_date').required = false;
+  }
+}
+
+async function saveMessageForm(e) {
+  e.preventDefault();
+  
+  const id = document.getElementById('message_id').value;
+  const title = document.getElementById('message_title').value.trim();
+  const content = document.getElementById('message_content').value.trim();
+  const type = document.getElementById('message_type').value;
+  
+  const start_date = type === 'temporary' ? document.getElementById('message_start_date').value : null;
+  const end_date = type === 'temporary' ? document.getElementById('message_end_date').value : null;
+  
+  const payload = { title, content, type, start_date, end_date };
+  
+  const url = id ? `api/admin/messages/${id}` : 'api/admin/messages';
+  const method = id ? 'PUT' : 'POST';
+  
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Fehler beim Speichern.');
+    
+    closeModal('message-modal');
+    showAdminAlert(data.message, 'success');
+    loadAdminMessages();
+    
+    // Auch Dashboard-Nachrichten sofort neu laden
+    loadActiveMessages();
+  } catch (err) {
+    alert('Fehler beim Speichern: ' + err.message);
+  }
+}
+
+async function deleteMessage(id) {
+  if (!confirm('Möchtest du diese Nachricht wirklich löschen?')) return;
+  
+  try {
+    const res = await fetch(`api/admin/messages/${id}`, {
+      method: 'DELETE'
+    });
+    
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Fehler beim Löschen.');
+    
+    showAdminAlert(data.message, 'success');
+    loadAdminMessages();
+    
+    // Auch Dashboard-Nachrichten sofort neu laden
+    loadActiveMessages();
+  } catch (err) {
+    alert('Fehler beim Löschen: ' + err.message);
+  }
+}
+
+function formatDateTime(isoString) {
+  if (!isoString) return '-';
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+  } catch (e) {
+    return isoString;
+  }
 }

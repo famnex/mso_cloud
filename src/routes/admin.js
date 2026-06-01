@@ -538,4 +538,92 @@ router.post('/system/update', (req, res) => {
   });
 });
 
+/* ==========================================================================
+   7. News und Nachrichten (Messages)
+   ========================================================================== */
+
+/**
+ * Holt alle erstellten Nachrichten (für die Admin-Tabelle).
+ */
+router.get('/messages', (req, res) => {
+  try {
+    const messages = db.prepare('SELECT * FROM news_messages ORDER BY created_at DESC').all();
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Legt eine neue Nachricht an.
+ */
+router.post('/messages', (req, res) => {
+  try {
+    const { title, content, type, start_date, end_date } = req.body;
+    
+    if (!title || !content || !type) {
+      return res.status(400).json({ error: 'Titel, Inhalt und Typ sind Pflichtfelder.' });
+    }
+
+    db.prepare(`
+      INSERT INTO news_messages (title, content, type, start_date, end_date)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      title,
+      content,
+      type,
+      start_date || null,
+      end_date || null
+    );
+
+    res.json({ success: true, message: 'Nachricht erfolgreich hinzugefügt.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Aktualisiert eine bestehende Nachricht.
+ */
+router.put('/messages/:id', (req, res) => {
+  const messageId = req.params.id;
+  try {
+    const { title, content, type, start_date, end_date } = req.body;
+    
+    if (!title || !content || !type) {
+      return res.status(400).json({ error: 'Titel, Inhalt und Typ sind Pflichtfelder.' });
+    }
+
+    db.prepare(`
+      UPDATE news_messages 
+      SET title = ?, content = ?, type = ?, start_date = ?, end_date = ?
+      WHERE id = ?
+    `).run(
+      title,
+      content,
+      type,
+      start_date || null,
+      end_date || null,
+      messageId
+    );
+
+    res.json({ success: true, message: 'Nachricht erfolgreich aktualisiert.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Löscht eine Nachricht.
+ */
+router.delete('/messages/:id', (req, res) => {
+  const messageId = req.params.id;
+  try {
+    db.prepare('DELETE FROM news_messages WHERE id = ?').run(messageId);
+    res.json({ success: true, message: 'Nachricht erfolgreich gelöscht.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

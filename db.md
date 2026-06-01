@@ -143,6 +143,32 @@ Speichert die optionalen Schulportal Hessen Zugangsdaten der Benutzer für das a
 
 ---
 
+### Tabelle: `news_messages`
+Verwaltet globale Ankündigungen und News-Nachrichten für das Portal-Dashboard.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
+| `title` | TEXT | Titel der Nachricht |
+| `content` | TEXT | Der Nachrichtentext (HTML / Text) |
+| `type` | TEXT | Der Anzeigetyp (`temporary` = zeitgesteuert, `until_confirmation` = bis zur Bestätigung) |
+| `start_date` | TEXT | Startdatum und Uhrzeit der Sichtbarkeit (ISO-Format) |
+| `end_date` | TEXT | Enddatum und Uhrzeit der Sichtbarkeit (ISO-Format) |
+| `created_at` | DATETIME | Erstellungszeitpunkt |
+
+---
+
+### Tabelle: `user_message_confirmations`
+Speichert die Lesebestätigungen eingeloggter Benutzer für Nachrichten des Typs `until_confirmation`.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `user_id` (PK, FK) | INTEGER | Verweis auf den Benutzer (`users.id`) |
+| `message_id` (PK, FK) | INTEGER | Verweis auf die gelesene Nachricht (`news_messages.id`) |
+| `confirmed_at` | DATETIME | Zeitpunkt der Bestätigung |
+
+---
+
 
 ### Tabelle: `applied_migrations`
 Erfasst alle erfolgreich importierten Datenbank-Migrationsdateien.
