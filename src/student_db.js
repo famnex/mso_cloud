@@ -495,6 +495,8 @@ async function getStudentByEmail(email) {
  * Erzeugt ein neues E-Mail-Token für den Schüler-Erstlogin.
  */
 async function createStudentToken(email, token, ip) {
+  let userId;
+  
   if (pool) {
     try {
       const [rows] = await pool.query(
@@ -504,97 +506,79 @@ async function createStudentToken(email, token, ip) {
       if (rows.length > 0) {
         const applicationId = rows[0].application;
         
-        await pool.query(
-          'INSERT INTO schueleremailtokens (token, IDapplication, state, datetime) VALUES (?, ?, 0, NOW())',
-          [token, applicationId]
-        );
+        // Versuchen, das Token auch in MySQL zu loggen, damit andere Altsysteme synchron sind.
+        try {
+          await pool.query(
+            'INSERT INTO schueleremailtokens (token, IDapplication, state, datetime) VALUES (?, ?, 0, NOW())',
+            [token, applicationId]
+          );
+          await pool.query(`
+            INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip)
+            VALUES (NULL, ?, 'Information', 'Erhebung/Veränderung', 'sendmaillogin', NULL, ?, ?, ?)
+          `, [applicationId, `Neuer Token erstellt: ${token}`, email.trim(), ip || '127.0.0.1']);
+        } catch (mysqlErr) {
+          console.warn('MySQL-Token-Logging fehlgeschlagen:', mysqlErr.message);
+        }
 
-        await pool.query(`
-          INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip)
-          VALUES (NULL, ?, 'Information', 'Erhebung/Veränderung', 'sendmaillogin', NULL, ?, ?, ?)
-        `, [applicationId, `Neuer Token erstellt: ${token}`, email.trim(), ip || '127.0.0.1']);
+        // Lokalen SQLite-Nutzer prüfen/anlegen
+        let localUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
+        if (!localUser) {
+          const [fieldRows] = await pool.query(
+            'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
+            [applicationId]
+          );
+          const firstNameRow = fieldRows.find(r => r.field === 1);
+          const lastNameRow = fieldRows.find(r => r.field === 2);
+          const usernameRow = fieldRows.find(r => r.field === 146);
 
-        return { success: true };
+          const firstName = firstNameRow ? firstNameRow.value.trim() : '';
+          const lastName = lastNameRow ? lastNameRow.value.trim() : '';
+          const username = usernameRow ? usernameRow.value.trim() : email.trim().split('@')[0];
+
+          const info = db.prepare(`
+            INSERT INTO users (username, email, role, groups, is_ldap)
+            VALUES (?, ?, 'user', '["Schueler"]', 0)
+          `).run(username, email.trim());
+          userId = info.lastInsertRowId;
+
+          db.prepare(`
+            INSERT OR IGNORE INTO student_profiles (user_id, first_name, last_name, card_status)
+            VALUES (?, ?, ?, 'Bild ungeprüft / Kein Bild')
+          `).run(userId, firstName, lastName);
+        } else {
+          userId = localUser.id;
+        }
       }
     } catch (err) {
       console.error('MySQL Error in createStudentToken:', err);
     }
   }
 
-  // SQLite Fallback
-  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
-  if (user) {
-    db.prepare('DELETE FROM student_tokens WHERE user_id = ?').run(user.id);
+  if (!userId) {
+    const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
+    if (user) {
+      userId = user.id;
+    }
+  }
 
+  if (userId) {
+    db.prepare('DELETE FROM student_tokens WHERE user_id = ?').run(userId);
     const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
     db.prepare(`
       INSERT INTO student_tokens (user_id, token, expires_at, used)
       VALUES (?, ?, ?, 0)
-    `).run(user.id, token, expiresAt);
+    `).run(userId, token, expiresAt);
     return { success: true };
   }
-  return { success: false, error: 'User not found in local cache' };
+
+  return { success: false, error: 'Der Benutzer konnte im lokalen Cache nicht gefunden oder synchronisiert werden.' };
 }
 
 /**
  * Verifiziert das E-Mail-Token und gibt das zugehörige Benutzer-Objekt zurück.
  */
 async function verifyStudentToken(token, ip) {
-  if (pool) {
-    try {
-      // Veraltete Tokens löschen (> 20 Min)
-      await pool.query(
-        'DELETE FROM schueleremailtokens WHERE datetime < NOW() - INTERVAL 20 MINUTE'
-      );
-
-      const [tokenRows] = await pool.query(
-        'SELECT IDapplication, state FROM schueleremailtokens WHERE token = ?',
-        [token]
-      );
-
-      if (tokenRows.length > 0) {
-        const applicationId = tokenRows[0].IDapplication;
-
-        await pool.query(
-          'UPDATE schueleremailtokens SET state = 1 WHERE token = ?',
-          [token]
-        );
-
-        await pool.query(`
-          INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip)
-          VALUES (NULL, ?, 'Information', 'Abfrage', 'lobby', 'schueleremailtokens', 'Token gefunden.', ?, ?)
-        `, [applicationId, token, ip || '127.0.0.1']);
-
-        const [emailRows] = await pool.query(
-          'SELECT value FROM fieldvalues WHERE application = ? AND field = 18',
-          [applicationId]
-        );
-
-        const email = emailRows.length > 0 ? emailRows[0].value.trim() : '';
-        if (email) {
-          let localUser = db.prepare('SELECT id, username, email, role FROM users WHERE email = ?').get(email);
-          let userId = localUser ? localUser.id : 1000 + applicationId;
-          let username = localUser ? localUser.username : email.split('@')[0];
-
-          return {
-            success: true,
-            user: {
-              id: userId,
-              username: username,
-              email: email,
-              role: localUser ? localUser.role : 'user',
-              groups: localUser ? JSON.parse(localUser.groups || '[]') : [],
-              isLdap: false
-            }
-          };
-        }
-      }
-    } catch (err) {
-      console.error('MySQL Error in verifyStudentToken:', err);
-    }
-  }
-
-  // SQLite Fallback
+  // SQLite Prüfung (immer primär)
   const nowStr = new Date().toISOString();
   const row = db.prepare(`
     SELECT * FROM student_tokens 
@@ -603,6 +587,29 @@ async function verifyStudentToken(token, ip) {
 
   if (row) {
     db.prepare('UPDATE student_tokens SET used = 1 WHERE id = ?').run(row.id);
+
+    // Synchronisation mit MySQL (falls aktiv)
+    if (pool) {
+      try {
+        await pool.query(
+          'UPDATE schueleremailtokens SET state = 1 WHERE token = ?',
+          [token]
+        );
+        const [tokenRows] = await pool.query(
+          'SELECT IDapplication FROM schueleremailtokens WHERE token = ?',
+          [token]
+        );
+        if (tokenRows.length > 0) {
+          const applicationId = tokenRows[0].IDapplication;
+          await pool.query(`
+            INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip)
+            VALUES (NULL, ?, 'Information', 'Abfrage', 'lobby', 'schueleremailtokens', 'Token gefunden und entwertet via MSO-Cloud.', ?, ?)
+          `, [applicationId, token, ip || '127.0.0.1']);
+        }
+      } catch (err) {
+        console.error('MySQL-Synchronisation bei Token-Verifizierung fehlgeschlagen:', err.message);
+      }
+    }
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
     if (user) {
@@ -617,6 +624,94 @@ async function verifyStudentToken(token, ip) {
           isLdap: false
         }
       };
+    }
+  }
+
+  // Fallback: Versuche, das Token direkt aus MySQL zu lesen (falls es von externen Systemen wie PHP erstellt wurde)
+  if (pool) {
+    try {
+      // Veraltete Tokens löschen (> 20 Min)
+      await pool.query(
+        'DELETE FROM schueleremailtokens WHERE datetime < NOW() - INTERVAL 20 MINUTE'
+      );
+
+      const [tokenRows] = await pool.query(
+        'SELECT IDapplication, state FROM schueleremailtokens WHERE token = ? AND state = 0',
+        [token]
+      );
+
+      if (tokenRows.length > 0) {
+        const applicationId = tokenRows[0].IDapplication;
+
+        await pool.query(
+          'UPDATE schueleremailtokens SET state = 1 WHERE token = ?',
+          [token]
+        );
+
+        await pool.query(`
+          INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip)
+          VALUES (NULL, ?, 'Information', 'Abfrage', 'lobby', 'schueleremailtokens', 'Token in MySQL gefunden und entwertet.', ?, ?)
+        `, [applicationId, token, ip || '127.0.0.1']);
+
+        const [emailRows] = await pool.query(
+          'SELECT value FROM fieldvalues WHERE application = ? AND field = 18',
+          [applicationId]
+        );
+
+        const email = emailRows.length > 0 ? emailRows[0].value.trim() : '';
+        if (email) {
+          let localUser = db.prepare('SELECT id, username, email, role, groups FROM users WHERE email = ?').get(email);
+          let userId;
+          let username;
+          let role = 'user';
+          let groupsJson = '["Schueler"]';
+
+          if (!localUser) {
+            // Seede den Benutzer temporär in der lokalen SQLite
+            const [fieldRows] = await pool.query(
+              'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
+              [applicationId]
+            );
+            const firstNameRow = fieldRows.find(r => r.field === 1);
+            const lastNameRow = fieldRows.find(r => r.field === 2);
+            const usernameRow = fieldRows.find(r => r.field === 146);
+
+            const firstName = firstNameRow ? firstNameRow.value.trim() : '';
+            const lastName = lastNameRow ? lastNameRow.value.trim() : '';
+            username = usernameRow ? usernameRow.value.trim() : email.split('@')[0];
+
+            const info = db.prepare(`
+              INSERT INTO users (username, email, role, groups, is_ldap)
+              VALUES (?, ?, 'user', ?, 0)
+            `).run(username, email);
+            userId = info.lastInsertRowId;
+
+            db.prepare(`
+              INSERT OR IGNORE INTO student_profiles (user_id, first_name, last_name, card_status)
+              VALUES (?, ?, ?, 'Bild ungeprüft / Kein Bild')
+            `).run(userId, firstName, lastName);
+          } else {
+            userId = localUser.id;
+            username = localUser.username;
+            role = localUser.role;
+            groupsJson = localUser.groups || '[]';
+          }
+
+          return {
+            success: true,
+            user: {
+              id: userId,
+              username: username,
+              email: email,
+              role: role,
+              groups: JSON.parse(groupsJson),
+              isLdap: false
+            }
+          };
+        }
+      }
+    } catch (err) {
+      console.error('MySQL Error in verifyStudentToken (direct query):', err);
     }
   }
 
