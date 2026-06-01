@@ -469,14 +469,18 @@ main {
 
 .close-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
+  padding: 10px 14px;
   font-size: 1.5rem;
   cursor: pointer;
   color: var(--text-secondary);
+  line-height: 1;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 .close-btn:hover {
   color: var(--text-primary);
+  transform: scale(1.15);
 }
 
 .form-group {
