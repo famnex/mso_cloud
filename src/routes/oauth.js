@@ -207,7 +207,13 @@ router.get('/userinfo', (req, res) => {
       lastname = 'Administrator';
     }
 
-    // 4. Standard-OIDC Claims zurückgeben
+    // 4. Standard-OIDC Claims zurückgeben (CNs aus den LDAP-DNs extrahieren für saubere Übergabe)
+    const rawGroups = JSON.parse(user.groups || '[]');
+    const cleanGroups = rawGroups.map(g => {
+      const match = g.match(/cn=([^,]+)/i);
+      return match ? match[1].trim() : g;
+    });
+
     const claims = {
       sub: String(user.id),
       username: user.username,
@@ -217,7 +223,7 @@ router.get('/userinfo', (req, res) => {
       given_name: firstname,
       family_name: lastname,
       role: user.role,
-      groups: JSON.parse(user.groups || '[]')
+      groups: cleanGroups
     };
 
     console.log(`OIDC-Userinfo erfolgreich ausgeliefert für User: ${user.username}`);
