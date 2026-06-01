@@ -127,88 +127,132 @@ router.post('/logout', (req, res) => {
 });
 
 /**
- * E-Mail-Anfrage zur Passwortrücksetzung senden (Passwort vergessen)
+ * E-Mail-Anfrage zur Passwortrücksetzung senden per LDAP (Passwort vergessen)
  */
 router.post('/reset-request', async (req, res) => {
   const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ error: 'E-Mail-Adresse ist erforderlich.' });
+  if (!email || !email.includes('@')) {
+    // Sicherheitshinweis: Immer Erfolg vortäuschen, um E-Mail-Enumeration zu verhindern!
+    return res.json({ success: true, message: 'Wenn ein Konto existiert, haben wir dir eine E-Mail gesendet.' });
   }
 
   try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const emailHash = crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+    const ip = req.ip || req.headers['x-forwarded-for'] || '0.0.0.0';
+
+    // Rate Limiting (5 pro E-Mail per Stunde, 20 pro IP per Stunde)
+    const emailLimitRow = db.prepare(`
+      SELECT COUNT(*) as count FROM password_reset_tokens 
+      WHERE email_hash = ? AND created_at >= datetime('now', '-1 hour')
+    `).get(emailHash);
     
-    // Sicherheitshinweis: Immer Erfolg vortäuschen, um E-Mail-Enumeration zu verhindern!
-    const genericSuccessMsg = 'Falls ein lokales Konto mit dieser E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen versendet.';
+    const ipLimitRow = db.prepare(`
+      SELECT COUNT(*) as count FROM password_reset_tokens 
+      WHERE request_ip = ? AND created_at >= datetime('now', '-1 hour')
+    `).get(ip);
 
-    if (!user) {
-      return res.json({ success: true, message: genericSuccessMsg });
+    if (emailLimitRow.count >= 5 || ipLimitRow.count >= 20) {
+      console.warn(`Rate limit hit for password reset request. Email: ${email}, IP: ${ip}`);
+      return res.json({ success: true, message: 'Wenn ein Konto existiert, haben wir dir eine E-Mail gesendet.' });
     }
 
-    // Wenn es ein LDAP-Nutzer ist, kann sein Passwort nicht lokal zurückgesetzt werden
-    if (user.is_ldap === 1) {
-      return res.status(400).json({ 
-        error: 'Dieses Konto wird über LDAP verwaltet. Bitte ändere dein Passwort im Schulnetzwerk oder wende dich an den Administrator.' 
-      });
+    // 3. User im LDAP suchen
+    const ldapUser = await ldap.findUserByEmail(email);
+
+    if (ldapUser && ldapUser.dn) {
+      // Token erzeugen (32 random bytes -> base64url)
+      const raw = crypto.randomBytes(32);
+      const token = raw.toString('base64url');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 Min gültig
+      const createdAt = new Date().toISOString();
+      const userAgent = req.headers['user-agent'] ? req.headers['user-agent'].substring(0, 255) : '';
+
+      // In DB eintragen
+      db.prepare(`
+        INSERT INTO password_reset_tokens (user_dn, token_hash, email_hash, expires_at, created_at, request_ip, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(ldapUser.dn, tokenHash, emailHash, expiresAt, createdAt, ip, userAgent);
+
+      // Reset-URL zusammenbauen
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const host = req.get('host');
+      const resetUrl = `${protocol}://${host}/index.html?action=reset&token=${token}`;
+
+      // Mail senden
+      const htmlContent = `
+        <!doctype html><html lang="de"><meta charset="utf-8">
+        <body style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; line-height:1.6">
+          <p>Hallo,</p>
+          <p>du (oder jemand anderes) hat eine Zurücksetzung deines Passworts für dein MSO-Schulkonto angefordert.</p>
+          <p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none" target="_blank" rel="noopener">Passwort jetzt zurücksetzen</a></p>
+          <p>Alternativ: <a href="${resetUrl}" target="_blank" rel="noopener">${resetUrl}</a></p>
+          <p style="color:#666;font-size:12px">Der Link ist 15 Minuten gültig.</p>
+        </body></html>
+      `;
+
+      try {
+        await mail.sendMail(email, 'Passwort zurücksetzen', htmlContent);
+        console.log(`LDAP-Password-Reset Mail gesendet an: ${email}`);
+      } catch (mailErr) {
+        console.error('WARNUNG: E-Mail-Versand fehlgeschlagen (SMTP nicht konfiguriert?):', mailErr.message);
+      }
+    } else {
+      console.log(`E-Mail ${email} wurde im LDAP nicht gefunden.`);
     }
 
-    // Token erzeugen
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 3600000).toISOString(); // 1 Stunde gültig
-
-    // In DB eintragen
-    db.prepare(`
-      INSERT INTO password_resets (user_id, token, expires_at)
-      VALUES (?, ?, ?)
-    `).run(user.id, token, expiresAt);
-
-    // Reset-URL zusammenbauen
-    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-    const host = req.get('host');
-    const resetUrl = `${protocol}://${host}/index.html?action=reset&token=${token}`;
-
-    // Mail senden
-    await mail.sendResetMail(user.email, user.username, resetUrl);
-
-    res.json({ success: true, message: genericSuccessMsg });
+    res.json({ success: true, message: 'Wenn ein Konto existiert, haben wir dir eine E-Mail gesendet.' });
   } catch (error) {
-    console.error('Fehler bei der Passwort-Reset-Anfrage:', error);
-    res.status(500).json({ error: 'Fehler beim Senden der Reset-Mail: ' + error.message });
+    console.error('Fehler bei der LDAP-Passwort-Reset-Anfrage:', error);
+    res.status(500).json({ error: 'Interner Serverfehler beim Verarbeiten des Passwort-Resets.' });
   }
 });
 
 /**
- * Passwort mit Token tatsächlich zurücksetzen
+ * Passwort mit Token tatsächlich im LDAP zurücksetzen
  */
-router.post('/reset-password', (req, res) => {
+router.post('/reset-password', async (req, res) => {
   const { token, password } = req.body;
 
   if (!token || !password) {
     return res.status(400).json({ error: 'Token und neues Passwort sind erforderlich.' });
   }
 
+  // Passwort-Richtlinie prüfen (Mindestens 8 Zeichen, Groß-, Kleinbuchstabe, Zahl, Sonderzeichen)
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
+  if (password.length < 8 || !passwordRegex.test(password)) {
+    return res.status(400).json({ 
+      error: 'Das Passwort erfüllt die Richtlinie nicht (Minds. 8 Zeichen, Groß-/Kleinbuchstabe, Zahl und Sonderzeichen).' 
+    });
+  }
+
   try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const nowIso = new Date().toISOString();
+
     // Aktiven, ungenutzten Reset-Token holen
     const reset = db.prepare(`
-      SELECT * FROM password_resets 
-      WHERE token = ? AND used = 0 AND expires_at > datetime('now')
-    `).get(token);
+      SELECT * FROM password_reset_tokens 
+      WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(tokenHash, nowIso);
 
     if (!reset) {
       return res.status(400).json({ error: 'Der Link ist ungültig oder abgelaufen.' });
     }
 
-    // Neues Passwort hashen und updaten
-    const hash = bcrypt.hashSync(password, 10);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, reset.user_id);
+    // Passwort in LDAP ändern
+    console.log(`Setze neues Passwort in LDAP für DN: ${reset.user_dn}`);
+    await ldap.changePassword(reset.user_dn, password);
 
     // Token als verbraucht markieren
-    db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(reset.id);
+    const usedAt = new Date().toISOString();
+    db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE id = ?').run(usedAt, reset.id);
 
     res.json({ success: true, message: 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.' });
   } catch (error) {
-    console.error('Fehler beim Zurücksetzen des Passworts:', error);
+    console.error('Fehler beim Zurücksetzen des LDAP-Passworts:', error);
     res.status(500).json({ error: 'Fehler beim Passwort-Reset: ' + error.message });
   }
 });

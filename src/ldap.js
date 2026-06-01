@@ -1,5 +1,26 @@
 const ldap = require('ldapjs');
+const crypto = require('crypto');
 const { db, getConfig } = require('./db');
+
+if (process.env.MOCK_LDAP === '1') {
+  module.exports = {
+    authenticate: async (u, p) => ({ username: u, email: `${u}@mso-hef.de`, roles: [], isLdap: true }),
+    testConnection: async () => true,
+    syncUserGroups: async () => [],
+    findUserByEmail: async (email) => {
+      if (email.includes('error')) throw new Error('LDAP Connection Timeout');
+      if (email === 'max@mso-hef.de' || email === 'ldap@mso-hef.de') {
+        return { dn: 'CN=Max Mustermann,OU=Users,DC=mso,DC=local', email: email, username: 'max' };
+      }
+      return null;
+    },
+    changePassword: async (userDn, newPassword) => {
+      if (newPassword.includes('fail')) throw new Error('LDAP Constraint Violation');
+      return true;
+    }
+  };
+  return;
+}
 
 /**
  * Erstellt einen LDAP-Client basierend auf den detaillierten Datenbank-Konfigurationen.
@@ -323,8 +344,164 @@ async function syncUserGroups(username) {
   });
 }
 
+/**
+ * Sucht einen LDAP-Benutzer anhand der E-Mail-Adresse.
+ * Gibt das Benutzerobjekt mit { dn, email, username } oder null zurück.
+ */
+async function findUserByEmail(email) {
+  const enabled = getConfig('ldap_enabled') === '1';
+  if (!enabled) {
+    throw new Error('LDAP ist in den Einstellungen deaktiviert.');
+  }
+
+  const bindDn = getConfig('ldap_bind_dn');
+  const bindPassword = getConfig('ldap_bind_password');
+  const baseDn = getConfig('ldap_base_dn');
+  const mailAttr = getConfig('ldap_mail_attribute', 'mail');
+  const userAttr = getConfig('ldap_user_attribute', 'sAMAccountName');
+
+  // Filter z.B. (mail=user@domain.tld)
+  const filter = `(${mailAttr}=${email})`;
+
+  return new Promise((resolve, reject) => {
+    let client;
+    try {
+      client = createLdapClient();
+    } catch (err) {
+      return reject(err);
+    }
+
+    client.on('error', (err) => {
+      console.error('LDAP Client-Fehler bei E-Mail-Suche:', err);
+    });
+
+    client.bind(bindDn, bindPassword, (err) => {
+      if (err) {
+        client.destroy();
+        return reject(new Error('LDAP-Admin-Bind fehlgeschlagen: ' + err.message));
+      }
+
+      const opts = {
+        filter: filter,
+        scope: 'sub',
+        attributes: ['dn', mailAttr, userAttr]
+      };
+
+      let userEntry = null;
+
+      client.search(baseDn, opts, (err, res) => {
+        if (err) {
+          client.destroy();
+          return reject(new Error('LDAP-Suche fehlgeschlagen: ' + err.message));
+        }
+
+        res.on('searchEntry', (entry) => {
+          const obj = {};
+          const attributes = entry.attributes || [];
+          for (const attr of attributes) {
+            obj[attr.type] = attr.values.length === 1 ? attr.values[0] : attr.values;
+            obj[attr.type.toLowerCase()] = obj[attr.type];
+          }
+          userEntry = obj;
+          userEntry.dn = entry.dn.toString();
+        });
+
+        res.on('error', (err) => {
+          client.destroy();
+          return reject(new Error('LDAP-Suchstrom-Fehler: ' + err.message));
+        });
+
+        res.on('end', (result) => {
+          client.destroy();
+          if (!userEntry) {
+            return resolve(null);
+          }
+          const emailVal = userEntry[mailAttr] || userEntry[mailAttr.toLowerCase()] || '';
+          const usernameVal = userEntry[userAttr] || userEntry[userAttr.toLowerCase()] || '';
+          resolve({
+            dn: userEntry.dn,
+            email: emailVal,
+            username: usernameVal
+          });
+        });
+      });
+    });
+  });
+}
+
+/**
+ * Ändert das Passwort eines Benutzers direkt im LDAP.
+ */
+async function changePassword(userDn, newPassword) {
+  const enabled = getConfig('ldap_enabled') === '1';
+  if (!enabled) {
+    throw new Error('LDAP ist in den Einstellungen deaktiviert.');
+  }
+
+  const bindDn = getConfig('ldap_bind_dn');
+  const bindPassword = getConfig('ldap_bind_password');
+  const provider = getConfig('ldap_provider', 'ad').toLowerCase(); // Standardmäßig Active Directory
+
+  return new Promise((resolve, reject) => {
+    let client;
+    try {
+      client = createLdapClient();
+    } catch (err) {
+      return reject(err);
+    }
+
+    client.on('error', (err) => {
+      console.error('LDAP Client-Fehler beim Passwort ändern:', err);
+    });
+
+    client.bind(bindDn, bindPassword, (err) => {
+      if (err) {
+        client.destroy();
+        return reject(new Error('LDAP-Admin-Bind fehlgeschlagen: ' + err.message));
+      }
+
+      let change;
+      if (provider === 'ad') {
+        // Active Directory verlangt UTF-16LE mit Anführungszeichen
+        const doubleQuotedPassword = `"${newPassword}"`;
+        const unicodePwdBuffer = Buffer.from(doubleQuotedPassword, 'utf16le');
+        
+        change = new ldap.Change({
+          operation: 'replace',
+          modification: {
+            unicodePwd: [unicodePwdBuffer]
+          }
+        });
+      } else {
+        // OpenLDAP oder standardisiertes LDAP (SSHA-Verschlüsselung)
+        const salt = crypto.randomBytes(8);
+        const sha1Sum = crypto.createHash('sha1').update(newPassword).update(salt).digest();
+        const sshaHash = Buffer.concat([sha1Sum, salt]).toString('base64');
+        const hashedPw = '{SSHA}' + sshaHash;
+
+        change = new ldap.Change({
+          operation: 'replace',
+          modification: {
+            userPassword: hashedPw
+          }
+        });
+      }
+
+      client.modify(userDn, change, (err) => {
+        client.destroy();
+        if (err) {
+          return reject(new Error('LDAP-Passwortänderung fehlgeschlagen: ' + err.message));
+        }
+        resolve(true);
+      });
+    });
+  });
+}
+
 module.exports = {
   authenticate,
   testConnection,
-  syncUserGroups
+  syncUserGroups,
+  findUserByEmail,
+  changePassword
 };
