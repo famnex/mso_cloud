@@ -1605,14 +1605,30 @@ async function loadActiveMessages() {
     // Indikatoren & Dropdown initialisieren (berücksichtigt ungesehen/ungelesen)
     updateNewsIndicators();
     
-    // Automatisches Popup bei Seitenaufruf (einmal pro Tab-Session und nur wenn unbestätigte Nachrichten vorhanden)
-    const unconfirmedCount = activeMessages.filter(msg => !msg.confirmed).length;
-    if (unconfirmedCount > 0 && sessionStorage.getItem('news_popup_shown') !== 'true') {
+    // Automatisches Popup bei Seitenaufruf:
+    // 1. Wenn es brandneue, ungesehene und unbestätigte Nachrichten gibt -> Popup ERZWINGEN (ignoriert sessionStorage!)
+    // 2. Wenn es unbestätigte (aber bereits gesehene) Nachrichten gibt -> Popup nur EINMAL pro Tab-Session anzeigen
+    const seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
+    const unseenUnconfirmedCount = activeMessages.filter(msg => !msg.confirmed && !seenIds.includes(msg.id)).length;
+    const totalUnconfirmedCount = activeMessages.filter(msg => !msg.confirmed).length;
+    
+    let shouldShowPopup = false;
+    if (unseenUnconfirmedCount > 0) {
+      // Erzwingen, da eine neue, bisher ungesehene Nachricht vorhanden ist!
+      shouldShowPopup = true;
       sessionStorage.setItem('news_popup_shown', 'true');
-      
-      // Finde den Index der ersten unbestätigten Nachricht
+    } else if (totalUnconfirmedCount > 0 && sessionStorage.getItem('news_popup_shown') !== 'true') {
+      // Bereits gesehen, aber noch nicht bestätigt -> Nur einmal pro Session einblenden
+      shouldShowPopup = true;
+      sessionStorage.setItem('news_popup_shown', 'true');
+    }
+    
+    if (shouldShowPopup) {
+      // Bevorzuge das erste ungesehene Slide, andernfalls das erste unbestätigte
+      const firstUnseenIdx = activeMessages.findIndex(msg => !msg.confirmed && !seenIds.includes(msg.id));
       const firstUnconfirmedIdx = activeMessages.findIndex(msg => !msg.confirmed);
-      currentMessageIndex = firstUnconfirmedIdx !== -1 ? firstUnconfirmedIdx : 0;
+      
+      currentMessageIndex = firstUnseenIdx !== -1 ? firstUnseenIdx : (firstUnconfirmedIdx !== -1 ? firstUnconfirmedIdx : 0);
       
       openNewsViewModal();
     }
