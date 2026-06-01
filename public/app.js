@@ -2436,6 +2436,8 @@ async function loadStudentProfile() {
     document.getElementById('student-mso-username').innerText = currentUser.username || '-';
     document.getElementById('student-mso-password').innerText = profile.start_password || '-';
     document.getElementById('student-mediothek-number').innerText = profile.mediothek_number || '-';
+    document.getElementById('student-sph-username-display').innerText = profile.sph_username || '-';
+    document.getElementById('student-sph-password-display').innerText = profile.sph_password || '-';
 
     const statusEl = document.getElementById('student-account-status');
     if (profile.account_status === 'true') {
@@ -2480,20 +2482,7 @@ async function loadStudentProfile() {
     const previewImg = document.getElementById('student-photo-preview');
     previewImg.src = profile.card_image || 'media/user.png';
 
-    // SPH Credentials befüllen
-    try {
-      const sphRes = await fetch('api/auth/sph-credentials');
-      const sphData = await sphRes.json();
-      if (sphData.exists) {
-        document.getElementById('student-sph-username-display').innerText = sphData.username;
-        document.getElementById('student-sph-password-display').innerText = '•••••••• (Im System hinterlegt)';
-      } else {
-        document.getElementById('student-sph-username-display').innerText = 'Keine SPH-Daten hinterlegt';
-        document.getElementById('student-sph-password-display').innerText = '-';
-      }
-    } catch (sphErr) {
-      console.error('Fehler beim Laden der SPH-Zugangsdaten:', sphErr);
-    }
+
 
     // 2. Header Avatar & Anzeigenamen befüllen
     const fullName = ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim();

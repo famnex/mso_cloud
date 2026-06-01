@@ -110,7 +110,7 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
 
   rows.forEach(row => {
     const val = (row.value || '').trim();
-    switch (row.field) {
+    switch (Number(row.field)) {
       case 1: profile.first_name = val; break;
       case 2: profile.last_name = val; break;
       case 3: profile.birth_date = val; break;
@@ -194,7 +194,11 @@ async function getStudentProfile(user) {
         'SELECT file FROM images WHERE application = ? AND field = 37',
         [applicationId]
       );
-      const photoFile = photoRows.length > 0 ? photoRows[0].file : null;
+      let photoFile = null;
+      if (photoRows.length > 0) {
+        const rawFile = photoRows[0].file;
+        photoFile = Buffer.isBuffer(rawFile) ? rawFile.toString('utf-8') : rawFile;
+      }
 
       return buildProfileFromMySQL(user.id, applicationId, fieldRows, photoFile);
     } catch (err) {
@@ -285,9 +289,13 @@ async function getAllStudents() {
           'SELECT file FROM images WHERE application = ? AND field = 37',
           [appId]
         );
-        const photoFile = photoRows.length > 0 ? photoRows[0].file : null;
+        let photoFile = null;
+        if (photoRows.length > 0) {
+          const rawFile = photoRows[0].file;
+          photoFile = Buffer.isBuffer(rawFile) ? rawFile.toString('utf-8') : rawFile;
+        }
 
-        const emailRow = fieldRows.find(r => r.field === 18);
+        const emailRow = fieldRows.find(r => Number(r.field) === 18);
         const email = emailRow ? emailRow.value : '';
 
         if (!email) continue;
@@ -527,9 +535,9 @@ async function createStudentToken(email, token, ip) {
             'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
             [applicationId]
           );
-          const firstNameRow = fieldRows.find(r => r.field === 1);
-          const lastNameRow = fieldRows.find(r => r.field === 2);
-          const usernameRow = fieldRows.find(r => r.field === 146);
+          const firstNameRow = fieldRows.find(r => Number(r.field) === 1);
+          const lastNameRow = fieldRows.find(r => Number(r.field) === 2);
+          const usernameRow = fieldRows.find(r => Number(r.field) === 146);
 
           const firstName = firstNameRow ? firstNameRow.value.trim() : '';
           const lastName = lastNameRow ? lastNameRow.value.trim() : '';
@@ -672,9 +680,9 @@ async function verifyStudentToken(token, ip) {
               'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
               [applicationId]
             );
-            const firstNameRow = fieldRows.find(r => r.field === 1);
-            const lastNameRow = fieldRows.find(r => r.field === 2);
-            const usernameRow = fieldRows.find(r => r.field === 146);
+            const firstNameRow = fieldRows.find(r => Number(r.field) === 1);
+            const lastNameRow = fieldRows.find(r => Number(r.field) === 2);
+            const usernameRow = fieldRows.find(r => Number(r.field) === 146);
 
             const firstName = firstNameRow ? firstNameRow.value.trim() : '';
             const lastName = lastNameRow ? lastNameRow.value.trim() : '';
