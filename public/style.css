@@ -261,7 +261,7 @@ main {
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   text-decoration: none !important;
   color: inherit !important;
@@ -336,6 +336,7 @@ main {
 .tile-body {
   z-index: 2;
   margin-top: 20px;
+  width: 100%;
 }
 
 .tile-title {
@@ -343,6 +344,7 @@ main {
   font-weight: 600;
   margin-bottom: 6px;
   letter-spacing: -0.3px;
+  text-align: right;
 }
 
 .tile-description {
