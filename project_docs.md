@@ -158,5 +158,17 @@ Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in 
 *   **Erstlogin-Tokens**: Generierte Anmeldelinks und Logeinträge werden in den MySQL-Tabellen `schueleremailtokens` und `documentation` verwaltet. Veraltete E-Mail-Tokens werden bei jeder Verifikation automatisch gelöscht.
 *   **Nahtloser SQLite-Fallback**: Fehlen die MySQL-Umgebungsvariablen (z. B. bei Offline-Entwicklung oder automatisierten Tests), schaltet der Adapter vollautomatisch und transparent auf die lokale SQLite-Datenbank um. Die Frontend- und API-Schichten müssen dadurch an keiner Stelle angepasst werden.
 
+## 7. Microsoft 365 & Outlook login_hint SSO Integration
 
+Um das Einloggen bei Microsoft 365 und Outlook Web App für Benutzer so komfortabel wie möglich zu gestalten (True Single Sign-On), besitzt das Backend in `src/routes/tiles.js` eine dynamische Parameter-Injektion:
 
+1. **Outlook-Weiterleitung**:
+   - Erkennt Links zu `outlook.office.com`, `outlook.com` oder `outlook.office365.com`.
+   - Fügt den Parameter `login_hint=USER_EMAIL` nur dann an die Weiterleitungs-URL an, wenn die E-Mail-Adresse des Benutzers auf `@mso-hef.de` endet (LehrerInnen).
+   - Bei anderen E-Mail-Domains (SchülerInnen) wird kein Hint übergeben, um Fehlleitungen zu vermeiden.
+2. **Microsoft 365 Weiterleitung**:
+   - Erkennt Links zu `portal.office.com`, `login.microsoftonline.com` oder `office.com`.
+   - **LehrerInnen (E-Mail endet auf `@mso-hef.de`)**: Es wird die im Profil hinterlegte E-Mail-Adresse als `login_hint` übergeben.
+   - **SchülerInnen (alle anderen)**: Es wird automatisch der UPN im Format `[Benutzername]@msohef.onmicrosoft.com` generiert und als `login_hint` übergeben (gemäß FAQ-Vorgabe).
+
+Dies ermöglicht ein vollautomatisches Überspringen der Benutzernamens-Eingabe auf den Microsoft-Login-Seiten.

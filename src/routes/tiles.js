@@ -238,6 +238,43 @@ router.get('/sso/:id', (req, res) => {
       redirectUrl = `${redirectUrl}${separator}sso_token=${token}`;
     }
 
+    // Dynamic Microsoft 365 / Outlook login_hint resolution
+    if (user && redirectUrl) {
+      const isOutlook = redirectUrl.toLowerCase().includes('outlook.office') || 
+                        redirectUrl.toLowerCase().includes('outlook.com') ||
+                        redirectUrl.toLowerCase().includes('outlook.office365.com');
+                        
+      const isM365 = !isOutlook && (
+                       redirectUrl.toLowerCase().includes('portal.office.com') || 
+                       redirectUrl.toLowerCase().includes('login.microsoftonline.com') ||
+                       redirectUrl.toLowerCase().includes('office.com')
+                     );
+
+      if (isOutlook) {
+        // Outlook: Only append hint if the user's email ends with @mso-hef.de
+        if (user.email && user.email.toLowerCase().endsWith('@mso-hef.de')) {
+          const separator = redirectUrl.includes('?') ? '&' : '?';
+          redirectUrl = `${redirectUrl}${separator}login_hint=${encodeURIComponent(user.email)}`;
+        }
+      } else if (isM365) {
+        // Microsoft 365:
+        // 1. Teachers (email ends with @mso-hef.de): Use their email address
+        // 2. Students (all others): Use [Email-Präfix vor @]@msohef.onmicrosoft.com (falls E-Mail vorhanden), sonst Benutzername
+        let hint = '';
+        if (user.email && user.email.toLowerCase().endsWith('@mso-hef.de')) {
+          hint = user.email;
+        } else {
+          const usernamePart = (user.email && user.email.includes('@')) ? user.email.split('@')[0] : user.username;
+          hint = `${usernamePart}@msohef.onmicrosoft.com`;
+        }
+        
+        if (hint) {
+          const separator = redirectUrl.includes('?') ? '&' : '?';
+          redirectUrl = `${redirectUrl}${separator}login_hint=${encodeURIComponent(hint)}`;
+        }
+      }
+    }
+
     // Redirect ausführen
     res.redirect(redirectUrl);
 
