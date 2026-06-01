@@ -1556,6 +1556,29 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+function markMessageAsSeen(messageId) {
+  let seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
+  if (!seenIds.includes(messageId)) {
+    seenIds.push(messageId);
+    localStorage.setItem('mso_seen_messages', JSON.stringify(seenIds));
+    updateNewsIndicators();
+  }
+}
+
+function updateNewsIndicators() {
+  const seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
+  const unreadCount = activeMessages.filter(msg => !msg.confirmed && !seenIds.includes(msg.id)).length;
+  
+  const badge = document.getElementById('news-badge');
+  if (badge) {
+    badge.innerText = unreadCount;
+    badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+  }
+  
+  // Dropdown list indicators ebenfalls live anpassen
+  renderNewsDropdownList();
+}
+
 async function loadActiveMessages() {
   try {
     const res = await fetch('api/messages');
@@ -1571,24 +1594,16 @@ async function loadActiveMessages() {
       };
     });
     
-    // Megafon-Button Sichtbarkeit & Badge-Zustand steuern
+    // Megafon-Button Sichtbarkeit steuern
     const bellWrapper = document.getElementById('news-bell-wrapper');
-    const badge = document.getElementById('news-badge');
-    
     if (activeMessages.length > 0) {
       if (bellWrapper) bellWrapper.style.display = 'inline-block';
-      
-      const unconfirmedCount = activeMessages.filter(msg => !msg.confirmed).length;
-      if (badge) {
-        badge.innerText = unconfirmedCount;
-        badge.style.display = unconfirmedCount > 0 ? 'flex' : 'none';
-      }
     } else {
       if (bellWrapper) bellWrapper.style.display = 'none';
     }
     
-    // Dropdown-Liste rendern
-    renderNewsDropdownList();
+    // Indikatoren & Dropdown initialisieren (berücksichtigt ungesehen/ungelesen)
+    updateNewsIndicators();
     
     // Automatisches Popup bei Seitenaufruf (einmal pro Tab-Session und nur wenn unbestätigte Nachrichten vorhanden)
     const unconfirmedCount = activeMessages.filter(msg => !msg.confirmed).length;
@@ -1616,14 +1631,19 @@ function renderNewsDropdownList() {
     return;
   }
   
+  const seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
+  
   activeMessages.forEach(msg => {
     const li = document.createElement('li');
     li.className = 'news-dropdown-item';
-    if (msg.confirmed) {
+    
+    // Gelesen, wenn bestätigt ODER bereits gesehen
+    const isRead = msg.confirmed || seenIds.includes(msg.id);
+    if (isRead) {
       li.classList.add('confirmed');
     }
     
-    const indicator = msg.confirmed ? '' : '<span class="dot-indicator"></span>';
+    const indicator = isRead ? '' : '<span class="dot-indicator"></span>';
     
     li.innerHTML = `
       <span class="news-title-text"><i class="fa-solid fa-bullhorn" style="font-size:0.75rem; margin-right:6px; opacity:0.7;"></i> ${escapeHtml(msg.title)}</span>
@@ -1714,6 +1734,11 @@ function renderModalNewsCarousel() {
     ${navNext}
     ${dotsHtml}
   `;
+  
+  // Markiere die aktuell gezeigte Nachricht als gesehen
+  if (activeMessages[currentMessageIndex]) {
+    markMessageAsSeen(activeMessages[currentMessageIndex].id);
+  }
 }
 
 function prevNewsSlide() {
@@ -1749,6 +1774,11 @@ function updateNewsSlidePosition() {
       dot.classList.remove('active');
     }
   });
+  
+  // Markiere die neu angezeigte Nachricht als gesehen
+  if (activeMessages[currentMessageIndex]) {
+    markMessageAsSeen(activeMessages[currentMessageIndex].id);
+  }
 }
 
 async function toggleMessageConfirmation(event, messageId) {
@@ -1779,24 +1809,34 @@ async function toggleMessageConfirmation(event, messageId) {
           if (idx !== -1) {
             guestConfirmedIds.splice(idx, 1);
           }
+          
+          // Auch aus seen entfernen, damit wieder als ungelesen markiert
+          let seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
+          const sIdx = seenIds.indexOf(messageId);
+          if (sIdx !== -1) {
+            seenIds.splice(sIdx, 1);
+            localStorage.setItem('mso_seen_messages', JSON.stringify(seenIds));
+          }
         }
         localStorage.setItem('mso_confirmed_messages', JSON.stringify(guestConfirmedIds));
+      } else {
+        // Für angemeldete Nutzer: Wenn wieder aktiviert, auch aus seen entfernen
+        if (isChecked) {
+          let seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
+          const sIdx = seenIds.indexOf(messageId);
+          if (sIdx !== -1) {
+            seenIds.splice(sIdx, 1);
+            localStorage.setItem('mso_seen_messages', JSON.stringify(seenIds));
+          }
+        }
       }
       
       // Quittierungsstatus im aktuellen Array lokal aktualisieren
       const msg = activeMessages.find(m => m.id === messageId);
       if (msg) msg.confirmed = !isChecked; // confirmed = true, wenn checkbox UNCHECKED (isChecked = false)
       
-      // Badge aktualisieren
-      const unconfirmedCount = activeMessages.filter(m => !m.confirmed).length;
-      const badge = document.getElementById('news-badge');
-      if (badge) {
-        badge.innerText = unconfirmedCount;
-        badge.style.display = unconfirmedCount > 0 ? 'flex' : 'none';
-      }
-      
-      // Dropdown aktualisieren
-      renderNewsDropdownList();
+      // Badge und Dropdown-Menü live über zentralisierte Funktion aktualisieren
+      updateNewsIndicators();
       
       // Slide weiterblättern oder Modal schließen nach einer kurzen Verzögerung, wenn uncheck (gelesen)
       if (!isChecked) {
