@@ -26,7 +26,6 @@ function renderIcon(icon) {
 }
 
 // DOM-Elemente
-const themeToggleBtn = document.getElementById('theme-toggle');
 const authSection = document.getElementById('auth-section');
 const tilesContainer = document.getElementById('tiles-container');
 
@@ -69,11 +68,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initTheme() {
   const savedTheme = localStorage.getItem('theme') || 'dark';
   setTheme(savedTheme);
+}
 
-  themeToggleBtn.addEventListener('click', () => {
-    const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-  });
+function toggleTheme() {
+  const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
+  setTheme(newTheme);
 }
 
 function setTheme(theme) {
@@ -81,12 +80,11 @@ function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('theme', theme);
 
-  // Icon anpassen
-  if (theme === 'dark') {
-    themeToggleBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-  } else {
-    themeToggleBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
-  }
+  const icon = theme === 'dark' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+  const btnAnon = document.getElementById('theme-toggle-anon');
+  const btnAuth = document.getElementById('theme-toggle-auth');
+  if (btnAnon) btnAnon.innerHTML = icon;
+  if (btnAuth) btnAuth.innerHTML = icon;
 }
 
 /* ==========================================================================
@@ -111,36 +109,47 @@ async function checkAuthStatus() {
 }
 
 function renderAuthenticatedHeader() {
-  const isAdmin = currentUser.role === 'admin';
   const isStudent = currentUser.groups && currentUser.groups.includes('Schueler');
-  
-  const adminBtnHtml = isAdmin 
-    ? `<button class="btn btn-secondary" onclick="openAdminView()"><i class="fa-solid fa-screwdriver-wrench"></i> Admin-Bereich</button>`
-    : '';
 
-  const studentBtnHtml = isStudent
-    ? `<button class="btn btn-secondary" onclick="openStudentView()"><i class="fa-solid fa-graduation-cap"></i> Schülerportal</button>`
-    : '';
+  const headerAnon = document.getElementById('header-anonymous');
+  const headerAuth = document.getElementById('header-authenticated');
+  if (headerAnon) headerAnon.style.display = 'none';
+  if (headerAuth) headerAuth.style.display = 'flex';
 
-  authSection.innerHTML = `
-    <div style="display:flex; align-items:center; gap:15px;">
-      <div class="user-badge">
-        <i class="fa-solid fa-user-circle"></i>
-        <span>Eingeloggt als <strong>${currentUser.username}</strong></span>
-      </div>
-      ${studentBtnHtml}
-      ${adminBtnHtml}
-      <button class="btn btn-danger" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Abmelden</button>
-    </div>
-  `;
+  // Fallback initial
+  document.getElementById('header-full-name').innerText = currentUser.username;
+  document.getElementById('header-user-avatar').src = 'media/user.png';
+
+  // Render Admin Button right container if admin
+  renderAdminButton();
+
+  // Load student profile details
+  if (isStudent) {
+    loadStudentProfile();
+  }
+}
+
+function renderAdminButton() {
+  const container = document.getElementById('admin-btn-container');
+  if (!container) return;
+
+  const isAdmin = currentUser.role === 'admin';
+  if (isAdmin) {
+    container.innerHTML = `
+      <button class="btn btn-secondary" onclick="openAdminView()">
+        <i class="fa-solid fa-screwdriver-wrench"></i> Admin-Bereich
+      </button>
+    `;
+  } else {
+    container.innerHTML = '';
+  }
 }
 
 function renderAnonymousHeader() {
-  authSection.innerHTML = `
-    <button class="btn btn-primary" onclick="openModal('login-modal')">
-      <i class="fa-solid fa-right-to-bracket"></i> Anmelden
-    </button>
-  `;
+  const headerAnon = document.getElementById('header-anonymous');
+  const headerAuth = document.getElementById('header-authenticated');
+  if (headerAnon) headerAnon.style.display = 'flex';
+  if (headerAuth) headerAuth.style.display = 'none';
 }
 
 async function handleLogin(e) {
@@ -190,6 +199,7 @@ async function handleLogout() {
       renderAnonymousHeader();
       closeAdminView();
       closeStudentView();
+      closeCardView();
       await loadTiles();
       await loadActiveMessages();
     }
@@ -495,10 +505,20 @@ function closeModal(id) {
   if (alert) alert.style.display = 'none';
 }
 
-// Schließen per Klick außerhalb des Modals
+// Schließen per Klick außerhalb des Modals oder Dropdowns
 window.onclick = function(event) {
   if (event.target.classList.contains('modal')) {
     event.target.style.display = 'none';
+  }
+  
+  // User Dropdown schließen bei Klick außerhalb
+  const dropdown = document.getElementById('header-user-dropdown');
+  if (dropdown && dropdown.style.display === 'block') {
+    const trigger = document.getElementById('header-user-display-name');
+    const avatar = document.querySelector('.user-avatar-circle');
+    if (trigger && avatar && !trigger.contains(event.target) && !avatar.contains(event.target)) {
+      dropdown.style.display = 'none';
+    }
   }
 };
 
@@ -2298,9 +2318,11 @@ function openStudentView() {
   const mainView = document.getElementById('main-view');
   const studentView = document.getElementById('student-view');
   const adminView = document.getElementById('admin-view');
+  const cardView = document.getElementById('card-view');
 
   if (adminView) adminView.style.display = 'none';
   if (mainView) mainView.style.display = 'none';
+  if (cardView) cardView.style.display = 'none';
   if (studentView) {
     studentView.style.display = 'block';
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2319,21 +2341,30 @@ function closeStudentView() {
 async function loadStudentProfile() {
   try {
     const res = await fetch('api/auth/student-profile');
-    if (!res.ok) throw new Error('Profil konnte nicht geladen werden.');
+    if (!res.ok) {
+      // Fallback für Nicht-Schüler / Admin-Accounts
+      document.getElementById('header-full-name').innerText = currentUser.username;
+      document.getElementById('header-user-avatar').src = 'media/user.png';
+      return;
+    }
     const profile = await res.json();
 
+    // 1. Benutzerprofil Ansicht befüllen
     document.getElementById('student-first-name').innerText = profile.first_name || '-';
     document.getElementById('student-last-name').innerText = profile.last_name || '-';
     
+    let formattedBirthDate = '-';
     if (profile.birth_date) {
       const date = new Date(profile.birth_date);
       if (!isNaN(date.getTime())) {
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
-        document.getElementById('student-birth-date').innerText = `${day}.${month}.${year}`;
+        formattedBirthDate = `${day}.${month}.${year}`;
+        document.getElementById('student-birth-date').innerText = formattedBirthDate;
       } else {
-        document.getElementById('student-birth-date').innerText = profile.birth_date;
+        formattedBirthDate = profile.birth_date;
+        document.getElementById('student-birth-date').innerText = formattedBirthDate;
       }
     } else {
       document.getElementById('student-birth-date').innerText = '-';
@@ -2386,12 +2417,9 @@ async function loadStudentProfile() {
     }
 
     const previewImg = document.getElementById('student-photo-preview');
-    if (profile.card_image) {
-      previewImg.src = profile.card_image;
-    } else {
-      previewImg.src = 'https://cloud.mso-hef.de/launcher/media/user.png';
-    }
+    previewImg.src = profile.card_image || 'media/user.png';
 
+    // SPH Credentials befüllen
     try {
       const sphRes = await fetch('api/auth/sph-credentials');
       const sphData = await sphRes.json();
@@ -2406,8 +2434,60 @@ async function loadStudentProfile() {
       console.error('Fehler beim Laden der SPH-Zugangsdaten:', sphErr);
     }
 
+    // 2. Header Avatar & Anzeigenamen befüllen
+    const fullName = ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim();
+    document.getElementById('header-full-name').innerText = fullName || currentUser.username;
+    document.getElementById('header-user-avatar').src = profile.card_image || 'media/user.png';
+
+    // 3. Schülerausweis Ansicht befüllen
+    const cardFullName = document.getElementById('card-full-name');
+    if (cardFullName) cardFullName.innerText = fullName || '-';
+
+    const cardBirthDate = document.getElementById('card-birth-date');
+    if (cardBirthDate) cardBirthDate.innerText = formattedBirthDate;
+
+    const cardMediothekDisplay = document.getElementById('card-mediothek-number-display');
+    if (cardMediothekDisplay) cardMediothekDisplay.innerText = profile.mediothek_number || '-';
+
+    const cardPhotoImg = document.getElementById('card-photo-img');
+    if (cardPhotoImg) cardPhotoImg.src = profile.card_image || 'media/user.png';
+
+    const cardStatusText = document.getElementById('card-status-text');
+    if (cardStatusText) {
+      cardStatusText.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
+      if (profile.card_status === 'Bild genehmigt') {
+        cardStatusText.style.color = 'var(--success-color)';
+      } else if (profile.card_status === 'Bild eingereicht') {
+        cardStatusText.style.color = 'var(--accent-color)';
+      } else if (profile.card_status === 'Bild abgelehnt') {
+        cardStatusText.style.color = 'var(--danger-color)';
+      } else {
+        cardStatusText.style.color = 'var(--warn-color)';
+      }
+    }
+
+    const cardStatusLabel = document.getElementById('card-status-label');
+    if (cardStatusLabel) {
+      if (profile.card_status === 'Bild genehmigt') {
+        cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-check"></i> GÜLTIG';
+        cardStatusLabel.style.color = 'var(--success-color)';
+      } else if (profile.card_status === 'Bild eingereicht') {
+        cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> IN PRÜFUNG';
+        cardStatusLabel.style.color = 'var(--accent-color)';
+      } else if (profile.card_status === 'Bild abgelehnt') {
+        cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ABGELEHNT';
+        cardStatusLabel.style.color = 'var(--danger-color)';
+      } else {
+        cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-question"></i> INAKTIV';
+        cardStatusLabel.style.color = 'var(--warn-color)';
+      }
+    }
+
   } catch (err) {
     console.error('Fehler beim Laden des Schülerprofils:', err);
+    // Fallback bei Verbindungsfehlern
+    document.getElementById('header-full-name').innerText = currentUser.username;
+    document.getElementById('header-user-avatar').src = 'media/user.png';
   }
 }
 
@@ -2415,7 +2495,7 @@ function handleStudentPhotoSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const uploadBtn = document.getElementById('student-photo-upload-btn');
+  const uploadBtn = document.getElementById('student-photo-upload-btn-card') || document.getElementById('student-photo-upload-btn');
   const originalBtnHtml = uploadBtn.innerHTML;
   uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verarbeite Bild...';
   uploadBtn.disabled = true;
@@ -2481,7 +2561,12 @@ function handleStudentPhotoSelect(event) {
           ctx.drawImage(img, x - (w / (2 * zoom)), y - (h / (2 * zoom)), w / zoom, h / zoom, 0, 0, 147, 196);
           
           const croppedBase64 = canvas.toDataURL("image/png");
-          document.getElementById('student-photo-preview').src = croppedBase64;
+          const previewImg = document.getElementById('student-photo-preview');
+          if (previewImg) previewImg.src = croppedBase64;
+          const cardImg = document.getElementById('card-photo-img');
+          if (cardImg) cardImg.src = croppedBase64;
+          const headerAvatar = document.getElementById('header-user-avatar');
+          if (headerAvatar) headerAvatar.src = croppedBase64;
           
           uploadCroppedPhoto(croppedBase64, originalBtnHtml);
           found = true;
@@ -2499,7 +2584,7 @@ function handleStudentPhotoSelect(event) {
 }
 
 async function uploadCroppedPhoto(croppedBase64, originalBtnHtml) {
-  const uploadBtn = document.getElementById('student-photo-upload-btn');
+  const uploadBtn = document.getElementById('student-photo-upload-btn-card') || document.getElementById('student-photo-upload-btn');
   try {
     const res = await fetch('api/auth/student-photo', {
       method: 'POST',
@@ -2521,4 +2606,52 @@ async function uploadCroppedPhoto(croppedBase64, originalBtnHtml) {
     uploadBtn.innerHTML = originalBtnHtml;
     uploadBtn.disabled = false;
   }
+}
+
+function toggleUserDropdown(event) {
+  event.stopPropagation();
+  const dropdown = document.getElementById('header-user-dropdown');
+  if (dropdown) {
+    const isShowing = dropdown.style.display === 'block';
+    dropdown.style.display = isShowing ? 'none' : 'block';
+  }
+}
+
+function navigateTo(page, event) {
+  if (event) event.preventDefault();
+  
+  // Close user dropdown
+  const dropdown = document.getElementById('header-user-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+
+  if (page === 'profile') {
+    openStudentView();
+  } else if (page === 'card') {
+    openCardView();
+  }
+}
+
+function openCardView() {
+  const mainView = document.getElementById('main-view');
+  const studentView = document.getElementById('student-view');
+  const cardView = document.getElementById('card-view');
+  const adminView = document.getElementById('admin-view');
+
+  if (adminView) adminView.style.display = 'none';
+  if (mainView) mainView.style.display = 'none';
+  if (studentView) studentView.style.display = 'none';
+  if (cardView) {
+    cardView.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  loadStudentProfile();
+}
+
+function closeCardView() {
+  const mainView = document.getElementById('main-view');
+  const cardView = document.getElementById('card-view');
+
+  if (cardView) cardView.style.display = 'none';
+  if (mainView) mainView.style.display = 'block';
 }

@@ -124,3 +124,29 @@ Wir haben eine native Schnittstelle für das automatisierte Login am Schulportal
    - Es bietet eine Option zur direkten Eingabe der Zugangsdaten, um die MSO Cloud dauerhaft zu verlinken.
    - Es warnt, dass das Startpasswort vorab geändert werden muss.
    - Ein Opt-out-Kästchen ("Diese Meldung immer anzeigen", standardmäßig aktiv) speichert den Wunsch des Nutzers im Browser-`localStorage` (`sph_always_show_info`). Wird es abgewählt, leitet das Portal zukünftig direkt zur normalen Anmeldeseite des Schulportals weiter.
+
+---
+
+## 6. Benutzerprofil & Schülerausweis
+
+Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in zwei separate, dedizierte Ansichten auf:
+
+### A. Benutzerprofil (ehemals Schülerportal)
+* **Funktion**: Zeigt persönliche Stammdaten, erteilte Einwilligungen, MSO- und SPH-Zugangsdaten sowie das aktuelle Passbild.
+* **Passbild-Upload**: Ermöglicht den Upload eines Porträtfotos. Wenn kein Foto eingereicht wurde oder das Foto leer ist, wird als Fallback eine lokale Dummygrafik (`media/user.png`) angezeigt. Sollte das Laden des Bildes fehlschlagen, sorgt ein `onerror`-Handler für das automatische Nachladen des Dummys.
+* **Gesichtserkennung (Pico.js)**: Ein im Browser integrierter Gesichtserkennungs-Algorithmus lokalisiert das Gesicht, schneidet das Bild automatisch in das Standard-Passbildformat (Verhältnis 3:4, zentriert) und skaliert es hochauflösend, bevor es an den Server übermittelt wird.
+
+### B. Digitaler Schülerausweis
+* **Funktion**: Präsentiert den digitalen Schülerausweis in einer premium gestalteten Ausweismatte (mit Gold-Chip, Gültigkeits-Badge, CSS-gezeichnetem Barcode und dynamischem Freigabestatus).
+* **Ausweisstatus**: 
+  * *Bild ungeprüft / Kein Bild*: Standardfall, zeigt Dummy-Foto und inaktiven Status.
+  * *Bild eingereicht*: Wartet auf manuelle Prüfung durch das IT-Büro.
+  * *Bild genehmigt*: Ausweis wird als "GÜLTIG" markiert.
+  * *Bild abgelehnt*: Ausweis inaktiv, neues Foto muss eingereicht werden.
+
+### C. Header-Navigation & Dropdown
+* Im angemeldeten Zustand zeigt der Header oben links das kreisförmige Benutzerbild (oder den Dummy) und daneben den echten, vollständigen Namen des Benutzers (nicht den Benutzernamen). Daneben befinden sich die Buttons für Ankündigungen (News) und den Dark/Light-Mode.
+* Ein Klick auf den Benutzernamen oder das Bild öffnet ein gläsernes Dropdown-Menü mit direkten Navigations-Links zu:
+  1. *Benutzerprofil* (Stammdaten & Upload)
+  2. *Schülerausweis* (Digitaler Ausweis)
+  3. *Abmelden* (Logout)

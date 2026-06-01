@@ -13,38 +13,75 @@
 <body>
 
   <!-- HEADER -->
-  <header>
-    <div class="logo-section">
-      <img src="logo.png" class="logo-img" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
-      <span class="logo-text">Die digitalen Dienste der MSO</span>
-    </div>
+  <header style="display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; height: 75px; background: rgba(18, 18, 18, 0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06); position: sticky; top: 0; z-index: 100;">
     
-    <div class="nav-controls">
-      <!-- Megafon News-Button -->
-      <div class="news-bell-wrapper" id="news-bell-wrapper" style="position: relative; display: none;">
-        <button class="btn-icon" id="news-bell-btn" onclick="toggleNewsDropdown(event)" title="Neuigkeiten anzeigen">
-          <i class="fa-solid fa-bullhorn"></i>
-          <span class="news-badge" id="news-badge">0</span>
-        </button>
-        <!-- Megafon Dropdown -->
-        <div id="news-dropdown" class="news-dropdown glass-panel">
-          <div class="news-dropdown-header">Ankündigungen</div>
-          <ul class="news-dropdown-list" id="news-dropdown-list">
-            <!-- Dynamisch gerendert -->
-          </ul>
-        </div>
+    <!-- ANONYMOUS HEADER -->
+    <div id="header-anonymous" style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+      <div class="logo-section" style="display: flex; align-items: center; gap: 15px;">
+        <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
+        <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">Die digitalen Dienste der MSO</span>
       </div>
-
-      <!-- Dark/Light Toggle -->
-      <button class="btn-icon" id="theme-toggle" title="Design umschalten">
-        <i class="fa-solid fa-moon"></i>
-      </button>
-
-      <!-- Auth State Section -->
-      <div id="auth-section">
+      <div class="nav-controls" style="display: flex; align-items: center; gap: 15px;">
+        <button class="btn-icon" id="theme-toggle-anon" onclick="toggleTheme()" title="Design umschalten">
+          <i class="fa-solid fa-moon"></i>
+        </button>
         <button class="btn btn-primary" onclick="openModal('login-modal')">
           <i class="fa-solid fa-right-to-bracket"></i> Anmelden
         </button>
+      </div>
+    </div>
+
+    <!-- AUTHENTICATED HEADER (Standardmäßig ausgeblendet) -->
+    <div id="header-authenticated" style="width: 100%; display: none; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <!-- Avatar Circle -->
+        <div class="user-avatar-circle" onclick="toggleUserDropdown(event)" style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 2px solid var(--accent-color); cursor: pointer; box-shadow: 0 0 10px rgba(2,64,134,0.3); transition: transform 0.2s ease;">
+          <img id="header-user-avatar" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" onerror="this.src='media/user.png'">
+        </div>
+        
+        <!-- User Display Name with Dropdown Trigger -->
+        <div style="position: relative;">
+          <span id="header-user-display-name" onclick="toggleUserDropdown(event)" style="font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; font-size: 1.05rem;">
+            <span id="header-full-name">Name Laden...</span>
+            <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem; color: var(--text-secondary);"></i>
+          </span>
+          
+          <!-- User Dropdown Menu -->
+          <div id="header-user-dropdown" class="user-dropdown glass-panel" style="display: none; position: absolute; top: 40px; left: 0; min-width: 210px; padding: 10px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 1000; background: rgba(20,20,20,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+            <a href="#" onclick="navigateTo('profile', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-user-gear" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Benutzerprofil</a>
+            <a href="#" onclick="navigateTo('card', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis</a>
+            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 5px 0;"></div>
+            <a href="#" onclick="handleLogout()" style="display: block; padding: 10px 20px; color: #f43f5e; text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-right-from-bracket" style="margin-right: 10px; width: 16px;"></i> Abmelden</a>
+          </div>
+        </div>
+
+        <!-- Megafon News-Button & Dark/Light Toggle -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <!-- Megafon News-Button -->
+          <div class="news-bell-wrapper" id="news-bell-wrapper" style="position: relative; display: none;">
+            <button class="btn-icon" id="news-bell-btn" onclick="toggleNewsDropdown(event)" title="Neuigkeiten anzeigen">
+              <i class="fa-solid fa-bullhorn"></i>
+              <span class="news-badge" id="news-badge">0</span>
+            </button>
+            <!-- Megafon Dropdown -->
+            <div id="news-dropdown" class="news-dropdown glass-panel" style="right: auto; left: 0;">
+              <div class="news-dropdown-header">Ankündigungen</div>
+              <ul class="news-dropdown-list" id="news-dropdown-list">
+                <!-- Dynamisch gerendert -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- Dark/Light Toggle for Authenticated -->
+          <button class="btn-icon" id="theme-toggle-auth" onclick="toggleTheme()" title="Design umschalten">
+            <i class="fa-solid fa-moon"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Side: Admin Area Button -->
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <div id="admin-btn-container"></div>
       </div>
     </div>
   </header>
@@ -451,12 +488,12 @@
     </div>
   </main>
 
-  <!-- SCHÜLERPORTAL VIEW (Standardmäßig ausgeblendet) -->
+  <!-- BENUTZERPROFIL VIEW (Standardmäßig ausgeblendet) -->
   <main id="student-view" style="display: none;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
       <div>
-        <h2 style="font-weight:700; font-size:1.8rem; letter-spacing:-0.5px; color: var(--accent-color);"><i class="fa-solid fa-graduation-cap"></i> Schülerportal</h2>
-        <p style="color:var(--text-secondary); margin-top:5px;">Hier finden Sie Ihre MSO-Zugangsdaten, erteilten Einwilligungen und können Ihr Ausweisbild verwalten.</p>
+        <h2 style="font-weight:700; font-size:1.8rem; letter-spacing:-0.5px; color: var(--accent-color);"><i class="fa-solid fa-user-gear"></i> Benutzerprofil</h2>
+        <p style="color:var(--text-secondary); margin-top:5px;">Hier finden Sie Ihre MSO-Zugangsdaten, erteilten Einwilligungen und SPH-Daten.</p>
       </div>
       <button class="btn btn-secondary" onclick="closeStudentView()">
         <i class="fa-solid fa-arrow-left-long"></i> Zurück zum Portal (Lobby)
@@ -519,7 +556,7 @@
           
           <!-- Bild-Vorschau -->
           <div style="width: 147px; height: 196px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-            <img id="student-photo-preview" src="https://cloud.mso-hef.de/launcher/media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild-Vorschau">
+            <img id="student-photo-preview" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild-Vorschau" onerror="this.src='media/user.png'">
             <canvas id="student-photo-canvas" width="147" height="196" style="display: none;"></canvas>
           </div>
 
@@ -540,6 +577,138 @@
         </div>
       </div>
 
+  </main>
+
+  <!-- SCHÜLERAUSWEIS VIEW (Neu) -->
+  <main id="card-view" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+      <div>
+        <h2 style="font-weight:700; font-size:1.8rem; letter-spacing:-0.5px; color: var(--accent-color);"><i class="fa-solid fa-address-card"></i> Digitaler Schülerausweis</h2>
+        <p style="color:var(--text-secondary); margin-top:5px;">Ihr offizieller digitaler Schülerausweis der Modellschule Obersberg.</p>
+      </div>
+      <button class="btn btn-secondary" onclick="closeCardView()">
+        <i class="fa-solid fa-arrow-left-long"></i> Zurück zum Portal (Lobby)
+      </button>
+    </div>
+
+    <div class="student-grid" style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 25px;">
+      <!-- Linker Bereich: Schülerausweis Mockup -->
+      <div style="display: flex; justify-content: center; align-items: center;">
+        
+        <!-- Premium ID Card Mockup -->
+        <div class="school-id-card" style="width: 320px; height: 480px; border-radius: 16px; background: linear-gradient(135deg, #0f172a, #1e293b); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 20px 50px rgba(0,0,0,0.5); padding: 25px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; color: #fff;">
+          
+          <!-- Glossy / Glassmorphism Diagonal Overlay -->
+          <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: linear-gradient(45deg, transparent, rgba(255,255,255,0.03), transparent); transform: rotate(30deg); pointer-events: none;"></div>
+          
+          <!-- Card Top: School Info -->
+          <div style="display: flex; gap: 12px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; position: relative; z-index: 2;">
+            <img src="logo.png" style="width: 40px; height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
+            <div>
+              <div style="font-weight: 700; font-size: 0.9rem; letter-spacing: 0.5px; color: #38bdf8;">MODELLSCHULE OBERSBERG</div>
+              <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 1px;">Bad Hersfeld</div>
+            </div>
+          </div>
+
+          <!-- Card Title & Chip -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; position: relative; z-index: 2;">
+            <span style="font-weight: 800; font-size: 1.1rem; color: #fff; letter-spacing: 0.5px; border-left: 3px solid #38bdf8; padding-left: 8px; line-height: 1;">SCHÜLERAUSWEIS</span>
+            <!-- Chip Gold Icon -->
+            <div style="width: 32px; height: 24px; border-radius: 4px; background: linear-gradient(135deg, #e2e8f0, #94a3b8); border: 1px solid rgba(0,0,0,0.1); position: relative;">
+              <div style="position: absolute; top: 4px; left: 4px; right: 4px; bottom: 4px; border-right: 1px solid rgba(0,0,0,0.15); border-bottom: 1px solid rgba(0,0,0,0.15);"></div>
+            </div>
+          </div>
+
+          <!-- Card Middle: Photo & Core Details -->
+          <div style="display: grid; grid-template-columns: 120px 1fr; gap: 15px; margin-top: 15px; align-items: center; position: relative; z-index: 2;">
+            <!-- Photo Frame -->
+            <div style="width: 120px; height: 160px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.3); overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+              <img id="card-photo-img" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild" onerror="this.src='media/user.png'">
+            </div>
+
+            <!-- Details -->
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.75rem;">
+              <div>
+                <span style="color: var(--text-secondary); display: block; font-size: 0.6rem; text-transform: uppercase;">Name</span>
+                <strong style="font-size: 0.95rem; color: #fff; display: block;" id="card-full-name">-</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary); display: block; font-size: 0.6rem; text-transform: uppercase;">Geburtsdatum</span>
+                <span style="font-weight: 600; color: #fff;" id="card-birth-date">-</span>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary); display: block; font-size: 0.6rem; text-transform: uppercase;">Status</span>
+                <span style="font-weight: 700; color: var(--success-color); display: flex; align-items: center; gap: 4px;" id="card-status-label">
+                  <i class="fa-solid fa-circle-check"></i> GÜLTIG
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Bottom: Barcode & Mediothek -->
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 15px; position: relative; z-index: 2;">
+            <!-- Barcode Mockup (Stylized CSS lines) -->
+            <div style="display: flex; width: 100%; height: 40px; background: #fff; border-radius: 4px; padding: 4px 10px; align-items: center; justify-content: center;">
+              <div id="card-barcode-lines" style="display: flex; width: 100%; height: 100%; background: #fff; gap: 2px;">
+                <!-- Barcode lines -->
+                <div style="width: 2px; height: 100%; background: #000;"></div>
+                <div style="width: 1px; height: 100%; background: #000;"></div>
+                <div style="width: 3px; height: 100%; background: #000;"></div>
+                <div style="width: 1px; height: 100%; background: #000;"></div>
+                <div style="width: 2px; height: 100%; background: #000;"></div>
+                <div style="width: 4px; height: 100%; background: #000;"></div>
+                <div style="width: 1px; height: 100%; background: #000;"></div>
+                <div style="width: 3px; height: 100%; background: #000;"></div>
+                <div style="width: 2px; height: 100%; background: #000;"></div>
+                <div style="width: 1px; height: 100%; background: #000;"></div>
+                <div style="width: 4px; height: 100%; background: #000;"></div>
+                <div style="width: 2px; height: 100%; background: #000;"></div>
+                <div style="width: 1px; height: 100%; background: #000;"></div>
+                <div style="width: 3px; height: 100%; background: #000;"></div>
+                <div style="width: 2px; height: 100%; background: #000;"></div>
+                <div style="width: 1px; height: 100%; background: #000;"></div>
+                <div style="width: 3px; height: 100%; background: #000;"></div>
+                <div style="width: 1px; height: 100%; background: #000;"></div>
+                <div style="width: 2px; height: 100%; background: #000;"></div>
+                <div style="width: 4px; height: 100%; background: #000;"></div>
+              </div>
+            </div>
+            <!-- Barcode Number -->
+            <div style="font-family: monospace; font-size: 0.65rem; color: var(--text-secondary); letter-spacing: 2px;" id="card-mediothek-number-display">12345678</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Rechter Bereich: Foto ändern & Gesichtserkennung Info -->
+      <div style="display: flex; flex-direction: column; gap: 25px;">
+        <div class="glass-panel" style="padding: 25px; text-align: center; display: flex; flex-direction: column; align-items: center;">
+          <h3 style="font-weight:600; font-size:1.2rem; margin-bottom:15px; color: var(--accent-color); width: 100%;">
+            <i class="fa-solid fa-camera"></i> Foto hochladen / ändern
+          </h3>
+          <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5; margin-bottom:20px;">
+            Sie können Ihr Ausweisbild hier ändern. Sobald Sie ein Foto hochladen, wird es mithilfe der automatischen Gesichtserkennung (Pico.js) optimal zugeschnitten und zentriert.
+          </p>
+
+          <!-- Bild-Prüfstatus Info -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; width: 100%; text-align: left; margin-bottom: 20px; font-size: 0.85rem;">
+            <div style="margin-bottom: 8px;">
+              <strong>Aktueller Status:</strong> <span id="card-status-text" style="font-weight: 600; color: var(--warn-color);">Kein Bild</span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+              * **Bild ungeprüft / Kein Bild**: Es wurde noch kein Bild eingereicht oder das Bild wurde gelöscht.<br>
+              * **Bild eingereicht**: Das Bild wartet auf die manuelle Freigabe durch das IT-Büro.<br>
+              * **Bild genehmigt**: Das Bild wurde freigegeben. Der Schülerausweis ist aktiv.<br>
+              * **Bild abgelehnt**: Das Bild wurde nicht akzeptiert. Bitte laden Sie ein neues Foto hoch.
+            </div>
+          </div>
+
+          <!-- File Upload input -->
+          <button class="btn btn-primary" id="student-photo-upload-btn-card" onclick="document.getElementById('student-photo-input').click()" style="width: 100%; justify-content: center;">
+            <i class="fa-solid fa-upload"></i> Neues Foto auswählen
+          </button>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -579,7 +748,7 @@
       <!-- FORM 2: EMAIL LOGIN (Erstlogin) -->
       <form id="student-email-form" onsubmit="handleStudentLinkRequest(event)" style="display: none;">
         <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px; text-align: left;">
-          Benutzerkonten inklusive Passwörter und weitere Daten können über das Schülerportal abgefragt werden. Tragen Sie bitte Ihre bei der Schulanmeldung hinterlegte E-Mail-Adresse ein.<br><br>
+          Benutzerkonten inklusive Passwörter und weitere Daten können über das Benutzerprofil abgefragt werden. Tragen Sie bitte Ihre bei der Schulanmeldung hinterlegte E-Mail-Adresse ein.<br><br>
           Sie erhalten kurz darauf einen sicheren Anmeldelink per E-Mail, der 20 Minuten lang gültig ist und Sie direkt in das System einloggt.
         </div>
         
