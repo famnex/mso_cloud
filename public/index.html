@@ -583,13 +583,13 @@
           <h3 style="font-weight:600; font-size:1.2rem; margin-bottom:15px; display:flex; align-items:center; gap:10px; color: var(--accent-color);">
             <i class="fa-solid fa-file-signature"></i> Erteilte Einwilligungen & Vereinbarungen
           </h3>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 0.85rem;">
-            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> DSGVO-Einwilligung: <span id="student-dsgvo">-</span></div>
-            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> WLAN-Nutzung: <span id="student-wlan">-</span></div>
-            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> MS365-Nutzung: <span id="student-ms365">-</span></div>
-            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Pädnetz-Vereinbarung: <span id="student-paednetz">-</span></div>
-            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Videokonferenzen: <span id="student-videoconference">-</span></div>
-            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Ausweisverarbeitung: <span id="student-card-processing">-</span></div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 0.85rem;" id="student-consents-container">
+            <div style="display: flex; align-items: center; gap: 8px;" id="consent-dsgvo-wrapper"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> DSGVO-Einwilligung: <span id="student-dsgvo">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;" class="consent-sub-item"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> WLAN-Nutzung: <span id="student-wlan">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;" class="consent-sub-item"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> MS365-Nutzung: <span id="student-ms365">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;" class="consent-sub-item"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Pädnetz-Vereinbarung: <span id="student-paednetz">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;" class="consent-sub-item"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Videokonferenzen: <span id="student-videoconference">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;" class="consent-sub-item"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Ausweisverarbeitung: <span id="student-card-processing">-</span></div>
           </div>
         </div>
       </div>

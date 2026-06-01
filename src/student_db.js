@@ -122,17 +122,19 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
       case 165: profile.sph_username = val; break;
       case 164: profile.sph_password = val; break;
       case 150: profile.account_status = val; break;
-      case 158: 
-        if (val.includes('genehmigt') || val === 'Bild genehmigt' || val === '1131') {
+      case 158: {
+        const lowerVal = val.toLowerCase();
+        if (lowerVal.includes('genehmigt') || lowerVal === '1131') {
           profile.card_status = 'Bild genehmigt';
-        } else if (val.includes('eingereicht') || val === 'Bild eingereicht' || val === '1130') {
+        } else if (lowerVal.includes('eingereicht') || lowerVal === '1130') {
           profile.card_status = 'Bild eingereicht';
-        } else if (val.includes('abgelehnt') || val === 'Bild abgelehnt' || val === '1132') {
+        } else if (lowerVal.includes('abgelehnt') || lowerVal === '1132') {
           profile.card_status = 'Bild abgelehnt';
         } else {
           profile.card_status = 'Bild ungeprüft / Kein Bild';
         }
         break;
+      }
       case 39: profile.dsgvo_consent = val; break;
       case 87: profile.publish_consent = val; break;
       case 88: profile.usage_consent = val; break;

@@ -2457,7 +2457,7 @@ async function loadStudentProfile() {
 
     ['student-dsgvo', 'student-wlan', 'student-ms365', 'student-paednetz', 'student-videoconference', 'student-card-processing'].forEach(id => {
       const el = document.getElementById(id);
-      if (el.innerText === 'Ja') {
+      if (el.innerText === 'Ja' || el.innerText === 'Ich erkläre meine Einwilligung zu allen Punkten.') {
         el.style.color = 'var(--success-color)';
         el.style.fontWeight = '600';
       } else {
@@ -2465,6 +2465,20 @@ async function loadStudentProfile() {
         el.style.fontWeight = 'normal';
       }
     });
+
+    const isGlobalConsent = profile.dsgvo_consent === 'Ich erkläre meine Einwilligung zu allen Punkten.';
+    document.querySelectorAll('.consent-sub-item').forEach(el => {
+      el.style.display = isGlobalConsent ? 'none' : 'flex';
+    });
+
+    const dsgvoWrapper = document.getElementById('consent-dsgvo-wrapper');
+    if (dsgvoWrapper) {
+      if (isGlobalConsent) {
+        dsgvoWrapper.style.gridColumn = 'span 2';
+      } else {
+        dsgvoWrapper.style.gridColumn = 'auto';
+      }
+    }
 
     const cardStatusEl = document.getElementById('student-card-status');
     cardStatusEl.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
