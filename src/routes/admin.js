@@ -124,7 +124,11 @@ router.post('/config/test-smtp', async (req, res) => {
     await mail.testSmtpConnection(config);
     res.json({ success: true, message: 'SMTP-Verbindung erfolgreich verifiziert!' });
   } catch (error) {
-    res.status(400).json({ error: 'SMTP-Verbindungsfehler: ' + error.message });
+    let errMsg = error.message;
+    if (errMsg.includes('wrong version number') || errMsg.includes('0A00010B') || errMsg.includes('wrong-version-number')) {
+      errMsg = 'Falsche SSL-Version/Konfiguration. Wenn Sie Port 587 (STARTTLS) oder Port 25 nutzen, deaktivieren Sie bitte den Schalter „Sichere Verbindung (SSL/TLS)“, da dieser ausschließlich für implizites SSL/TLS (in der Regel auf Port 465) gedacht ist.';
+    }
+    res.status(400).json({ error: 'SMTP-Verbindungsfehler: ' + errMsg });
   }
 });
 
