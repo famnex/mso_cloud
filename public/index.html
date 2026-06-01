@@ -33,27 +33,16 @@
 
     <!-- AUTHENTICATED HEADER (Standardmäßig ausgeblendet) -->
     <div id="header-authenticated" style="width: 100%; display: none; justify-content: space-between; align-items: center;">
+      <!-- Left Side: Logo & Tagline -->
+      <div class="logo-section" style="display: flex; align-items: center; gap: 15px;">
+        <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
+        <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">Die digitalen Dienste der MSO</span>
+      </div>
+
+      <!-- Right Side: Controls, User Info & Dropdown -->
       <div style="display: flex; align-items: center; gap: 15px;">
-        <!-- Avatar Circle -->
-        <div class="user-avatar-circle" onclick="toggleUserDropdown(event)" style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 2px solid var(--accent-color); cursor: pointer; box-shadow: 0 0 10px rgba(2,64,134,0.3); transition: transform 0.2s ease;">
-          <img id="header-user-avatar" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" onerror="this.src='media/user.png'">
-        </div>
-        
-        <!-- User Display Name with Dropdown Trigger -->
-        <div style="position: relative;">
-          <span id="header-user-display-name" onclick="toggleUserDropdown(event)" style="font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; font-size: 1.05rem;">
-            <span id="header-full-name">Name Laden...</span>
-            <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem; color: var(--text-secondary);"></i>
-          </span>
-          
-          <!-- User Dropdown Menu -->
-          <div id="header-user-dropdown" class="user-dropdown glass-panel" style="display: none; position: absolute; top: 40px; left: 0; min-width: 210px; padding: 10px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 1000; background: rgba(20,20,20,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
-            <a href="#" onclick="navigateTo('profile', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-user-gear" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Benutzerprofil & Zugänge</a>
-            <a href="#" onclick="navigateTo('card', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis</a>
-            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 5px 0;"></div>
-            <a href="#" onclick="handleLogout()" style="display: block; padding: 10px 20px; color: #f43f5e; text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-right-from-bracket" style="margin-right: 10px; width: 16px;"></i> Abmelden</a>
-          </div>
-        </div>
+        <!-- Admin Area Button Container -->
+        <div id="admin-btn-container"></div>
 
         <!-- Megafon News-Button & Dark/Light Toggle -->
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -63,8 +52,8 @@
               <i class="fa-solid fa-bullhorn"></i>
               <span class="news-badge" id="news-badge">0</span>
             </button>
-            <!-- Megafon Dropdown -->
-            <div id="news-dropdown" class="news-dropdown glass-panel" style="right: auto; left: 0;">
+            <!-- Megafon Dropdown (Right Aligned) -->
+            <div id="news-dropdown" class="news-dropdown glass-panel" style="right: 0; left: auto;">
               <div class="news-dropdown-header">Ankündigungen</div>
               <ul class="news-dropdown-list" id="news-dropdown-list">
                 <!-- Dynamisch gerendert -->
@@ -77,11 +66,28 @@
             <i class="fa-solid fa-moon"></i>
           </button>
         </div>
-      </div>
 
-      <!-- Right Side: Admin Area Button -->
-      <div style="display: flex; align-items: center; gap: 15px;">
-        <div id="admin-btn-container"></div>
+        <!-- User Display Name & Avatar Group with Dropdown -->
+        <div style="position: relative; display: flex; align-items: center; gap: 12px;">
+          <!-- User Display Name with Dropdown Trigger -->
+          <span id="header-user-display-name" onclick="toggleUserDropdown(event)" style="font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; font-size: 1.05rem;">
+            <span id="header-full-name">Name Laden...</span>
+            <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem; color: var(--text-secondary);"></i>
+          </span>
+
+          <!-- Avatar Circle -->
+          <div class="user-avatar-circle" onclick="toggleUserDropdown(event)" style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 2px solid var(--accent-color); cursor: pointer; box-shadow: 0 0 10px rgba(2,64,134,0.3); transition: transform 0.2s ease;">
+            <img id="header-user-avatar" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" onerror="this.src='media/user.png'">
+          </div>
+          
+          <!-- User Dropdown Menu (Right Aligned) -->
+          <div id="header-user-dropdown" class="user-dropdown glass-panel" style="display: none; position: absolute; top: 50px; right: 0; min-width: 210px; padding: 10px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 1000; background: rgba(20,20,20,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+            <a href="#" onclick="navigateTo('profile', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-user-gear" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Benutzerprofil & Zugänge</a>
+            <a href="#" onclick="navigateTo('card', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis</a>
+            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 5px 0;"></div>
+            <a href="#" onclick="handleLogout()" style="display: block; padding: 10px 20px; color: #f43f5e; text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-right-from-bracket" style="margin-right: 10px; width: 16px;"></i> Abmelden</a>
+          </div>
+        </div>
       </div>
     </div>
   </header>
