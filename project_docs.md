@@ -127,11 +127,11 @@ Wir haben eine native Schnittstelle für das automatisierte Login am Schulportal
 
 ---
 
-## 6. Benutzerprofil & Schülerausweis
+## 6. Benutzerprofil & Zugänge
 
 Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in zwei separate, dedizierte Ansichten auf:
 
-### A. Benutzerprofil (ehemals Schülerportal)
+### A. Benutzerprofil & Zugänge (ehemals Schülerportal)
 * **Funktion**: Zeigt persönliche Stammdaten, erteilte Einwilligungen, MSO- und SPH-Zugangsdaten sowie das aktuelle Passbild.
 * **Passbild-Upload**: Ermöglicht den Upload eines Porträtfotos. Wenn kein Foto eingereicht wurde oder das Foto leer ist, wird als Fallback eine lokale Dummygrafik (`media/user.png`) angezeigt. Sollte das Laden des Bildes fehlschlagen, sorgt ein `onerror`-Handler für das automatische Nachladen des Dummys.
 * **Gesichtserkennung (Pico.js)**: Ein im Browser integrierter Gesichtserkennungs-Algorithmus lokalisiert das Gesicht, schneidet das Bild automatisch in das Standard-Passbildformat (Verhältnis 3:4, zentriert) und skaliert es hochauflösend, bevor es an den Server übermittelt wird.
@@ -147,6 +147,6 @@ Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in 
 ### C. Header-Navigation & Dropdown
 * Im angemeldeten Zustand zeigt der Header oben links das kreisförmige Benutzerbild (oder den Dummy) und daneben den echten, vollständigen Namen des Benutzers (nicht den Benutzernamen). Daneben befinden sich die Buttons für Ankündigungen (News) und den Dark/Light-Mode.
 * Ein Klick auf den Benutzernamen oder das Bild öffnet ein gläsernes Dropdown-Menü mit direkten Navigations-Links zu:
-  1. *Benutzerprofil* (Stammdaten & Upload)
+  1. *Benutzerprofil & Zugänge* (Stammdaten & Upload)
   2. *Schülerausweis* (Digitaler Ausweis)
   3. *Abmelden* (Logout)
