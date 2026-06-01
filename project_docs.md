@@ -145,7 +145,8 @@ Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in 
   * *Bild abgelehnt*: Ausweis inaktiv, neues Foto muss eingereicht werden.
 
 ### C. Header-Navigation & Dropdown
-* Im angemeldeten Zustand zeigt der Header oben links das kreisförmige Benutzerbild (oder den Dummy) und daneben den echten, vollständigen Namen des Benutzers (nicht den Benutzernamen). Daneben befinden sich die Buttons für Ankündigungen (News) und den Dark/Light-Mode.
+* Im angemeldeten Zustand zeigt der Header auf der linken Seite das MSO-Schullogo mit dem Text „Die digitalen Dienste der MSO“.
+* Auf der rechten Seite des Headers befinden sich der Admin-Bereich (falls berechtigt), die Symbole für Neuigkeiten (Megafon) und den Dark/Light-Mode sowie der vollständige Name und das kreisförmige Benutzerbild (oder die Dummy-Grafik).
 * Ein Klick auf den Benutzernamen oder das Bild öffnet ein gläsernes Dropdown-Menü mit direkten Navigations-Links zu:
   1. *Benutzerprofil & Zugänge* (Stammdaten & Upload)
   2. *Schülerausweis* (Digitaler Ausweis)
