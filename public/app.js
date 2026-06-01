@@ -212,6 +212,7 @@ async function loadTiles() {
       tileCard.id = `tile-card-${tile.id}`;
       
       const isLocked = tile.is_time_locked === 1;
+      const isSph = tile.link && tile.link.includes('login.schulportal.hessen.de');
       
       if (isLocked) {
         tileCard.className = 'tile-card glass-panel time-locked';
@@ -220,9 +221,14 @@ async function loadTiles() {
         tileCard.className = 'tile-card glass-panel';
         // SSO-Gateway Link als Href nutzen
         tileCard.href = `api/tiles/sso/${tile.id}`;
+        
+        if (isSph) {
+          tileCard.onclick = function(e) {
+            handleSphClick(e, tile.id);
+          };
+        }
       }
       
-      const isSph = tile.link && tile.link.includes('login.schulportal.hessen.de');
       const keyBtnHtml = (isSph && currentUser) 
         ? `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id})" title="Schulportal-Zugangsdaten hinterlegen"><i class="fa-solid fa-key"></i></button>`
         : '';
@@ -1449,4 +1455,59 @@ async function deleteSphCredentials() {
   } catch (err) {
     alert('Fehler beim Löschen: ' + err.message);
   }
+}
+
+async function handleSphClick(e, tileId) {
+  // 1. Wenn nicht eingeloggt in der MSO Cloud, ganz normale Weiterleitung erlauben
+  if (!currentUser) {
+    return;
+  }
+
+  e.preventDefault(); // Standard-Navigation unterbrechen
+  
+  try {
+    // 2. Prüfen, ob Zugangsdaten hinterlegt sind
+    const res = await fetch('api/auth/sph-credentials');
+    const data = await res.json();
+
+    if (data.exists) {
+      // Zugangsdaten vorhanden -> Direkt weiterleiten (löst den Auto-POST aus!)
+      window.location.href = `api/tiles/sso/${tileId}`;
+      return;
+    }
+
+    // 3. Keine Zugangsdaten vorhanden -> Prüfen, ob der Info-Popup Opt-out aktiv ist
+    const alwaysShow = localStorage.getItem('sph_always_show_info') !== 'false';
+    if (!alwaysShow) {
+      // Benutzer hat Opt-out gewählt -> Direkt zur normalen SPH-Loginseite weiterleiten
+      window.location.href = `api/tiles/sso/${tileId}`;
+      return;
+    }
+
+    // 4. Info-Modal anzeigen!
+    activeSphTileId = tileId;
+    document.getElementById('sph-info-always-show').checked = true;
+    
+    // Verlinkung im Modal-Text zum Öffnen des Zugangsdaten-Eingabemodals
+    document.getElementById('sph-info-link-credentials').onclick = (event) => {
+      closeModal('sph-info-modal');
+      openSphCredentialsModal(event, tileId);
+    };
+
+    openModal('sph-info-modal');
+
+  } catch (err) {
+    console.error('Fehler bei SPH-Weiterleitungsprüfung:', err);
+    // Fallback: Direkt weiterleiten
+    window.location.href = `api/tiles/sso/${tileId}`;
+  }
+}
+
+function proceedToSchulportal() {
+  // Opt-out Checkbox Zustand sichern
+  const alwaysShow = document.getElementById('sph-info-always-show').checked;
+  localStorage.setItem('sph_always_show_info', alwaysShow ? 'true' : 'false');
+  
+  closeModal('sph-info-modal');
+  window.location.href = `api/tiles/sso/${activeSphTileId}`;
 }

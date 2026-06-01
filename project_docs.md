@@ -103,5 +103,24 @@ Die Benutzeroberfläche nutzt ein maßgeschneidertes **Glassmorphic-Konzept** au
   * Status Grün (`#4ade80`) signalisiert aktive, geprüfte Dienste.
   * Status Rot (`#f87171`) signalisiert Ausfälle.
 * **Micro-Animations**:
-  * Smooth Hover: `transform: translateY(-8px)` mit `cubic-bezier(0.16, 1, 0.3, 1)`.
+  * Smooth Hover: `transform: translateY(-8px)` with `cubic-bezier(0.16, 1, 0.3, 1)`.
   * Pulsierende Online-Indikatoren über `@keyframes pulse`.
+
+---
+
+## 5. Schulportal Hessen Autologin (Option A)
+
+Wir haben eine native Schnittstelle für das automatisierte Login am Schulportal Hessen (SPH) entwickelt.
+
+### A. Funktionsweise und Ablauf
+1. **Benutzerdaten-Eingabe**: Ein Benutzer kann über das Schlüssel-Symbol auf der SPH-Kachel ein Modal öffnen und seine SPH-Zugangsdaten eingeben.
+2. **Datenbankverschlüsselung**: Die Zugangsdaten werden in der Tabelle `user_sph_credentials` gespeichert. Das Passwort wird dabei mittels **AES-256-CBC symmetrisch verschlüsselt** (unter Verwendung eines vom `SESSION_SECRET` abgeleiteten Schlüssels).
+3. **SSO-Weiterleitungs-Schutz & Auto-Login**:
+   - Wenn der Benutzer auf die SPH-Kachel klickt, prüft die Frontend-Prüfung (`public/app.js`), ob Zugangsdaten hinterlegt sind.
+   - **Sind Zugangsdaten vorhanden**, wird der Aufruf direkt an das Backend (`/api/tiles/sso/:id`) geleitet. Das Backend entschlüsselt das Passwort, generiert die passenden Formularfelder (`user` und `user2` unter Berücksichtigung des Schul-Präfixes `9743.`) und führt eine automatische POST-Übermittlung an die Login-Schnittstelle des Schulportals aus. Der Login geschieht vollautomatisch und unsichtbar.
+   - **Sind keine Zugangsdaten vorhanden**, wird ein elegantes Info-Modal eingeblendet.
+4. **Info-Modal & Opt-out**:
+   - Das Info-Modal weist darauf hin, dass separate Benutzerdaten gelten und enthält einen Link, um die Startdaten abzurufen.
+   - Es bietet eine Option zur direkten Eingabe der Zugangsdaten, um die MSO Cloud dauerhaft zu verlinken.
+   - Es warnt, dass das Startpasswort vorab geändert werden muss.
+   - Ein Opt-out-Kästchen ("Diese Meldung immer anzeigen", standardmäßig aktiv) speichert den Wunsch des Nutzers im Browser-`localStorage` (`sph_always_show_info`). Wird es abgewählt, leitet das Portal zukünftig direkt zur normalen Anmeldeseite des Schulportals weiter.

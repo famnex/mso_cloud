@@ -668,6 +668,42 @@
     </div>
   </div>
 
+  <!-- MODAL: SPH INFO POPUP -->
+  <div class="modal" id="sph-info-modal">
+    <div class="modal-content glass-panel" style="max-width: 550px;">
+      <span class="close-btn" onclick="closeModal('sph-info-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px; display:flex; align-items:center; gap:10px; color: var(--accent-color);">
+        <i class="fa-solid fa-circle-info"></i> Weiterleitung zum Schulportal
+      </h3>
+      
+      <div style="line-height: 1.6; font-size: 0.95rem; display: flex; flex-direction: column; gap: 15px;">
+        <p>
+          Wir leiten dich weiter zum Schulportal. Da gelten andere Benutzerdaten. Die Startbenutzerdaten erhältst du <a href="https://cloud.mso-hef.de/launcher/digitaleanmeldung/schueler/" target="_blank" style="color: var(--accent-color); font-weight: 600; text-decoration: underline;">hier</a>.
+        </p>
+        <p>
+          Möchtest du die MSO Cloud dauerhaft mit dem Schulportal verbinden? Dann gib <a href="#" id="sph-info-link-credentials" style="color: var(--warn-color); font-weight: 600; text-decoration: underline;">hier</a> deine Schulportal-Zugangsdaten ein. Danach wirst du immer automatisch angemeldet.
+        </p>
+        <p style="color: var(--warn-color); font-size: 0.9rem; display: flex; align-items: flex-start; gap: 8px;">
+          <i class="fa-solid fa-triangle-exclamation" style="flex-shrink: 0; margin-top: 3px;"></i>
+          <span><strong>Achtung:</strong> Du musst dein Startpasswort erst ändern damit das funktioniert.</span>
+        </p>
+        
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 10px 0;">
+        
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.9rem; color:var(--text-secondary); user-select: none;">
+          <input type="checkbox" id="sph-info-always-show" checked style="width:16px; height:16px; cursor:pointer;">
+          <span>Diese Meldung immer anzeigen</span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:25px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('sph-info-modal')">Abbrechen</button>
+        <button type="button" class="btn btn-primary" onclick="proceedToSchulportal()"><i class="fa-solid fa-share"></i> Weiter zum Schulportal</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- MODAL: SPH CREDENTIALS -->
   <div class="modal" id="sph-credentials-modal">
     <div class="modal-content glass-panel">
