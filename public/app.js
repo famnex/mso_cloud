@@ -1682,14 +1682,17 @@ function renderModalNewsCarousel() {
   let slidesHtml = `<div class="news-carousel-track" style="transform: translateX(-${currentMessageIndex * 100}%);">`;
   
   activeMessages.forEach(msg => {
-    // Bestätigungs-Button nur für unbestätigte Nachrichten des Typs 'until_confirmation' anzeigen
-    const showConfirm = msg.type === 'until_confirmation' && !msg.confirmed;
-    const confirmBtn = showConfirm 
-      ? `<button class="news-confirm-btn" onclick="confirmMessage(event, ${msg.id})"><i class="fa-solid fa-check"></i> Nicht mehr anzeigen</button>`
+    // Checkbox für Nachrichten des Typs 'until_confirmation' anzeigen (opt-out: standardmäßig angehakt, wenn unbestätigt)
+    const showCheckbox = msg.type === 'until_confirmation';
+    const optOutCheckbox = showCheckbox 
+      ? `<label class="news-always-show-label">
+           <input type="checkbox" onchange="toggleMessageConfirmation(event, ${msg.id})" ${msg.confirmed ? '' : 'checked'}>
+           <span>Nachricht immer anzeigen</span>
+         </label>`
       : '';
       
     slidesHtml += `
-      <div class="news-slide" style="padding: 0 45px;">
+      <div class="news-slide">
         <h4 class="news-title" style="font-size: 1.3rem;">
           <i class="fa-solid fa-bullhorn"></i> ${escapeHtml(msg.title)}
         </h4>
@@ -1697,7 +1700,7 @@ function renderModalNewsCarousel() {
           ${msg.content}
         </div>
         <div class="news-footer" style="min-height: 40px;">
-          ${confirmBtn}
+          ${optOutCheckbox}
         </div>
       </div>
     `;
@@ -1748,12 +1751,14 @@ function updateNewsSlidePosition() {
   });
 }
 
-async function confirmMessage(event, messageId) {
-  event.stopPropagation();
-  event.preventDefault();
+async function toggleMessageConfirmation(event, messageId) {
+  const isChecked = event.target.checked;
   
   try {
-    const res = await fetch(`api/messages/${messageId}/confirm`, {
+    // Wenn unchecked (also opt-out / "Nicht mehr anzeigen"): confirm
+    // Wenn checked (also opt-in / "Nachricht immer anzeigen"): unconfirm
+    const action = isChecked ? 'unconfirm' : 'confirm';
+    const res = await fetch(`api/messages/${messageId}/${action}`, {
       method: 'POST'
     });
     
@@ -1761,17 +1766,26 @@ async function confirmMessage(event, messageId) {
     
     if (data.success) {
       if (data.guest) {
-        // Für Gäste im localStorage persistieren
+        // Für Gäste im localStorage regeln
         const guestConfirmedIds = JSON.parse(localStorage.getItem('mso_confirmed_messages') || '[]');
-        if (!guestConfirmedIds.includes(messageId)) {
-          guestConfirmedIds.push(messageId);
-          localStorage.setItem('mso_confirmed_messages', JSON.stringify(guestConfirmedIds));
+        if (!isChecked) {
+          // Confirm -> Hinzufügen
+          if (!guestConfirmedIds.includes(messageId)) {
+            guestConfirmedIds.push(messageId);
+          }
+        } else {
+          // Unconfirm -> Entfernen
+          const idx = guestConfirmedIds.indexOf(messageId);
+          if (idx !== -1) {
+            guestConfirmedIds.splice(idx, 1);
+          }
         }
+        localStorage.setItem('mso_confirmed_messages', JSON.stringify(guestConfirmedIds));
       }
       
       // Quittierungsstatus im aktuellen Array lokal aktualisieren
       const msg = activeMessages.find(m => m.id === messageId);
-      if (msg) msg.confirmed = true;
+      if (msg) msg.confirmed = !isChecked; // confirmed = true, wenn checkbox UNCHECKED (isChecked = false)
       
       // Badge aktualisieren
       const unconfirmedCount = activeMessages.filter(m => !m.confirmed).length;
@@ -1784,23 +1798,28 @@ async function confirmMessage(event, messageId) {
       // Dropdown aktualisieren
       renderNewsDropdownList();
       
-      // Slide weiterblättern oder Modal schließen
-      const remainingUnconfirmed = activeMessages.filter(m => !m.confirmed);
-      if (remainingUnconfirmed.length === 0) {
-        // Alle gelesen -> Modal schließen
-        closeModal('news-view-modal');
-      } else {
-        // Zum nächsten unbestätigten Slide wechseln
-        const nextIdx = activeMessages.findIndex(m => m.id === remainingUnconfirmed[0].id);
-        currentMessageIndex = nextIdx !== -1 ? nextIdx : 0;
-        renderModalNewsCarousel();
+      // Slide weiterblättern oder Modal schließen nach einer kurzen Verzögerung, wenn uncheck (gelesen)
+      if (!isChecked) {
+        setTimeout(() => {
+          const remainingUnconfirmed = activeMessages.filter(m => !m.confirmed);
+          if (remainingUnconfirmed.length === 0) {
+            closeModal('news-view-modal');
+          } else {
+            // Zum nächsten unbestätigten Slide wechseln
+            const nextIdx = activeMessages.findIndex(m => m.id === remainingUnconfirmed[0].id);
+            currentMessageIndex = nextIdx !== -1 ? nextIdx : 0;
+            renderModalNewsCarousel();
+          }
+        }, 500); // 500ms Verzögerung für ein schönes visuelles Feedback
       }
     } else {
-      throw new Error(data.error || 'Fehler beim Bestätigen.');
+      throw new Error(data.error || 'Fehler beim Ändern des Bestätigungsstatus.');
     }
   } catch (err) {
-    console.error('Fehler beim Bestätigen der Nachricht:', err);
+    console.error('Fehler beim Ändern des Bestätigungsstatus:', err);
     alert('Fehler: ' + err.message);
+    // Zustand der Checkbox zurücksetzen bei Fehler
+    event.target.checked = !isChecked;
   }
 }
 

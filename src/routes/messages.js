@@ -81,4 +81,32 @@ router.post('/:id/confirm', (req, res) => {
   }
 });
 
+/**
+ * Hebt die Bestätigung einer Nachricht auf, sodass sie dem Nutzer wieder angezeigt wird.
+ */
+router.post('/:id/unconfirm', (req, res) => {
+  const messageId = parseInt(req.params.id, 10);
+  const user = req.session.user;
+  
+  if (isNaN(messageId)) {
+    return res.status(400).json({ error: 'Ungültige Nachrichten-ID.' });
+  }
+  
+  try {
+    if (user) {
+      db.prepare(`
+        DELETE FROM user_message_confirmations 
+        WHERE user_id = ? AND message_id = ?
+      `).run(user.id, messageId);
+      
+      res.json({ success: true, logged_in: true });
+    } else {
+      res.json({ success: true, logged_in: false, guest: true });
+    }
+  } catch (error) {
+    console.error('Fehler beim Aufheben der Bestätigung:', error);
+    res.status(500).json({ error: 'Fehler beim Aufheben der Bestätigung: ' + error.message });
+  }
+});
+
 module.exports = router;

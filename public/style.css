@@ -868,8 +868,10 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 0 35px; /* Platz für Pfeiltasten */
+  padding: 0 40px; /* Platz für Pfeiltasten */
   box-sizing: border-box;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .news-title {
@@ -887,6 +889,15 @@ input:checked + .slider:before {
   line-height: 1.6;
   color: var(--text-primary);
   margin: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.news-body p, .news-body div, .news-body span, .news-body li {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .news-footer {
@@ -917,6 +928,34 @@ input:checked + .slider:before {
   transform: scale(1.02);
 }
 
+.news-always-show-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  user-select: none;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+}
+
+.news-always-show-label:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.news-always-show-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
 .news-nav-btn {
   position: absolute;
   top: 50%;
@@ -943,11 +982,11 @@ input:checked + .slider:before {
 }
 
 .news-nav-btn.prev {
-  left: 10px;
+  left: 0;
 }
 
 .news-nav-btn.next {
-  right: 10px;
+  right: 0;
 }
 
 .news-dots {
