@@ -285,8 +285,8 @@ router.get('/groups', (req, res) => {
   try {
     const groups = new Set();
 
-    // 1. Aus den Benutzerdaten auslesen
-    const users = db.prepare('SELECT groups FROM users').all();
+    // 1. Nur von lokalen Benutzern auslesen (nicht von LDAP-Benutzern, da deren Gruppen rohe LDAP-DNs/CNs sind)
+    const users = db.prepare('SELECT groups FROM users WHERE is_ldap = 0').all();
     for (const user of users) {
       try {
         const userGroups = JSON.parse(user.groups || '[]');
@@ -300,7 +300,7 @@ router.get('/groups', (req, res) => {
       }
     }
 
-    // 2. Aus den LDAP-Mappings auslesen
+    // 2. Aus den LDAP-Mappings auslesen (das sind die tatsächlich gemappten Gruppen)
     const mappings = db.prepare('SELECT DISTINCT local_group FROM ldap_mappings').all();
     for (const mapping of mappings) {
       if (mapping.local_group) {
