@@ -152,16 +152,11 @@ Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in 
   2. *Schülerausweis* (Digitaler Ausweis)
   3. *Abmelden* (Logout)
 
-### D. Schüler-Datenbank & Ausweis-Verwaltung (Administration)
-* **Übersicht**: Ein neuer, eigenständiger Tab „Schüler-Datenbank & Ausweise“ im Administrations-Backend listet alle eingereichten Schülerprofile auf. Admins können Profile nach Vor-/Nachname, E-Mail-Adresse und Benutzername filtern und durchsuchen.
-* **Filterung**: Es stehen Filter zur gezielten Selektion bereit (z. B. nur Profile, deren Passbilder auf die Freigabe warten).
-* **Bild-Freigabe & Lightbox**: Eingereichte Passbilder werden in der Tabelle als Miniaturansicht dargestellt. Durch Anklicken des Bildes öffnet sich eine glassmorphe Lightbox-Großansicht. Der Administrator kann das Bild direkt freigeben („Bild genehmigt“), ablehnen („Bild abgelehnt“) oder unwiderruflich aus der Datenbank löschen.
-* **Stammdaten & Einwilligungen**: Es werden Geburtsdatum, E-Mail und Mediotheksnummer übersichtlich dargestellt. Erteilte datenschutzrechtliche und nutzungsbedingte Einwilligungen (DSGVO, WLAN, MS365, Pädnetz) werden kompakt als farblich markierte Badges visualisiert.
-
-### E. Duale MySQL/SQLite-Datenbank-Architektur (Schülerdaten & Erstlogin)
+### D. Duale MySQL/SQLite-Datenbank-Architektur (Schülerdaten & Erstlogin)
 *   **MySQL-Routing im Produktivbetrieb**: Wenn MySQL-Umgebungsvariablen (`MYSQL_HOST`, `MYSQL_USER` etc.) konfiguriert sind, greift die Anwendung für das Benutzerprofil, den Schülerausweis und den Erstlogin (Tokenverwaltung & E-Mail-Authentifizierung) auf eine externe MySQL-Datenbank zu. Alle anderen Systembereiche (News, Kacheln, SMTP/LDAP-Konfigurationen) verbleiben unbeeinflusst auf der lokalen SQLite-Datenbank.
 *   **Dynamische Feldzuordnung (Dynamic Fields Mapping)**: Die in MySQL als Zeilen abgelegten Datensätze aus `fieldvalues` (joins mit `fields` und `subfields`) werden durch den Adapter (`src/student_db.js`) in ein flaches JavaScript-Objekt übersetzt und an API und Frontend ausgeliefert. Schreibzugriffe werden automatisch als Zeilenänderungen (`INSERT ... ON DUPLICATE KEY UPDATE` für Stammdaten, `REPLACE` für Bilder) zurückgeschrieben.
 *   **Erstlogin-Tokens**: Generierte Anmeldelinks und Logeinträge werden in den MySQL-Tabellen `schueleremailtokens` und `documentation` verwaltet. Veraltete E-Mail-Tokens werden bei jeder Verifikation automatisch gelöscht.
 *   **Nahtloser SQLite-Fallback**: Fehlen die MySQL-Umgebungsvariablen (z. B. bei Offline-Entwicklung oder automatisierten Tests), schaltet der Adapter vollautomatisch und transparent auf die lokale SQLite-Datenbank um. Die Frontend- und API-Schichten müssen dadurch an keiner Stelle angepasst werden.
+
 
 

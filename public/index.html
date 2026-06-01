@@ -148,9 +148,6 @@
           <li class="admin-nav-item" onclick="switchTab('tab-users', this)">
             <i class="fa-solid fa-users-gear"></i> Benutzerverwaltung
           </li>
-          <li class="admin-nav-item" onclick="switchTab('tab-students', this)">
-            <i class="fa-solid fa-address-card"></i> Schüler-Datenbank & Ausweise
-          </li>
           <li class="admin-nav-item" onclick="switchTab('tab-messages', this)">
             <i class="fa-solid fa-bullhorn"></i> Nachrichten (News)
           </li>
@@ -498,45 +495,6 @@
                 </tr>
               </thead>
               <tbody id="admin-users-table-body">
-                <!-- Dynamisch -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- TAB: SCHÜLER-DATENBANK & AUSWEISE -->
-        <div class="admin-tab" id="tab-students">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 style="font-weight:600;">Schüler-Datenbank & Ausweise</h3>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <select id="admin-students-filter" class="form-control" style="width:180px; margin-bottom:0;" onchange="loadAdminStudents()">
-                <option value="all">Alle Ausweise</option>
-                <option value="eingereicht">Wartend auf Freigabe</option>
-                <option value="genehmigt">Genehmigt (Aktiv)</option>
-                <option value="abgelehnt">Abgelehnt</option>
-                <option value="none">Kein Bild</option>
-              </select>
-              <input type="text" id="admin-students-search" class="form-control" placeholder="Name oder E-Mail suchen..." style="width:220px; margin-bottom:0;" oninput="loadAdminStudents()">
-            </div>
-          </div>
-          <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:20px;">
-            Hier können Sie die eingereichten Passbilder der Schüler prüfen, genehmigen oder ablehnen sowie deren Stammdaten und erteilte Einwilligungen einsehen.
-          </p>
-          <div class="admin-table-container">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th style="width:70px;">Passbild</th>
-                  <th>Name</th>
-                  <th>Geburtsdatum</th>
-                  <th>E-Mail</th>
-                  <th>Mediothek-Nr.</th>
-                  <th>Ausweis-Status</th>
-                  <th>Einwilligungen</th>
-                  <th>Aktionen</th>
-                </tr>
-              </thead>
-              <tbody id="admin-students-table-body">
                 <!-- Dynamisch -->
               </tbody>
             </table>
