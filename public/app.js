@@ -100,6 +100,7 @@ async function checkAuthStatus() {
       renderAuthenticatedHeader();
     } else {
       currentUser = null;
+      clearStudentViewDOM();
       renderAnonymousHeader();
     }
   } catch (err) {
@@ -196,6 +197,7 @@ async function handleLogout() {
     const res = await fetch('api/auth/logout', { method: 'POST' });
     if (res.ok) {
       currentUser = null;
+      clearStudentViewDOM();
       renderAnonymousHeader();
       closeAdminView();
       closeStudentView();
@@ -2399,7 +2401,101 @@ function closeStudentView() {
   if (mainView) mainView.style.display = 'block';
 }
 
+function clearStudentViewDOM() {
+  const fields = [
+    'student-first-name',
+    'student-last-name',
+    'student-birth-date',
+    'student-birth-place',
+    'student-email-display',
+    'student-mso-username',
+    'student-mso-password',
+    'student-mediothek-number',
+    'student-sph-username-display',
+    'student-sph-password-display',
+    'card-full-name',
+    'card-birth-date',
+    'card-mediothek-number-display'
+  ];
+
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = '-';
+  });
+
+  const statusEl = document.getElementById('student-account-status');
+  if (statusEl) {
+    statusEl.innerText = '-';
+    statusEl.style.color = 'var(--text-secondary)';
+  }
+
+  const consents = [
+    'student-dsgvo',
+    'student-wlan',
+    'student-ms365',
+    'student-paednetz',
+    'student-videoconference',
+    'student-card-processing'
+  ];
+
+  consents.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerText = 'Nein';
+      el.style.color = 'var(--text-secondary)';
+      el.style.fontWeight = 'normal';
+    }
+  });
+
+  document.querySelectorAll('.consent-sub-item').forEach(el => {
+    el.style.display = 'flex';
+  });
+
+  const dsgvoWrapper = document.getElementById('consent-dsgvo-wrapper');
+  if (dsgvoWrapper) {
+    dsgvoWrapper.style.gridColumn = 'auto';
+  }
+
+  const cardStatusEl = document.getElementById('student-card-status');
+  if (cardStatusEl) {
+    cardStatusEl.innerText = 'Bild ungeprüft / Kein Bild';
+    cardStatusEl.style.color = 'var(--warn-color)';
+  }
+
+  const previewImg = document.getElementById('student-photo-preview');
+  if (previewImg) {
+    previewImg.src = 'media/user.png';
+  }
+
+  const cardPhotoImg = document.getElementById('card-photo-img');
+  if (cardPhotoImg) {
+    cardPhotoImg.src = 'media/user.png';
+  }
+
+  const cardStatusText = document.getElementById('card-status-text');
+  if (cardStatusText) {
+    cardStatusText.innerText = 'Bild ungeprüft / Kein Bild';
+    cardStatusText.style.color = 'var(--warn-color)';
+  }
+
+  const cardStatusLabel = document.getElementById('card-status-label');
+  if (cardStatusLabel) {
+    cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-question"></i> INAKTIV';
+    cardStatusLabel.style.color = 'var(--warn-color)';
+  }
+
+  const headerName = document.getElementById('header-full-name');
+  if (headerName) {
+    headerName.innerText = '-';
+  }
+  const headerAvatar = document.getElementById('header-user-avatar');
+  if (headerAvatar) {
+    headerAvatar.src = 'media/user.png';
+  }
+}
+
 async function loadStudentProfile() {
+  clearStudentViewDOM();
   try {
     const res = await fetch('api/auth/student-profile');
     if (!res.ok) {

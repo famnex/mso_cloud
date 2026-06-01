@@ -11,6 +11,7 @@ const studentDb = require('../student_db');
  * Holt den aktuellen Benutzer aus der Session.
  */
 router.get('/me', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   if (req.session.user) {
     res.json({ logged_in: true, user: req.session.user });
   } else {
@@ -245,6 +246,7 @@ function decrypt(text) {
  * Gibt den Status der hinterlegten Schulportal-Zugangsdaten für den aktuellen Benutzer aus.
  */
 router.get('/sph-credentials', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const user = req.session.user;
 
   if (!user) {
@@ -433,6 +435,7 @@ router.post('/student-token-login', async (req, res) => {
  * Ruft die detaillierten Schülerportal-Stammdaten des angemeldeten Benutzers ab.
  */
 router.get('/student-profile', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const user = req.session.user;
   if (!user) {
     return res.status(401).json({ error: 'Nicht angemeldet.' });
