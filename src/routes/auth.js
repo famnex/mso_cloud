@@ -44,6 +44,7 @@ router.post('/login', async (req, res) => {
           groups: groups,
           isLdap: false
         };
+        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
         const isOauth = !!req.session.oauthQuery;
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
       }
@@ -95,6 +96,7 @@ router.post('/login', async (req, res) => {
           groups: ldapUser.rawGroups,
           isLdap: true
         };
+        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
 
         const isOauth = !!req.session.oauthQuery;
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
@@ -206,6 +208,27 @@ router.post('/reset-password', (req, res) => {
   } catch (error) {
     console.error('Fehler beim Zurücksetzen des Passworts:', error);
     res.status(500).json({ error: 'Fehler beim Passwort-Reset: ' + error.message });
+  }
+});
+
+/**
+ * Gibt die temporär in der Session gespeicherten Anmeldedaten für das Autologin-Skript aus.
+ * CORS ist für das Schulportal Hessen freigegeben.
+ */
+router.get('/sph-credentials', (req, res) => {
+  // CORS-Header für das Schulportal Hessen setzen
+  res.setHeader('Access-Control-Allow-Origin', 'https://login.schulportal.hessen.de');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.session && req.session.user && req.session.plain_password) {
+    res.json({
+      logged_in: true,
+      username: req.session.user.username,
+      password: req.session.plain_password
+    });
+  } else {
+    res.status(401).json({ logged_in: false, error: 'Keine aktive MSO-Cloud Session oder Passwort nicht im Cache.' });
   }
 });
 
