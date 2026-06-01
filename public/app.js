@@ -1429,9 +1429,8 @@ async function saveSphCredentials(e) {
     });
 
     if (res.ok) {
-      alert('Zugangsdaten erfolgreich gespeichert.');
-      // Status neu abfragen, um das "Bereits hinterlegt"-Template anzuzeigen
-      await openSphCredentialsModal(null, activeSphTileId);
+      closeModal('sph-credentials-modal');
+      window.location.href = `api/tiles/sso/${activeSphTileId}`;
     } else {
       const data = await res.json();
       throw new Error(data.error);
