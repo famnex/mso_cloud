@@ -400,6 +400,38 @@ main {
   display: none;
 }
 
+/* Kachel Zeitlich Gesperrt */
+.tile-card.time-locked {
+  cursor: not-allowed;
+  opacity: 0.7;
+  background: rgba(10, 10, 10, 0.4) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.tile-card.time-locked .tile-icon-wrapper {
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: var(--text-secondary) !important;
+  filter: grayscale(1);
+}
+.tile-card.time-locked .time-locked-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn-color);
+  font-weight: 600;
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+.tile-card.time-locked .status-dot {
+  background-color: var(--text-secondary) !important;
+  box-shadow: none !important;
+}
+
+.time-locked-label {
+  display: none;
+}
+
 /* Modals & Forms */
 .modal {
   display: none;

@@ -568,6 +568,27 @@
                 Diesen Schlüssel teilen Sie mit dem Zielserver, um die Herkunft der Anmeldung zu verifizieren.
               </p>
             </div>
+
+            <!-- Sektion: Zeitsperre -->
+            <div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top:20px; padding-top:20px;">
+              <div class="form-group" style="margin-bottom: 10px;">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0;">
+                  <input type="checkbox" id="tile_time_limit_enabled" value="1" onchange="toggleTileTimeFields()" style="width:18px; height:18px; cursor:pointer;">
+                  <span style="font-weight:600; font-size:0.95rem;">Zeitsperre (Time Lock) aktivieren</span>
+                </label>
+              </div>
+
+              <div id="tile-time-fields" style="display:none; gap:15px; margin-top:12px;">
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                  <label for="tile_time_limit_start" style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:6px;">Aktiv ab (Start)</label>
+                  <input type="time" id="tile_time_limit_start" class="form-control" value="08:00">
+                </div>
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                  <label for="tile_time_limit_end" style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:6px;">Aktiv bis (Ende)</label>
+                  <input type="time" id="tile_time_limit_end" class="form-control" value="16:00">
+                </div>
+              </div>
+            </div>
           </div>
 
         </div>

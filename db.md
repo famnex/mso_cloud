@@ -60,6 +60,9 @@ Enthält alle Dienste-Kacheln, die auf dem Dashboard angezeigt werden.
 | `sso_type` | TEXT | SSO-Verfahren (`none`, `query`, `jwt`) |
 | `sso_key` | TEXT | Symmetrischer Schlüssel für SSO-Signierung |
 | `sort_order` | INTEGER | Priorität für die Anzeigereihenfolge |
+| `time_limit_enabled` | INTEGER | Flag für Zeitsperre (`0` = Inaktiv, `1` = Aktiv) |
+| `time_limit_start` | TEXT | Startzeitpunkt der Kachel-Aktivität (`HH:MM`) |
+| `time_limit_end` | TEXT | Endzeitpunkt der Kachel-Aktivität (`HH:MM`) |
 
 ---
 

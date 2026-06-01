@@ -5,6 +5,27 @@ const crypto = require('crypto');
 const { db } = require('../db');
 
 /**
+ * Prüft, ob eine Kachel aktuell zeitlich gesperrt ist.
+ * Unterstützt auch Spannen über Mitternacht hinweg (z. B. 22:00 bis 06:00 Uhr).
+ */
+function isTileTimeLocked(tile) {
+  if (tile.time_limit_enabled !== 1) return false;
+  
+  // Aktuelle Serverzeit im Format "HH:MM" holen
+  const now = new Date().toLocaleTimeString('de-DE', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const start = tile.time_limit_start || '08:00';
+  const end = tile.time_limit_end || '16:00';
+  
+  if (start <= end) {
+    // Normaler Bereich am selben Tag (z.B. 08:00 bis 16:00)
+    return now < start || now > end;
+  } else {
+    // Bereich überspannt Mitternacht (z.B. 22:00 bis 06:00)
+    return now < start && now > end;
+  }
+}
+
+/**
  * Ruft alle für den aktuellen Benutzer sichtbaren Kacheln ab.
  */
 router.get('/', (req, res) => {
@@ -56,7 +77,16 @@ router.get('/', (req, res) => {
       return false;
     });
 
-    res.json(visibleTiles);
+    // Zeitsperren-Flag dynamisch anfügen
+    const mappedTiles = visibleTiles.map(tile => {
+      const locked = isTileTimeLocked(tile);
+      return {
+        ...tile,
+        is_time_locked: locked ? 1 : 0
+      };
+    });
+
+    res.json(mappedTiles);
   } catch (error) {
     console.error('Fehler beim Abrufen der Kacheln:', error);
     res.status(500).json({ error: 'Fehler beim Laden der Dienste: ' + error.message });
@@ -103,6 +133,12 @@ router.get('/sso/:id', (req, res) => {
 
     if (!hasAccess) {
       return res.status(403).send('Zugriff verweigert. Sie haben keine Berechtigung für diesen Dienst.');
+    }
+
+    // Zeitsperre auf Server-Ebene erzwingen (Admins können sie zum Testen umgehen!)
+    const isLocked = isTileTimeLocked(tile);
+    if (isLocked && (!user || user.role !== 'admin')) {
+      return res.status(403).send(`Zugriff verweigert. Dieser Dienst ist momentan zeitlich gesperrt. Er ist nur von ${tile.time_limit_start} bis ${tile.time_limit_end} Uhr aktiv.`);
     }
 
     // SSO Logik anwenden

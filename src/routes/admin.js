@@ -209,7 +209,7 @@ router.post('/tiles/reorder', (req, res) => {
 
 router.post('/tiles', (req, res) => {
   try {
-    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order } = req.body;
+    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end } = req.body;
     
     if (!title || !icon || !link) {
       return res.status(400).json({ error: 'Titel, Icon und Link sind Pflichtfelder.' });
@@ -224,8 +224,8 @@ router.post('/tiles', (req, res) => {
     }
 
     db.prepare(`
-      INSERT INTO tiles (title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tiles (title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title,
       description || '',
@@ -235,7 +235,10 @@ router.post('/tiles', (req, res) => {
       JSON.stringify(allowed_groups || []),
       sso_type || 'none',
       sso_key || '',
-      finalSortOrder
+      finalSortOrder,
+      parseInt(time_limit_enabled || 0, 10),
+      time_limit_start || '08:00',
+      time_limit_end || '16:00'
     );
 
     res.json({ success: true, message: 'Dienst erfolgreich hinzugefügt.' });
@@ -247,7 +250,7 @@ router.post('/tiles', (req, res) => {
 router.put('/tiles/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order } = req.body;
+    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end } = req.body;
 
     if (!title || !icon || !link) {
       return res.status(400).json({ error: 'Titel, Icon und Link sind Pflichtfelder.' });
@@ -255,7 +258,7 @@ router.put('/tiles/:id', (req, res) => {
 
     db.prepare(`
       UPDATE tiles
-      SET title = ?, description = ?, icon = ?, link = ?, visibility = ?, allowed_groups = ?, sso_type = ?, sso_key = ?, sort_order = ?
+      SET title = ?, description = ?, icon = ?, link = ?, visibility = ?, allowed_groups = ?, sso_type = ?, sso_key = ?, sort_order = ?, time_limit_enabled = ?, time_limit_start = ?, time_limit_end = ?
       WHERE id = ?
     `).run(
       title,
@@ -267,6 +270,9 @@ router.put('/tiles/:id', (req, res) => {
       sso_type || 'none',
       sso_key || '',
       parseInt(sort_order || 0, 10),
+      parseInt(time_limit_enabled || 0, 10),
+      time_limit_start || '08:00',
+      time_limit_end || '16:00',
       id
     );
 

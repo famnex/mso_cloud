@@ -2,6 +2,29 @@
 let currentUser = null;
 let activeTheme = 'dark';
 
+/**
+ * Hilfsfunktion zum sauberen Rendern von Icons (Bootstrap Icons und FontAwesome).
+ */
+function renderIcon(icon) {
+  if (!icon) return '<i class="fa-solid fa-cubes"></i>';
+  if (icon.startsWith('bi-')) {
+    return `<i class="bi ${icon}"></i>`;
+  }
+  // Wenn bereits mehrere Klassen angegeben sind (z.B. "fa-solid fa-graduation-cap")
+  if (icon.includes(' ')) {
+    return `<i class="${icon}"></i>`;
+  }
+  // Wenn es eine Standard-FontAwesome Klasse wie fa-solid/fa-regular/fa-brands ist
+  if (icon.startsWith('fa-solid') || icon.startsWith('fa-regular') || icon.startsWith('fa-brands')) {
+    return `<i class="${icon}"></i>`;
+  }
+  // Fallback bei einfachem Namen
+  if (icon.startsWith('fa-')) {
+    return `<i class="fa-solid ${icon}"></i>`;
+  }
+  return `<i class="fa-solid ${icon}"></i>`;
+}
+
 // DOM-Elemente
 const themeToggleBtn = document.getElementById('theme-toggle');
 const authSection = document.getElementById('auth-section');
@@ -186,15 +209,23 @@ async function loadTiles() {
     // Kacheln rendern
     tiles.forEach(tile => {
       const tileCard = document.createElement('a');
-      tileCard.className = 'tile-card glass-panel';
       tileCard.id = `tile-card-${tile.id}`;
-      // SSO-Gateway Link als Href nutzen
-      tileCard.href = `api/tiles/sso/${tile.id}`;
+      
+      const isLocked = tile.is_time_locked === 1;
+      
+      if (isLocked) {
+        tileCard.className = 'tile-card glass-panel time-locked';
+        tileCard.onclick = function(e) { e.preventDefault(); return false; };
+      } else {
+        tileCard.className = 'tile-card glass-panel';
+        // SSO-Gateway Link als Href nutzen
+        tileCard.href = `api/tiles/sso/${tile.id}`;
+      }
       
       tileCard.innerHTML = `
         <div class="tile-header">
           <div class="tile-icon-wrapper">
-            ${tile.icon && tile.icon.startsWith('bi-') ? `<i class="bi ${tile.icon}"></i>` : `<i class="fa-solid ${tile.icon || 'fa-cubes'}"></i>`}
+            ${renderIcon(tile.icon)}
           </div>
           <div class="status-dot" id="status-dot-${tile.id}" data-toggle="tooltip" title="Wird geprüft..."></div>
         </div>
@@ -202,6 +233,7 @@ async function loadTiles() {
           <h4 class="tile-title">${tile.title}</h4>
           <p class="tile-description">${tile.description || ''}</p>
           <div class="unavailable-label"><i class="fa-solid fa-circle-exclamation"></i> Dienst momentan nicht verfügbar.</div>
+          <div class="time-locked-label"><i class="fa-solid fa-lock"></i> Aktiv von ${tile.time_limit_start || '08:00'} bis ${tile.time_limit_end || '16:00'} Uhr</div>
         </div>
         <div class="tile-bg-glow"></div>
       `;
@@ -209,7 +241,15 @@ async function loadTiles() {
       tilesContainer.appendChild(tileCard);
 
       // Statusprüfung asynchron starten (CORS-gesichert über MSO-Cloud Checker)
-      checkTileStatus(tile.id, tile.link);
+      if (isLocked) {
+        const dot = document.getElementById(`status-dot-${tile.id}`);
+        if (dot) {
+          dot.className = 'status-dot';
+          dot.setAttribute('title', 'Dienst aktuell im gesperrten Zeitraum');
+        }
+      } else {
+        checkTileStatus(tile.id, tile.link);
+      }
     });
 
   } catch (err) {
@@ -496,7 +536,13 @@ const POPULAR_ICONS = [
   'bi-globe', 'bi-music-note-list', 'bi-play-btn-fill', 'bi-terminal-fill',
   'bi-folder-fill', 'bi-hdd-network-fill', 'bi-kanban-fill', 'bi-list-check',
   'bi-printer-fill', 'bi-server', 'bi-telephone-fill', 'bi-trophy-fill',
-  'bi-vector-pen', 'bi-wrench-adjustable-circle-fill', 'bi-pc-display-horizontal', 'bi-activity'
+  'bi-vector-pen', 'bi-wrench-adjustable-circle-fill', 'bi-pc-display-horizontal', 'bi-activity',
+  // FontAwesome Icons aus lobby.php hinzufügen
+  'fa-solid fa-graduation-cap', 'fa-solid fa-ticket', 'fa-solid fa-brain', 'fa-solid fa-calendar-check',
+  'fa-regular fa-folder-open', 'fa-brands fa-windows', 'fa-regular fa-envelope', 'fa-regular fa-calendar',
+  'fa-regular fa-calendar-xmark', 'fa-solid fa-calendar-days', 'fa-solid fa-person-circle-plus',
+  'fa-solid fa-virus', 'fa-solid fa-school', 'fa-solid fa-chalkboard-user', 'fa-solid fa-id-badge',
+  'fa-solid fa-gavel', 'fa-solid fa-phone'
 ];
 
 function initIconPicker(selectedIcon = 'bi-link-45deg') {
@@ -506,23 +552,19 @@ function initIconPicker(selectedIcon = 'bi-link-45deg') {
   POPULAR_ICONS.forEach(icon => {
     const item = document.createElement('div');
     item.className = `icon-picker-item ${icon === selectedIcon ? 'active' : ''}`;
-    item.innerHTML = `<i class="bi ${icon}"></i>`;
+    item.innerHTML = renderIcon(icon);
     item.title = icon;
     item.onclick = () => {
       document.querySelectorAll('#tile-icon-picker-grid .icon-picker-item').forEach(i => i.classList.remove('active'));
       item.classList.add('active');
       document.getElementById('tile_icon').value = icon;
-      document.getElementById('tile-icon-preview').innerHTML = `<i class="bi ${icon}"></i>`;
+      document.getElementById('tile-icon-preview').innerHTML = renderIcon(icon);
     };
     grid.appendChild(item);
   });
 
   document.getElementById('tile_icon').value = selectedIcon;
-  if (selectedIcon.startsWith('bi-')) {
-    document.getElementById('tile-icon-preview').innerHTML = `<i class="bi ${selectedIcon}"></i>`;
-  } else {
-    document.getElementById('tile-icon-preview').innerHTML = `<i class="fa-solid ${selectedIcon}"></i>`;
-  }
+  document.getElementById('tile-icon-preview').innerHTML = renderIcon(selectedIcon);
 }
 
 async function loadGroupCheckboxes(selectedGroups = []) {
@@ -569,17 +611,20 @@ async function loadAdminTiles() {
       const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
       const groupsLabel = tile.visibility === 'groups' ? ` (${allowedGroups.join(', ')})` : '';
       
+      const timeLockBadge = tile.time_limit_enabled === 1 
+        ? ` <span class="user-badge" style="font-size:0.7rem; background:rgba(245,158,11,0.1); color:var(--warn-color); display:inline-flex; align-items:center; gap:3px;" title="Zeitsperre aktiv: ${tile.time_limit_start} - ${tile.time_limit_end} Uhr"><i class="fa-solid fa-lock"></i> ${tile.time_limit_start}-${tile.time_limit_end}</span>`
+        : '';
+
       const tr = document.createElement('tr');
       tr.setAttribute('draggable', 'true');
       tr.dataset.id = tile.id;
       tr.style.transition = 'background-color 0.2s ease';
       
-      const isBi = tile.icon && tile.icon.startsWith('bi-');
       tr.innerHTML = `
         <td style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
-        <td><strong>${tile.title}</strong></td>
+        <td><strong>${tile.title}</strong>${timeLockBadge}</td>
         <td style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
-        <td>${isBi ? `<i class="bi ${tile.icon}" style="font-size: 1.25rem;"></i>` : `<i class="fa-solid ${tile.icon || 'fa-cubes'}" style="font-size: 1.25rem;"></i>`}</td>
+        <td style="font-size: 1.25rem;">${renderIcon(tile.icon)}</td>
         <td><span class="user-badge" style="font-size:0.75rem;">${tile.visibility}${groupsLabel}</span></td>
         <td><code>${tile.sso_type}</code></td>
         <td>${tile.sort_order}</td>
@@ -682,6 +727,14 @@ function openTileForm(tile = null) {
     
     document.getElementById('tile_sso_type').value = tile.sso_type;
     document.getElementById('tile_sso_key').value = tile.sso_key || '';
+    
+    document.getElementById('tile_time_limit_enabled').checked = tile.time_limit_enabled === 1;
+    document.getElementById('tile_time_limit_start').value = tile.time_limit_start || '08:00';
+    document.getElementById('tile_time_limit_end').value = tile.time_limit_end || '16:00';
+  } else {
+    document.getElementById('tile_time_limit_enabled').checked = false;
+    document.getElementById('tile_time_limit_start').value = '08:00';
+    document.getElementById('tile_time_limit_end').value = '16:00';
   }
 
   // Initialisiere die premium icon & group Selectors
@@ -690,6 +743,7 @@ function openTileForm(tile = null) {
 
   toggleTileGroupsSelect();
   toggleTileSsoFields();
+  toggleTileTimeFields();
   openModal('tile-modal');
 }
 
@@ -703,6 +757,12 @@ function toggleTileSsoFields() {
   const sso = document.getElementById('tile_sso_type').value;
   const wrapper = document.getElementById('tile-sso-key-wrapper');
   wrapper.style.display = sso !== 'none' ? 'block' : 'none';
+}
+
+function toggleTileTimeFields() {
+  const enabled = document.getElementById('tile_time_limit_enabled').checked;
+  const fields = document.getElementById('tile-time-fields');
+  fields.style.display = enabled ? 'flex' : 'none';
 }
 
 async function saveTileForm(e) {
@@ -721,7 +781,10 @@ async function saveTileForm(e) {
     visibility: document.getElementById('tile_visibility').value,
     allowed_groups: allowedGroups,
     sso_type: document.getElementById('tile_sso_type').value,
-    sso_key: document.getElementById('tile_sso_key').value.trim()
+    sso_key: document.getElementById('tile_sso_key').value.trim(),
+    time_limit_enabled: document.getElementById('tile_time_limit_enabled').checked ? 1 : 0,
+    time_limit_start: document.getElementById('tile_time_limit_start').value,
+    time_limit_end: document.getElementById('tile_time_limit_end').value
   };
 
   const url = id ? `api/admin/tiles/${id}` : 'api/admin/tiles';
