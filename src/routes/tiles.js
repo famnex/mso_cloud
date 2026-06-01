@@ -153,6 +153,18 @@ router.get('/sso/:id', (req, res) => {
           const decryptedPassword = authRouter.decrypt(sphCreds.sph_password);
           
           if (decryptedPassword) {
+            let sphUsername = sphCreds.sph_username.trim();
+            let userVal, user2Val;
+            if (sphUsername.includes('.')) {
+              userVal = sphUsername;
+              user2Val = sphUsername.split('.').slice(1).join('.');
+            } else {
+              user2Val = sphUsername;
+              userVal = `9743.${sphUsername}`;
+            }
+
+            const timezoneOffset = -new Date().getTimezoneOffset() / 60;
+
             return res.send(`
               <!DOCTYPE html>
               <html lang="de">
@@ -170,8 +182,12 @@ router.get('/sso/:id', (req, res) => {
                 <div class="loader"></div>
                 <p>Melde dich automatisch beim Schulportal Hessen an...</p>
                 
-                <form id="sph-login-form" method="POST" action="https://login.schulportal.hessen.de/?i=9743">
-                  <input type="hidden" name="user" value="${escapeHtml(sphCreds.sph_username)}">
+                <form id="sph-login-form" method="POST" action="https://login.schulportal.hessen.de/?url=aHR0cHM6Ly9jb25uZWN0LnNjaHVscG9ydGFsLmhlc3Nlbi5kZS8=&skin=sp&i=9743">
+                  <input type="hidden" name="url" value="aHR0cHM6Ly9jb25uZWN0LnNjaHVscG9ydGFsLmhlc3Nlbi5kZS8=">
+                  <input type="hidden" name="timezone" value="${timezoneOffset}">
+                  <input type="hidden" name="skin" value="sp">
+                  <input type="hidden" name="user2" value="${escapeHtml(user2Val)}">
+                  <input type="hidden" name="user" value="${escapeHtml(userVal)}">
                   <input type="hidden" name="password" value="${escapeHtml(decryptedPassword)}">
                 </form>
 
