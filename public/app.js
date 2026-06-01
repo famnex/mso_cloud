@@ -1524,39 +1524,131 @@ function proceedToSchulportal() {
 let activeMessages = [];
 let currentMessageIndex = 0;
 
+function toggleNewsDropdown(event) {
+  event.stopPropagation();
+  const dropdown = document.getElementById('news-dropdown');
+  if (dropdown) {
+    const isVisible = dropdown.style.display === 'block';
+    dropdown.style.display = isVisible ? 'none' : 'block';
+  }
+}
+
+// Schließen des Dropdowns bei Klick außerhalb
+window.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('news-dropdown');
+  const btn = document.getElementById('news-bell-btn');
+  if (dropdown && dropdown.style.display === 'block') {
+    if (!dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+      dropdown.style.display = 'none';
+    }
+  }
+});
+
 async function loadActiveMessages() {
   try {
     const res = await fetch('api/messages');
     if (!res.ok) throw new Error('Fehler beim Laden der Nachrichten.');
     const messages = await res.json();
     
-    // Gast-Bestätigungen aus localStorage filtern (nur relevant, wenn nicht eingeloggt)
+    // Gast-Bestätigungen aus localStorage markieren
     const guestConfirmedIds = JSON.parse(localStorage.getItem('mso_confirmed_messages') || '[]');
-    activeMessages = messages.filter(msg => !guestConfirmedIds.includes(msg.id));
+    activeMessages = messages.map(msg => {
+      return {
+        ...msg,
+        confirmed: msg.confirmed || guestConfirmedIds.includes(msg.id)
+      };
+    });
     
-    renderNewsCarousel();
+    // Megafon-Button Sichtbarkeit & Badge-Zustand steuern
+    const bellWrapper = document.getElementById('news-bell-wrapper');
+    const badge = document.getElementById('news-badge');
+    
+    if (activeMessages.length > 0) {
+      if (bellWrapper) bellWrapper.style.display = 'inline-block';
+      
+      const unconfirmedCount = activeMessages.filter(msg => !msg.confirmed).length;
+      if (badge) {
+        badge.innerText = unconfirmedCount;
+        badge.style.display = unconfirmedCount > 0 ? 'flex' : 'none';
+      }
+    } else {
+      if (bellWrapper) bellWrapper.style.display = 'none';
+    }
+    
+    // Dropdown-Liste rendern
+    renderNewsDropdownList();
+    
+    // Automatisches Popup bei Seitenaufruf (einmal pro Tab-Session und nur wenn unbestätigte Nachrichten vorhanden)
+    const unconfirmedCount = activeMessages.filter(msg => !msg.confirmed).length;
+    if (unconfirmedCount > 0 && sessionStorage.getItem('news_popup_shown') !== 'true') {
+      sessionStorage.setItem('news_popup_shown', 'true');
+      
+      // Finde den Index der ersten unbestätigten Nachricht
+      const firstUnconfirmedIdx = activeMessages.findIndex(msg => !msg.confirmed);
+      currentMessageIndex = firstUnconfirmedIdx !== -1 ? firstUnconfirmedIdx : 0;
+      
+      openNewsViewModal();
+    }
   } catch (err) {
-    console.error('Fehler beim Laden der Dashboard-Nachrichten:', err);
-    const container = document.getElementById('news-carousel-container');
-    if (container) container.style.display = 'none';
+    console.error('Fehler beim Laden der Nachrichten:', err);
   }
 }
 
-function renderNewsCarousel() {
-  const container = document.getElementById('news-carousel-container');
-  if (!container) return;
+function renderNewsDropdownList() {
+  const list = document.getElementById('news-dropdown-list');
+  if (!list) return;
+  list.innerHTML = '';
   
   if (activeMessages.length === 0) {
-    container.style.display = 'none';
+    list.innerHTML = '<li class="news-dropdown-item confirmed" style="cursor: default; justify-content: center;">Keine Mitteilungen</li>';
     return;
   }
   
-  // Sicherstellen, dass der Index nicht out of bounds ist
+  activeMessages.forEach(msg => {
+    const li = document.createElement('li');
+    li.className = 'news-dropdown-item';
+    if (msg.confirmed) {
+      li.classList.add('confirmed');
+    }
+    
+    const indicator = msg.confirmed ? '' : '<span class="dot-indicator"></span>';
+    
+    li.innerHTML = `
+      <span class="news-title-text"><i class="fa-solid fa-bullhorn" style="font-size:0.75rem; margin-right:6px; opacity:0.7;"></i> ${escapeHtml(msg.title)}</span>
+      ${indicator}
+    `;
+    
+    li.onclick = (event) => {
+      event.stopPropagation();
+      document.getElementById('news-dropdown').style.display = 'none';
+      
+      // Modal öffnen und auf diese Nachricht fokussieren
+      const idx = activeMessages.findIndex(m => m.id === msg.id);
+      currentMessageIndex = idx !== -1 ? idx : 0;
+      openNewsViewModal();
+    };
+    
+    list.appendChild(li);
+  });
+}
+
+function openNewsViewModal() {
+  renderModalNewsCarousel();
+  openModal('news-view-modal');
+}
+
+function renderModalNewsCarousel() {
+  const container = document.getElementById('modal-news-carousel-container');
+  if (!container) return;
+  
+  if (activeMessages.length === 0) {
+    closeModal('news-view-modal');
+    return;
+  }
+  
   if (currentMessageIndex >= activeMessages.length) {
     currentMessageIndex = 0;
   }
-  
-  container.style.display = 'block';
   
   // Pfeiltasten anzeigen, wenn mehr als 1 Nachricht vorhanden ist
   const showNav = activeMessages.length > 1;
@@ -1566,7 +1658,7 @@ function renderNewsCarousel() {
   // Rendern der Indikator-Punkte
   let dotsHtml = '';
   if (showNav) {
-    dotsHtml = `<div class="news-dots">`;
+    dotsHtml = `<div class="news-dots" style="margin-top: 15px;">`;
     for (let i = 0; i < activeMessages.length; i++) {
       const activeClass = i === currentMessageIndex ? 'active' : '';
       dotsHtml += `<div class="news-dot ${activeClass}" onclick="goToNewsSlide(${i})"></div>`;
@@ -1578,21 +1670,21 @@ function renderNewsCarousel() {
   let slidesHtml = `<div class="news-carousel-track" style="transform: translateX(-${currentMessageIndex * 100}%);">`;
   
   activeMessages.forEach(msg => {
-    // Bestätigungs-Button nur für Typ 'until_confirmation' anzeigen
-    const showConfirm = msg.type === 'until_confirmation';
+    // Bestätigungs-Button nur für unbestätigte Nachrichten des Typs 'until_confirmation' anzeigen
+    const showConfirm = msg.type === 'until_confirmation' && !msg.confirmed;
     const confirmBtn = showConfirm 
       ? `<button class="news-confirm-btn" onclick="confirmMessage(event, ${msg.id})"><i class="fa-solid fa-check"></i> Nicht mehr anzeigen</button>`
       : '';
       
     slidesHtml += `
-      <div class="news-slide">
-        <h4 class="news-title">
+      <div class="news-slide" style="padding: 0 45px;">
+        <h4 class="news-title" style="font-size: 1.3rem;">
           <i class="fa-solid fa-bullhorn"></i> ${escapeHtml(msg.title)}
         </h4>
-        <div class="news-body">
+        <div class="news-body" style="max-height: 280px; overflow-y: auto; padding: 10px 0;">
           ${msg.content}
         </div>
-        <div class="news-footer">
+        <div class="news-footer" style="min-height: 40px;">
           ${confirmBtn}
         </div>
       </div>
@@ -1628,13 +1720,13 @@ function goToNewsSlide(index) {
 }
 
 function updateNewsSlidePosition() {
-  const track = document.querySelector('.news-carousel-track');
+  const track = document.querySelector('#modal-news-carousel-container .news-carousel-track');
   if (track) {
     track.style.transform = `translateX(-${currentMessageIndex * 100}%)`;
   }
   
   // Indikatoren aktualisieren
-  const dots = document.querySelectorAll('.news-dot');
+  const dots = document.querySelectorAll('#modal-news-carousel-container .news-dot');
   dots.forEach((dot, idx) => {
     if (idx === currentMessageIndex) {
       dot.classList.add('active');
@@ -1665,15 +1757,32 @@ async function confirmMessage(event, messageId) {
         }
       }
       
-      // Bestätigte Nachricht aus der aktuellen Liste entfernen
-      activeMessages = activeMessages.filter(msg => msg.id !== messageId);
+      // Quittierungsstatus im aktuellen Array lokal aktualisieren
+      const msg = activeMessages.find(m => m.id === messageId);
+      if (msg) msg.confirmed = true;
       
-      // Index anpassen, falls wir am Ende waren
-      if (currentMessageIndex >= activeMessages.length && currentMessageIndex > 0) {
-        currentMessageIndex = activeMessages.length - 1;
+      // Badge aktualisieren
+      const unconfirmedCount = activeMessages.filter(m => !m.confirmed).length;
+      const badge = document.getElementById('news-badge');
+      if (badge) {
+        badge.innerText = unconfirmedCount;
+        badge.style.display = unconfirmedCount > 0 ? 'flex' : 'none';
       }
       
-      renderNewsCarousel();
+      // Dropdown aktualisieren
+      renderNewsDropdownList();
+      
+      // Slide weiterblättern oder Modal schließen
+      const remainingUnconfirmed = activeMessages.filter(m => !m.confirmed);
+      if (remainingUnconfirmed.length === 0) {
+        // Alle gelesen -> Modal schließen
+        closeModal('news-view-modal');
+      } else {
+        // Zum nächsten unbestätigten Slide wechseln
+        const nextIdx = activeMessages.findIndex(m => m.id === remainingUnconfirmed[0].id);
+        currentMessageIndex = nextIdx !== -1 ? nextIdx : 0;
+        renderModalNewsCarousel();
+      }
     } else {
       throw new Error(data.error || 'Fehler beim Bestätigen.');
     }

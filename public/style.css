@@ -1071,3 +1071,102 @@ input:checked + .slider:before {
   border-radius: 0;
   display: block;
 }
+
+/* Header Megafon & Dropdown */
+.news-bell-wrapper {
+  display: inline-block;
+}
+
+.news-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #f43f5e; /* Premium Rose accent red */
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.news-dropdown {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  width: 300px;
+  border-radius: 8px;
+  background: rgba(26, 26, 26, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 1000;
+  display: none;
+  animation: slideDown 0.2s ease;
+}
+
+.news-dropdown-header {
+  padding: 12px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--accent-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.news-dropdown-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.news-dropdown-item {
+  padding: 12px 15px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.news-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.news-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.news-dropdown-item.confirmed {
+  opacity: 0.5;
+}
+
+.news-dropdown-item .news-title-text {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-grow: 1;
+}
+
+.news-dropdown-item .dot-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f43f5e;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px #f43f5e;
+}

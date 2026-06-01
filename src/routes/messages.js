@@ -13,12 +13,11 @@ router.get('/', (req, res) => {
     // Alle Nachrichten aus der Datenbank holen
     const allMessages = db.prepare('SELECT * FROM news_messages ORDER BY created_at DESC').all();
     
-    // Aktuellen Zeitpunkt ermitteln (als ISO-String oder Date-Objekt)
+    // Aktuellen Zeitpunkt ermitteln
     const now = new Date();
     
-    // Filtern der aktiven Nachrichten
+    // Filtern der aktiven Nachrichten (nur zeitlich gültige)
     const activeMessages = allMessages.filter(msg => {
-      // 1. Zeitgesteuerte Nachricht (temporary) prüfen
       if (msg.type === 'temporary') {
         const start = msg.start_date ? new Date(msg.start_date) : null;
         const end = msg.end_date ? new Date(msg.end_date) : null;
@@ -26,23 +25,26 @@ router.get('/', (req, res) => {
         if (start && now < start) return false;
         if (end && now > end) return false;
       }
-      
-      // 2. Bestätigungsnachricht (until_confirmation) für angemeldete Nutzer serverseitig prüfen
+      return true;
+    });
+
+    // Bestätigungsstatus für jeden Eintrag anfügen
+    const mappedMessages = activeMessages.map(msg => {
+      let confirmed = false;
       if (msg.type === 'until_confirmation' && user) {
-        const confirmed = db.prepare(`
+        const row = db.prepare(`
           SELECT 1 FROM user_message_confirmations 
           WHERE user_id = ? AND message_id = ?
         `).get(user.id, msg.id);
-        
-        if (confirmed) {
-          return false; // Nachricht wurde bereits vom Benutzer bestätigt -> ausblenden
-        }
+        confirmed = !!row;
       }
-      
-      return true;
+      return {
+        ...msg,
+        confirmed: confirmed
+      };
     });
     
-    res.json(activeMessages);
+    res.json(mappedMessages);
   } catch (error) {
     console.error('Fehler beim Abrufen der Nachrichten:', error);
     res.status(500).json({ error: 'Fehler beim Laden der Nachrichten: ' + error.message });
