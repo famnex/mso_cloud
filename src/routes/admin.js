@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { db, getConfig, setConfig } = require('../db');
+const { db, getConfig, setConfig, logEvent } = require('../db');
 const ldap = require('../ldap');
 const mail = require('../mail');
 const updater = require('../updater');
@@ -100,8 +100,10 @@ router.post('/config', async (req, res) => {
     // Reaktiv den MySQL-Verbindungspool im laufenden Betrieb neu laden
     await studentDb.reconnectMySQL();
 
+    logEvent('info', 'config_saved', 'Systemeinstellungen erfolgreich aktualisiert', null, req.ip);
     res.json({ success: true, message: 'Einstellungen erfolgreich gespeichert.' });
   } catch (error) {
+    logEvent('error', 'config_save_failed', 'Fehler beim Speichern der Systemeinstellungen', { error: error.message }, req.ip);
     res.status(500).json({ error: error.message });
   }
 });
@@ -119,8 +121,10 @@ router.post('/config/test-ldap', async (req, res) => {
 
   try {
     await ldap.testConnection(config);
+    logEvent('info', 'ldap_test_success', 'LDAP-Verbindungstest erfolgreich durchgeführt', null, req.ip);
     res.json({ success: true, message: 'LDAP-Verbindung erfolgreich hergestellt!' });
   } catch (error) {
+    logEvent('warn', 'ldap_test_failed', 'LDAP-Verbindungstest fehlgeschlagen', { error: error.message }, req.ip);
     res.status(400).json({ error: 'LDAP-Verbindungsfehler: ' + error.message });
   }
 });
@@ -137,12 +141,14 @@ router.post('/config/test-smtp', async (req, res) => {
 
   try {
     await mail.testSmtpConnection(config);
+    logEvent('info', 'smtp_test_success', 'SMTP-Verbindungstest erfolgreich durchgeführt', null, req.ip);
     res.json({ success: true, message: 'SMTP-Verbindung erfolgreich verifiziert!' });
   } catch (error) {
     let errMsg = error.message;
     if (errMsg.includes('wrong version number') || errMsg.includes('0A00010B') || errMsg.includes('wrong-version-number')) {
       errMsg = 'Falsche SSL-Version/Konfiguration. Wenn Sie Port 587 (STARTTLS) oder Port 25 nutzen, deaktivieren Sie bitte den Schalter „Sichere Verbindung (SSL/TLS)“, da dieser ausschließlich für implizites SSL/TLS (in der Regel auf Port 465) gedacht ist.';
     }
+    logEvent('warn', 'smtp_test_failed', 'SMTP-Verbindungstest fehlgeschlagen', { error: errMsg }, req.ip);
     res.status(400).json({ error: 'SMTP-Verbindungsfehler: ' + errMsg });
   }
 });
@@ -165,8 +171,10 @@ router.post('/config/test-mysql', async (req, res) => {
       password: config.mysql_password,
       database: config.mysql_database
     });
+    logEvent('info', 'mysql_test_success', 'MySQL-Verbindungstest erfolgreich durchgeführt', null, req.ip);
     res.json({ success: true, message: 'MySQL-Verbindung erfolgreich hergestellt und verifiziert!' });
   } catch (error) {
+    logEvent('warn', 'mysql_test_failed', 'MySQL-Verbindungstest fehlgeschlagen', { error: error.message }, req.ip);
     res.status(400).json({ error: 'MySQL-Verbindungsfehler: ' + error.message });
   }
 });
@@ -669,5 +677,35 @@ router.delete('/messages/:id', (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+/* ==========================================================================
+   6. System-Protokolle (Audit Logs)
+   ========================================================================== */
+
+/**
+ * Holt die neuesten Logs (standardmäßig absteigend sortiert, max. 150 Einträge).
+ */
+router.get('/logs', (req, res) => {
+  try {
+    const logs = db.prepare('SELECT * FROM system_logs ORDER BY created_at DESC, id DESC LIMIT 150').all();
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Ermöglicht das vollständige Leeren des Protokoll-Verlaufs.
+ */
+router.post('/logs/clear', (req, res) => {
+  try {
+    db.prepare('DELETE FROM system_logs').run();
+    logEvent('info', 'logs_cleared', 'System-Protokolle wurden manuell gelöscht', null, req.ip);
+    res.json({ success: true, message: 'System-Protokolle erfolgreich geleert.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 

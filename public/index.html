@@ -154,6 +154,9 @@
           <li class="admin-nav-item" onclick="switchTab('tab-system', this)">
             <i class="fa-solid fa-gears"></i> System & Updates
           </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-logs', this)">
+            <i class="fa-solid fa-terminal"></i> System-Protokolle
+          </li>
         </ul>
       </div>
 
@@ -528,6 +531,50 @@
               <i class="fa-solid fa-spinner fa-spin fa-lg"></i>
               <span>Update läuft im Hintergrund. Die Anwendung startet in Kürze neu...</span>
             </div>
+          </div>
+        </div>
+
+        <!-- TAB: SYSTEM-PROTOKOLLE -->
+        <div class="admin-tab" id="tab-logs">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+            <h3 style="font-weight:600;"><i class="fa-solid fa-terminal"></i> System-Protokolle & Audit-Log</h3>
+            <button class="btn btn-danger" onclick="clearAdminLogs()">
+              <i class="fa-solid fa-trash-can"></i> Protokoll leeren
+            </button>
+          </div>
+
+          <div class="glass-panel" style="padding:15px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; background:rgba(0,0,0,0.15);">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="color:var(--text-secondary); font-size:0.9rem;">Level:</span>
+              <select id="log-filter-level" class="form-control" style="width:160px; height: 38px; padding: 6px 12px;" onchange="filterAdminLogs()">
+                <option value="all">Alle Level</option>
+                <option value="info">Info</option>
+                <option value="warn">Warnung</option>
+                <option value="error">Fehler</option>
+              </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-grow:1; max-width:400px;">
+              <span style="color:var(--text-secondary); font-size:0.9rem;">Suche:</span>
+              <input type="text" id="log-search" class="form-control" placeholder="Aktion, Meldung, IP..." oninput="filterAdminLogs()">
+            </div>
+          </div>
+
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th style="width:160px;">Zeitstempel</th>
+                  <th style="width:100px;">Level</th>
+                  <th style="width:180px;">Aktion</th>
+                  <th>Meldung</th>
+                  <th style="width:120px;">IP-Adresse</th>
+                  <th style="width:80px; text-align:center;">Details</th>
+                </tr>
+              </thead>
+              <tbody id="admin-logs-table-body">
+                <!-- Dynamisch geladen -->
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -1211,6 +1258,48 @@
           <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: LOG DETAILS -->
+  <div class="modal" id="log-details-modal">
+    <div class="modal-content glass-panel" style="max-width:650px; padding:24px;">
+      <span class="close-btn" onclick="closeModal('log-details-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px; display:flex; align-items:center; gap:8px; color:var(--accent-color);">
+        <i class="fa-solid fa-circle-info"></i> Protokoll-Details
+      </h3>
+      
+      <div style="display:flex; flex-direction:column; gap:15px;">
+        <div style="display:grid; grid-template-columns:120px 1fr; gap:8px; font-size:0.95rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:12px;">
+          <span style="color:var(--text-secondary);">Zeitpunkt:</span>
+          <strong id="log-details-time">-</strong>
+          
+          <span style="color:var(--text-secondary);">Schweregrad:</span>
+          <span id="log-details-level-badge">-</span>
+          
+          <span style="color:var(--text-secondary);">Aktion:</span>
+          <strong id="log-details-action" style="font-family:monospace; color:var(--warn-color);">-</strong>
+
+          <span style="color:var(--text-secondary);">IP-Adresse:</span>
+          <span id="log-details-ip" style="font-family:monospace;">-</span>
+        </div>
+
+        <div>
+          <span style="color:var(--text-secondary); display:block; margin-bottom:6px; font-size:0.95rem;">Nachricht:</span>
+          <p id="log-details-message" style="line-height:1.5; font-size:1rem; margin:0; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05);"></p>
+        </div>
+
+        <div>
+          <span style="color:var(--text-secondary); display:block; margin-bottom:6px; font-size:0.95rem;">Zusatzdaten (JSON):</span>
+          <div style="background:rgba(0,0,0,0.35); border-radius:6px; border:1px solid rgba(255,255,255,0.1); padding:15px; overflow-x:auto; max-height:280px;">
+            <pre style="margin:0;"><code id="log-details-json" style="font-family:'Courier New', Courier, monospace; font-size:0.9rem; color:#a6e22e; line-height:1.4; white-space:pre-wrap; word-break:break-all;">{}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:25px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('log-details-modal')">Schließen</button>
+      </div>
     </div>
   </div>
 

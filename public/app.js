@@ -570,6 +570,8 @@ function loadAdminTabContent(tabId) {
     loadAdminMessages();
   } else if (tabId === 'tab-system') {
     loadSystemInfo();
+  } else if (tabId === 'tab-logs') {
+    loadAdminLogs();
   }
 }
 
@@ -1442,6 +1444,183 @@ async function triggerSystemUpdate() {
     showAdminAlert(err.message, 'danger');
     btn.disabled = false;
     loader.style.display = 'none';
+  }
+}
+
+/* --- TAB: System-Protokolle (Audit Log) --- */
+let allAdminLogs = [];
+
+async function loadAdminLogs() {
+  const tableBody = document.getElementById('admin-logs-table-body');
+  tableBody.innerHTML = `
+    <tr>
+      <td colspan="6" style="text-align:center; padding:30px; color:var(--text-secondary);">
+        <i class="fa-solid fa-spinner fa-spin fa-xl" style="color:var(--accent-color); margin-bottom:10px; display:block;"></i>
+        Lade Protokolle...
+      </td>
+    </tr>
+  `;
+
+  try {
+    const res = await fetch('api/admin/logs');
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Fehler beim Laden der Protokolle');
+    }
+    allAdminLogs = await res.json();
+    
+    // Filterwerte zurücksetzen
+    document.getElementById('log-filter-level').value = 'all';
+    document.getElementById('log-search').value = '';
+    
+    renderAdminLogs(allAdminLogs);
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center; padding:30px; color:var(--danger-color);">
+          <i class="fa-solid fa-triangle-exclamation fa-xl" style="margin-bottom:10px; display:block;"></i>
+          Fehler beim Laden der Protokolle: ${err.message}
+        </td>
+      </tr>
+    `;
+  }
+}
+
+function renderAdminLogs(logs) {
+  const tableBody = document.getElementById('admin-logs-table-body');
+  
+  if (!logs || logs.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center; padding:35px; color:var(--text-secondary);">
+          Keine System-Protokolle vorhanden.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tableBody.innerHTML = logs.map(log => {
+    // Level badge
+    let levelBadge = '';
+    if (log.level === 'error') {
+      levelBadge = `<span class="badge" style="background:rgba(239, 68, 68, 0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-xmark"></i> Error</span>`;
+    } else if (log.level === 'warn') {
+      levelBadge = `<span class="badge" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-exclamation"></i> Warn</span>`;
+    } else {
+      levelBadge = `<span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-info"></i> Info</span>`;
+    }
+
+    // Details button (disabled if details is null/empty)
+    const hasDetails = log.details && log.details !== 'null' && log.details !== '{}';
+    const detailBtn = `
+      <button class="btn btn-secondary btn-sm" style="padding:4px 8px; display:inline-flex; align-items:center; justify-content:center;" onclick="openLogDetails(${log.id})" ${hasDetails ? '' : 'disabled'}>
+        <i class="fa-solid fa-magnifying-glass"></i>
+      </button>
+    `;
+
+    // Format created_at to local date/time beautifully
+    let dateStr = log.created_at;
+    try {
+      const date = new Date(log.created_at + (log.created_at.includes('Z') ? '' : 'Z')); // Ensure UTC parsing
+      dateStr = date.toLocaleString('de-DE', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit', 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
+    } catch(e) {}
+
+    return `
+      <tr>
+        <td style="font-size:0.9rem; font-weight:500;">${dateStr}</td>
+        <td>${levelBadge}</td>
+        <td><code style="color:var(--warn-color); font-weight:600; font-family:monospace; font-size:0.85rem;">${log.action}</code></td>
+        <td style="font-size:0.9rem; font-weight:normal; max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.message}">${log.message}</td>
+        <td><code style="font-family:monospace; font-size:0.85rem;">${log.ip || '-'}</code></td>
+        <td style="text-align:center;">${detailBtn}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterAdminLogs() {
+  const levelFilter = document.getElementById('log-filter-level').value;
+  const searchFilter = document.getElementById('log-search').value.toLowerCase().trim();
+
+  const filtered = allAdminLogs.filter(log => {
+    // Level match
+    const levelMatch = (levelFilter === 'all' || log.level === levelFilter);
+    
+    // Search match
+    const searchMatch = !searchFilter || 
+      log.action.toLowerCase().includes(searchFilter) ||
+      log.message.toLowerCase().includes(searchFilter) ||
+      (log.ip && log.ip.toLowerCase().includes(searchFilter)) ||
+      (log.details && log.details.toLowerCase().includes(searchFilter));
+
+    return levelMatch && searchMatch;
+  });
+
+  renderAdminLogs(filtered);
+}
+
+function openLogDetails(id) {
+  const log = allAdminLogs.find(l => l.id === id);
+  if (!log) return;
+
+  // Set general info
+  let dateStr = log.created_at;
+  try {
+    const date = new Date(log.created_at + (log.created_at.includes('Z') ? '' : 'Z'));
+    dateStr = date.toLocaleString('de-DE');
+  } catch(e) {}
+
+  document.getElementById('log-details-time').innerText = dateStr;
+  document.getElementById('log-details-action').innerText = log.action;
+  document.getElementById('log-details-ip').innerText = log.ip || '-';
+  document.getElementById('log-details-message').innerText = log.message;
+
+  // Badge in modal
+  const modalBadge = document.getElementById('log-details-level-badge');
+  if (log.level === 'error') {
+    modalBadge.innerHTML = `<span class="badge" style="background:rgba(239, 68, 68, 0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-xmark"></i> Error</span>`;
+  } else if (log.level === 'warn') {
+    modalBadge.innerHTML = `<span class="badge" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-exclamation"></i> Warn</span>`;
+  } else {
+    modalBadge.innerHTML = `<span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:4px 8px; border-radius:4px; font-weight:600; font-size:0.8rem; text-transform:uppercase;"><i class="fa-solid fa-circle-info"></i> Info</span>`;
+  }
+
+  // Format and highlight JSON
+  const jsonElement = document.getElementById('log-details-json');
+  try {
+    const parsed = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+    jsonElement.innerText = JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    jsonElement.innerText = log.details || '{}';
+  }
+
+  openModal('log-details-modal');
+}
+
+async function clearAdminLogs() {
+  if (!confirm('Sind Sie sicher, dass Sie alle System-Protokolle unwiderruflich löschen möchten?')) return;
+
+  try {
+    const res = await fetch('api/admin/logs/clear', { method: 'POST' });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAdminAlert(data.message || 'Protokolle erfolgreich geleert.');
+      loadAdminLogs();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
   }
 }
 

@@ -225,6 +225,21 @@ Erfasst alle erfolgreich importierten Datenbank-Migrationsdateien.
 
 ---
 
+### Tabelle: `system_logs`
+Speichert persistente System- und Sicherheits-Protokolle (Audit Log).
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
+| `level` | TEXT | Log-Level ('info', 'warn', 'error') |
+| `action` | TEXT | Log-Aktion (z. B. 'login_failed', 'password_reset_requested') |
+| `message` | TEXT | Protokoll-Nachricht |
+| `details` | TEXT | JSON-kodierte Zusatzdetails (LDAP-Meldungen, exceptions etc.) |
+| `ip` | TEXT | IP-Adresse des anfragenden Clients |
+| `created_at` | DATETIME | Zeitstempel des Ereignisses |
+
+---
+
 ## 3. Datenbank-Update-Skripte für GitHub
 Bei zukünftigen Updates über GitHub vergleicht der Updater den Ordner `/migrations` und führt neue `.sql`-Dateien automatisch aus.
 Jede neue Migration muss als separate Datei (z.B. `002_add_new_fields.sql`) hinterlegt werden.

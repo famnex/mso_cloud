@@ -91,6 +91,22 @@ function setConfig(key, value) {
   db.prepare('INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').run(key, valueStr, valueStr);
 }
 
+/**
+ * Schreibt einen Eintrag in die System-Protokolle (Audit Log).
+ */
+function logEvent(level, action, message, details = null, ip = null) {
+  try {
+    const detailsStr = details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null;
+    db.prepare(`
+      INSERT INTO system_logs (level, action, message, details, ip)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(level, action, message, detailsStr, ip);
+    console.log(`[System Log - ${level.toUpperCase()}] Action: ${action}, Message: ${message}`);
+  } catch (err) {
+    console.error('Fehler beim Schreiben des System-Protokolls:', err);
+  }
+}
+
 // Initialer Migrationslauf beim Laden des Moduls
 runMigrations();
 
@@ -98,5 +114,6 @@ module.exports = {
   db,
   getConfig,
   setConfig,
-  runMigrations
+  runMigrations,
+  logEvent
 };

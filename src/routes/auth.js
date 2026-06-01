@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { db, getConfig } = require('../db');
+const { db, getConfig, logEvent } = require('../db');
 const ldap = require('../ldap');
 const mail = require('../mail');
 const studentDb = require('../student_db');
@@ -48,6 +48,7 @@ router.post('/login', async (req, res) => {
         };
         req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
         const isOauth = !!req.session.oauthQuery;
+        logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, req.ip);
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
       }
     }
@@ -101,14 +102,17 @@ router.post('/login', async (req, res) => {
         req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
 
         const isOauth = !!req.session.oauthQuery;
+        logEvent('info', 'login_success', `LDAP-Login erfolgreich für: ${ldapUser.username}`, { userId: userId, role: role, groups: ldapUser.rawGroups }, req.ip);
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
       }
     }
 
     // Wenn beide fehlschlagen
+    logEvent('warn', 'login_failed', `Fehlgeschlagener Login-Versuch für: ${username}`, null, req.ip);
     res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort.' });
   } catch (error) {
     console.error('Fehler beim Login:', error);
+    logEvent('error', 'login_error', `Ausnahmefehler bei Login für: ${username}`, { error: error.message }, req.ip);
     res.status(500).json({ error: 'Serverfehler während der Authentifizierung: ' + error.message });
   }
 });
@@ -154,6 +158,7 @@ router.post('/reset-request', async (req, res) => {
 
     if (emailLimitRow.count >= 5 || ipLimitRow.count >= 20) {
       console.warn(`Rate limit hit for password reset request. Email: ${email}, IP: ${ip}`);
+      logEvent('warn', 'password_reset_rate_limited', `Rate-Limit für Passwort-Reset überschritten. E-Mail: ${email}`, { emailHash }, ip);
       return res.json({ success: true, message: 'Wenn ein Konto existiert, haben wir dir eine E-Mail gesendet.' });
     }
 
@@ -193,19 +198,24 @@ router.post('/reset-request', async (req, res) => {
         </body></html>
       `;
 
+      logEvent('info', 'password_reset_requested', `Passwort-Reset angefordert für: ${email}`, { userDn: ldapUser.dn, expiresAt }, ip);
+
       try {
         await mail.sendMail(email, 'Passwort zurücksetzen', htmlContent);
         console.log(`LDAP-Password-Reset Mail gesendet an: ${email}`);
       } catch (mailErr) {
         console.error('WARNUNG: E-Mail-Versand fehlgeschlagen (SMTP nicht konfiguriert?):', mailErr.message);
+        logEvent('error', 'password_reset_mail_failed', `Fehler beim Senden der Passwort-Reset-Mail an: ${email}`, { error: mailErr.message }, ip);
       }
     } else {
       console.log(`E-Mail ${email} wurde im LDAP nicht gefunden.`);
+      logEvent('warn', 'password_reset_user_not_found', `Passwort-Reset angefordert für nicht existierenden LDAP-User: ${email}`, null, ip);
     }
 
     res.json({ success: true, message: 'Wenn ein Konto existiert, haben wir dir eine E-Mail gesendet.' });
   } catch (error) {
     console.error('Fehler bei der LDAP-Passwort-Reset-Anfrage:', error);
+    logEvent('error', 'password_reset_request_error', `Fehler bei Passwort-Reset-Anfrage für E-Mail: ${email}`, { error: error.message }, req.ip || req.headers['x-forwarded-for'] || '0.0.0.0');
     res.status(500).json({ error: 'Interner Serverfehler beim Verarbeiten des Passwort-Resets.' });
   }
 });
@@ -220,9 +230,12 @@ router.post('/reset-password', async (req, res) => {
     return res.status(400).json({ error: 'Token und neues Passwort sind erforderlich.' });
   }
 
+  const ip = req.ip || req.headers['x-forwarded-for'] || '0.0.0.0';
+
   // Passwort-Richtlinie prüfen (Mindestens 8 Zeichen, Groß-, Kleinbuchstabe, Zahl, Sonderzeichen)
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
   if (password.length < 8 || !passwordRegex.test(password)) {
+    logEvent('warn', 'password_reset_policy_failed', 'Passwort-Reset abgelehnt: Passwort erfüllt die Richtlinie nicht', null, ip);
     return res.status(400).json({ 
       error: 'Das Passwort erfüllt die Richtlinie nicht (Minds. 8 Zeichen, Groß-/Kleinbuchstabe, Zahl und Sonderzeichen).' 
     });
@@ -239,6 +252,7 @@ router.post('/reset-password', async (req, res) => {
     `).get(tokenHash, nowIso);
 
     if (!reset) {
+      logEvent('warn', 'password_reset_token_invalid', 'Passwort-Reset-Versuch mit ungültigem oder abgelaufenem Token', { tokenHash }, ip);
       return res.status(400).json({ error: 'Der Link ist ungültig oder abgelaufen.' });
     }
 
@@ -250,9 +264,11 @@ router.post('/reset-password', async (req, res) => {
     const usedAt = new Date().toISOString();
     db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE id = ?').run(usedAt, reset.id);
 
+    logEvent('info', 'password_reset_success', `Passwort erfolgreich geändert für DN: ${reset.user_dn}`, { userDn: reset.user_dn }, ip);
     res.json({ success: true, message: 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.' });
   } catch (error) {
     console.error('Fehler beim Zurücksetzen des LDAP-Passworts:', error);
+    logEvent('error', 'password_reset_failed', `Fehler beim Setzen des Passworts in LDAP`, { error: error.message }, ip);
     res.status(500).json({ error: 'Fehler beim Passwort-Reset: ' + error.message });
   }
 });
