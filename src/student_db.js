@@ -124,13 +124,23 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
       case 150: profile.account_status = val; break;
       case 158: {
         const lowerVal = val.toLowerCase();
-        if (lowerVal.includes('genehmigt') || lowerVal === '1131') {
+        // ID 1131 (akzeptiert), 1132 (gedruckt), 1133 (ausgegeben)
+        if (lowerVal.includes('akzeptiert') || lowerVal.includes('gedruckt') || lowerVal.includes('ausgegeben') || ['1131', '1132', '1133'].includes(lowerVal)) {
           profile.card_status = 'Bild genehmigt';
-        } else if (lowerVal.includes('eingereicht') || lowerVal === '1130') {
-          profile.card_status = 'Bild eingereicht';
-        } else if (lowerVal.includes('abgelehnt') || lowerVal === '1132') {
+        }
+        // ID 1134 (abgelehnt)
+        else if (lowerVal.includes('abgelehnt') || lowerVal === '1134') {
           profile.card_status = 'Bild abgelehnt';
-        } else {
+        }
+        // ID 1130 (ungeprüft / kein bild)
+        else if (lowerVal.includes('ungeprüft') || lowerVal.includes('kein bild') || lowerVal === '1130') {
+          if (photoFile) {
+            profile.card_status = 'Bild eingereicht';
+          } else {
+            profile.card_status = 'Bild ungeprüft / Kein Bild';
+          }
+        }
+        else {
           profile.card_status = 'Bild ungeprüft / Kein Bild';
         }
         break;
