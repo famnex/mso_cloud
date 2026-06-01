@@ -215,6 +215,14 @@ router.post('/tiles', (req, res) => {
       return res.status(400).json({ error: 'Titel, Icon und Link sind Pflichtfelder.' });
     }
 
+    // Höchste sort_order ermitteln, falls keine angegeben wurde, damit die Kachel ans Ende wandert
+    let finalSortOrder = parseInt(sort_order, 10);
+    if (isNaN(finalSortOrder) || finalSortOrder === 0) {
+      const maxOrderRow = db.prepare('SELECT MAX(sort_order) as max_order FROM tiles').get();
+      const maxOrder = maxOrderRow ? (maxOrderRow.max_order || 0) : 0;
+      finalSortOrder = maxOrder + 1;
+    }
+
     db.prepare(`
       INSERT INTO tiles (title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -227,7 +235,7 @@ router.post('/tiles', (req, res) => {
       JSON.stringify(allowed_groups || []),
       sso_type || 'none',
       sso_key || '',
-      parseInt(sort_order || 0, 10)
+      finalSortOrder
     );
 
     res.json({ success: true, message: 'Dienst erfolgreich hinzugefügt.' });
