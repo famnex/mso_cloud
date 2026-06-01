@@ -558,7 +558,7 @@ async function loadGroupCheckboxes(selectedGroups = []) {
 
 async function loadAdminTiles() {
   const tbody = document.getElementById('admin-tiles-table-body');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Dienste...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Dienste...</td></tr>';
 
   try {
     const res = await fetch('api/admin/tiles');
@@ -570,8 +570,13 @@ async function loadAdminTiles() {
       const groupsLabel = tile.visibility === 'groups' ? ` (${allowedGroups.join(', ')})` : '';
       
       const tr = document.createElement('tr');
+      tr.setAttribute('draggable', 'true');
+      tr.dataset.id = tile.id;
+      tr.style.transition = 'background-color 0.2s ease';
+      
       const isBi = tile.icon && tile.icon.startsWith('bi-');
       tr.innerHTML = `
+        <td style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
         <td><strong>${tile.title}</strong></td>
         <td style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
         <td>${isBi ? `<i class="bi ${tile.icon}"></i>` : `<i class="fa-solid ${tile.icon || 'fa-cubes'}"></i>`} <code>${tile.icon}</code></td>
@@ -585,8 +590,72 @@ async function loadAdminTiles() {
       `;
       tbody.appendChild(tr);
     });
+
+    // Drag & Drop Event-Listeners registrieren
+    let dragEl = null;
+
+    tbody.addEventListener('dragstart', (e) => {
+      dragEl = e.target.closest('tr');
+      if (dragEl) {
+        dragEl.classList.add('dragging');
+        dragEl.style.opacity = '0.4';
+        dragEl.style.background = 'rgba(255, 255, 255, 0.08)';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragEl.dataset.id);
+      }
+    });
+
+    tbody.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const target = e.target.closest('tr');
+      if (target && target !== dragEl && target.parentNode === tbody) {
+        const bounding = target.getBoundingClientRect();
+        const offset = e.clientY - bounding.top - bounding.height / 2;
+        if (offset > 0) {
+          tbody.insertBefore(dragEl, target.nextSibling);
+        } else {
+          tbody.insertBefore(dragEl, target);
+        }
+      }
+    });
+
+    tbody.addEventListener('dragend', async (e) => {
+      if (dragEl) {
+        dragEl.classList.remove('dragging');
+        dragEl.style.opacity = '';
+        dragEl.style.background = '';
+      }
+      
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const order = rows.map((tr, index) => ({
+        id: parseInt(tr.dataset.id, 10),
+        sort_order: index + 1
+      })).filter(item => !isNaN(item.id));
+
+      try {
+        const res = await fetch('api/admin/tiles/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order })
+        });
+        const result = await res.json();
+        if (result.success) {
+          showAdminAlert('Reihenfolge erfolgreich aktualisiert.', 'success');
+          // Update order number column in real time without full reloading
+          rows.forEach((tr, index) => {
+            const orderCell = tr.cells[6];
+            if (orderCell) orderCell.innerText = index + 1;
+          });
+        } else {
+          showAdminAlert('Fehler beim Speichern: ' + result.error, 'danger');
+        }
+      } catch (err) {
+        showAdminAlert('Netzwerkfehler beim Speichern: ' + err.message, 'danger');
+      }
+    });
+
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--error-color);">Fehler beim Laden: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--error-color);">Fehler beim Laden: ${err.message}</td></tr>`;
   }
 }
 

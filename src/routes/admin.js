@@ -181,6 +181,32 @@ router.get('/tiles', (req, res) => {
   }
 });
 
+/**
+ * Aktualisiert die Sortierreihenfolge mehrerer Kacheln per Drag & Drop.
+ */
+router.post('/tiles/reorder', (req, res) => {
+  try {
+    const { order } = req.body;
+    if (!Array.isArray(order)) {
+      return res.status(400).json({ error: 'Ungültiges Format. order muss ein Array sein.' });
+    }
+
+    const stmt = db.prepare('UPDATE tiles SET sort_order = ? WHERE id = ?');
+    
+    // Transaktion für atomares und extrem schnelles Speichern
+    const runTx = db.transaction((rows) => {
+      for (const item of rows) {
+        stmt.run(item.sort_order, item.id);
+      }
+    });
+
+    runTx(order);
+    res.json({ success: true, message: 'Reihenfolge erfolgreich aktualisiert.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/tiles', (req, res) => {
   try {
     const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order } = req.body;
