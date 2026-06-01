@@ -1606,25 +1606,13 @@ async function loadActiveMessages() {
     updateNewsIndicators();
     
     // Automatisches Popup bei Seitenaufruf:
-    // 1. Wenn es brandneue, ungesehene und unbestätigte Nachrichten gibt -> Popup ERZWINGEN (ignoriert sessionStorage!)
-    // 2. Wenn es unbestätigte (aber bereits gesehene) Nachrichten gibt -> Popup nur EINMAL pro Tab-Session anzeigen
-    const seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
-    const unseenUnconfirmedCount = activeMessages.filter(msg => !msg.confirmed && !seenIds.includes(msg.id)).length;
+    // Wird erzwungen eingeblendet, solange es mindestens eine unbestätigte Nachricht gibt
+    // (d. h. eine Nachricht, bei der "Nachricht immer anzeigen" aktiv ist).
     const totalUnconfirmedCount = activeMessages.filter(msg => !msg.confirmed).length;
     
-    let shouldShowPopup = false;
-    if (unseenUnconfirmedCount > 0) {
-      // Erzwingen, da eine neue, bisher ungesehene Nachricht vorhanden ist!
-      shouldShowPopup = true;
-      sessionStorage.setItem('news_popup_shown', 'true');
-    } else if (totalUnconfirmedCount > 0 && sessionStorage.getItem('news_popup_shown') !== 'true') {
-      // Bereits gesehen, aber noch nicht bestätigt -> Nur einmal pro Session einblenden
-      shouldShowPopup = true;
-      sessionStorage.setItem('news_popup_shown', 'true');
-    }
-    
-    if (shouldShowPopup) {
-      // Bevorzuge das erste ungesehene Slide, andernfalls das erste unbestätigte
+    if (totalUnconfirmedCount > 0) {
+      // Bevorzuge bei der Anzeige die erste ungelesene/ungesehene Nachricht, andernfalls die erste unbestätigte
+      const seenIds = JSON.parse(localStorage.getItem('mso_seen_messages') || '[]');
       const firstUnseenIdx = activeMessages.findIndex(msg => !msg.confirmed && !seenIds.includes(msg.id));
       const firstUnconfirmedIdx = activeMessages.findIndex(msg => !msg.confirmed);
       

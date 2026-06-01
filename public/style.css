@@ -866,6 +866,7 @@ input:checked + .slider:before {
   width: 100%;
   max-width: 100%;
   min-width: 100%;
+  min-height: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -894,6 +895,7 @@ input:checked + .slider:before {
   word-break: break-word;
   overflow-wrap: break-word;
   white-space: normal;
+  flex-grow: 1;
 }
 
 .news-body p, .news-body div, .news-body span, .news-body li {
