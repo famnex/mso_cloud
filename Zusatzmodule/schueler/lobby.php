@@ -1,0 +1,425 @@
+<?php
+require_once('../include/includes.php');
+
+// Eingabe validieren und sanitisieren
+if (isset($_GET['token'])) {
+    $token = htmlspecialchars($_GET['token'], ENT_QUOTES, 'UTF-8');
+} else {
+    die("Fehler: Kein Token angegeben.");
+}
+
+// Alte Tokens löschen
+$sql = "DELETE FROM schueleremailtokens WHERE datetime < NOW() - INTERVAL 20 MINUTE";
+$stmt = $conn->prepare($sql);
+$stmt->execute();
+
+// Dokumentation der Löschung
+$sql = "INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip) VALUES (NULL, NULL, 'Information', 'Löschung', 'lobby', 'schueleremailtokens', 'Löschen von veralteten E-Mail-Tokens.', NULL, ?)";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param('s', $ip);
+$stmt->execute();
+
+// Token überprüfen
+$sql = "SELECT COUNT(*) AS Anzahl FROM schueleremailtokens WHERE token = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param('s', $token);
+$stmt->execute();
+$result = $stmt->get_result();
+$row = $result->fetch_assoc();
+
+if ($row["Anzahl"] == 0) {
+    $sql = "INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip) VALUES (NULL, NULL, 'Warnung', 'Abfrage', 'lobby', 'schueleremailtokens', 'Token nicht gefunden.', ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('ss', $token, $ip);
+    $stmt->execute();
+    die("Fehler: Token nicht gefunden.");
+}
+
+// Erfolgreiche Token-Abfrage dokumentieren
+$sql = "INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip) VALUES (NULL, NULL, 'Information', 'Abfrage', 'lobby', 'schueleremailtokens', 'Token gefunden.', ?, ?)";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param('ss', $token, $ip);
+$stmt->execute();
+
+// Token-Status aktualisieren
+$sql = "UPDATE schueleremailtokens SET state=1 WHERE token = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param('s', $token);
+$stmt->execute();
+
+// IDapplication abrufen
+$sql = "SELECT IDapplication FROM schueleremailtokens WHERE token = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param('s', $token);
+$stmt->execute();
+$result = $stmt->get_result();
+if ($result->num_rows > 0) {
+    $row = $result->fetch_assoc();
+    $application = $row["IDapplication"];
+} else {
+    $sql = "INSERT INTO documentation (user, application, category, task, page, element, comment, value, ip) VALUES (NULL, NULL, 'Warnung', 'Abfrage', 'lobby', 'schueleremailtokens', 'Token nicht gefunden.', ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('ss', $token, $ip);
+    $stmt->execute();
+    die("Fehler: Token nicht gefunden.");
+}
+?>
+<!-- HTML-Code bleibt unverändert -->
+
+
+ <html lang="de">
+
+ <head>
+     <title>Schülerportal</title>
+     <meta charset="utf-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+     <!-- JS -->
+     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="../js/pico.js"></script>  
+     <!-- CSS -->
+     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+     <link rel="stylesheet" href="<?php echo $basepath?>/../schueler/style.css">
+     <!-- FONTS -->
+     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+     <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128+Text&family=Open+Sans&display=swap" rel="stylesheet">
+	 <script src="https://kit.fontawesome.com/a974660f94.js" crossorigin="anonymous"></script>
+
+
+
+
+ </head>
+
+ <body>
+
+     <!-- Navigationsleiste -->
+     <nav class="navbar navbar-expand-sm bg-light stickynav">
+         <ul class="navbar-nav">
+         <img src="/media/logo.png" alt="logo" style="width:40px;">
+         </ul>    
+<ul>
+             <a style="color: black;font-size: 110%;" >Schülerportal</a>
+			 </ul>
+			 <ul>
+			 <b>Hilfe benötigt?</b> <span style="white-space: nowrap;"><i class="fa-solid fa-phone"></i> <a href="https://cloud.mso-hef.de/osticket/">Ticket erstellen!</a></span>
+			 </ul>
+             <ul>
+			 <div id="countdown" class="countdown">30:00</div>
+         </ul>
+     </nav>
+     <br>
+
+	 <!--Formular-->
+	 <div style="min-height:81%;">
+	 <div class="container tabcontent maincontainer" id="error">
+         <div class="jumbotron text-white" style="background: #5f9e0f">
+             <h1>Hallo!</h1>
+
+             <br><br>
+              Hier sind die uns vorliegenden Daten. Eine Änderung der Daten ist nur über das IT-Büro möglich. Bitte hierfür einen Termin machen.<br>
+			  Benutzername und Passwort funktionieren in allen für SchülerInnen freigegebenen Systemen. Das angegebene Passwort ist das Startpasswort.<br>
+			  Änderungen am Passwort werden hier nicht übernommen. Sobald Sie das Passwort geändert haben, ist das hier angezeigte Passwort nicht mehr korrekt.
+			  <br><br>
+			  <table>			  
+			  <?php
+			    $sql='select fieldvalues.field,type,case when type="select" or type="radio" or type="checkboxes" then subfields.value else fieldvalues.value end as value FROM
+(select * from fieldvalues join fields on fieldvalues.field = fields.ID where application='.$application.') as fieldvalues
+left JOIN
+subfields on subfields.ID=fieldvalues.value;';
+				
+				$result = $conn->query($sql);
+				while($row = $result->fetch_assoc()) {
+					if($row['field']=='1') echo "<tr><td>Vorname</td><td>".$row['value']."</td></tr>";					
+					if($row['field']=='2') echo "<tr><td>Nachname</td><td>".$row['value']."</td></tr>";
+					if ($row['field'] == '3') echo "<tr><td>Geburtsdatum</td><td>" . date('d.m.Y', strtotime($row['value'])) . "</td></tr>";
+					if($row['field']=='11') echo "<tr><td>Geburtsort</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='18') echo "<tr><td>E-Mail-Adresse</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='146') echo "<tr><td><b>Benutzername</b></td><td><b>".$row['value']."</b></td></tr>";
+					if($row['field']=='147') echo "<tr><td><b>Passwort</b></td><td><b>".$row['value']."</b></td></tr>";
+					if($row['field']=='145') echo "<tr><td>Lesenummer Mediothek</td><td>".$row['value']."</td></tr>";					
+					if($row['field']=='165') echo "<tr><td>Benutzername SCHULPORTAL</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='164') echo "<tr><td>STARTpasswort SCHULPORTAL:</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='150') {
+					if ($row['value']=='true') echo "<tr><td>Status Benutzerkonto</td><td>aktiv</td></tr>";
+					if ($row['value']=='false') echo "<tr><td>Status Benutzerkonto</td><td>Noch nicht erstellt. Bitte auf Begrüßungsemail warten.<br><i>Hinweis: Dies kann in Einzelfällen bis zu 2 Wochen dauern.</i></td></tr>";
+						$aktivausgegeben=true;
+					}
+				}
+				if($aktivausgegeben<>true)
+					echo "<tr><td>Status Benutzerkonto</td><td>Noch nicht erstellt. Bitte auf Begrüßungsemail warten.</td></tr>";
+				
+				$sql='select fieldvalues.field,type,case when type="select" or type="radio" or type="checkboxes" then subfields.value else fieldvalues.value end as value FROM
+(select * from fieldvalues join fields on fieldvalues.field = fields.ID where application='.$application.') as fieldvalues
+left JOIN
+subfields on subfields.ID=fieldvalues.value;';
+$result = $conn->query($sql);
+				while($row = $result->fetch_assoc()) {
+					if($row['field']=='158') {
+						echo "<tr><td>Ausweisstatus</td><td>".$row['value']."</td></tr>";									
+						$ausweisstatus=$row['value'];
+					}
+					if($row['field']=='39') echo "<tr><td>DSGVO-Einwilligung</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='87') echo "<tr><td>Veröffentlichung personenbezogener Daten</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='88') echo "<tr><td>Verwendung von</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='90') echo "<tr><td>Videokonferenzen erlaubt</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='91') echo "<tr><td>Ausweisverarbeitung erlaubt</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='93') echo "<tr><td>Nutzungsbedingungen Pädnetz zugestimmt</td><td>".$row['value']."</td></tr>";
+					if($row['field']=='94') echo "<tr><td>Nutzungsbedingungen W-Lan zugestimmt</td><td>".$row['value']."</td></tr>";					
+					if($row['field']=='95') echo "<tr><td>Nutzungsbedingungen MS365 zugestimmt</td><td>".$row['value']."</td></tr>";										
+					if($row['field']=='99') echo "<tr><td>Protokollierung Pädnetz zugestimmt</td><td>".$row['value']."</td></tr>";										
+					if($row['field']=='96') echo "<tr><td>Protokollierung W-Lan zugestimmt</td><td>".$row['value']."</td></tr>";										
+					if($row['field']=='97') echo "<tr><td>Protokollierung MS365 zugestimmt</td><td>".$row['value']."</td></tr>";										
+					if($row['field']=='98') echo "<tr><td>Protokollierung Onlinedienste zugestimmt</td><td>".$row['value']."</td></tr>";										
+				}
+				
+				$sql="SELECT file from images where application=".$application." and field=37";	
+				$result = $conn->query($sql);		
+                $found=false;
+                while($row = $result->fetch_assoc()) {	
+                  $file=$row["file"];
+                  $found=true;
+				}	 
+				echo "<tr><td>Eingereichtes Bild Schülerausweis</td><td>"; 
+				echo '<canvas style="display:none" id="canvas" width=147px></canvas>';
+				if (found&&!empty($file)) echo '<image id="preview" src="'.$file.'" x="21" y="98" width="147px"></image>';
+                else echo '<image id="preview" src="media/user.png" x="21" y="98" width="147px"></image>';
+				if($ausweisstatus=="Bild ungeprüft / Kein Bild" OR $ausweisstatus=="Bild abgelehnt") echo '<br><br></div><div class="fileUpload btn btn-success"><input id="file" class="upload"  onchange="loadFile(event,37)" type="file" name="photo" accept=".jpg,.jpeg,.png,.bmp,.heic" required hidden>
+				<button onclick="javascript:document.getElementById(\'file\').click();" class="custom-button">Foto ändern</button>
+
+                  ';
+				echo "</td></tr>";
+				
+				
+
+				
+	
+	?>
+			</table>
+
+			  
+             <br>
+			 Benutzerkonten werden erst in der 1. Schulwoche aktiviert.
+			 
+			 
+			 
+				
+
+             </p>
+             
+
+
+
+
+         </div>
+     </div>
+
+</div>
+<div class="navbar navbar-expand-sm bg-light stickynav_bottom">
+			 <a class="btn text-body btn-Danger" onclick="logoff();">Abmelden</a>
+			 <!--<a class="btn text-body btn-Warning" onclick="window.open('hilfe/index.php','_blank');">Hilfe</a>-->
+			 <div id="tenor"><img class="tenor" src="<?php echo $basepath?>/media/tenor.gif"/> Bitte warten</div>    
+			 <div id="errormessage"></div>
+            </div>
+	
+
+ </body>
+<script>
+	 var status = 0;
+	 var token = <?php echo "'".$token."'" ?>;
+	 var application = <?php echo "'".$application."'" ?>;
+	  var start=Date.now();
+
+	 
+	 function logoff() {
+		var sendData = function() {
+             $.post('logoff.php', {
+                 token: token
+             }, function(response) {
+                 console.log(response);
+				 var message = response;
+				 document.location.href="index.php";
+			 
+             });
+         }
+         sendData(); 
+	 }
+	 
+	 window.onload=function(){
+      start=Date.now()
+	  var r=document.getElementById('countdown');
+      (function f(){
+      var diff=Date.now()-start,ns=(((18e5-diff)/1e3)>>0),m=(ns/60)>>0,s=ns-m*60;
+      r.textContent=m+':'+((''+s).length>1?'':'0')+s;	  
+      if(diff>18e5){
+         start=Date.now()
+		 logoff();
+      }
+      setTimeout(f,1e3);
+      })();
+}
+
+      /*
+      download the face-detection cascade
+      */
+      var facefinder_classify_region = function(r, c, s, pixels, ldim) {
+         return -1.0;
+      };
+      var cascadeurl = 'https://raw.githubusercontent.com/nenadmarkus/pico/c2e81f9d23cc11d1a612fd21e4f9de0921a5d0d9/rnt/cascades/facefinder';
+      fetch(cascadeurl).then(function(response) {
+         response.arrayBuffer().then(function(buffer) {
+             var bytes = new Int8Array(buffer);
+             facefinder_classify_region = pico.unpack_cascade(bytes);
+             console.log('* cascade loaded');
+         })
+      })
+      /*
+      prepare the image and canvas context
+      */
+      var canvas = document.getElementById('canvas');
+      var ctx = canvas.getContext("2d");
+      var img = new Image()
+      //img.onload = () => ctx.drawImage(img, 0, 0);
+      /*
+      a function to transform an RGBA image to grayscale
+      */
+      function rgba_to_grayscale(rgba, nrows, ncols) {
+         var gray = new Uint8Array(nrows * ncols);
+         for (var r = 0; r < nrows; ++r)
+             for (var c = 0; c < ncols; ++c)
+                 // gray = 0.2*red + 0.7*green + 0.1*blue
+                 gray[r * ncols + c] = (2 * rgba[r * 4 * ncols + 4 * c + 0] + 7 * rgba[r * 4 * ncols + 4 * c + 1] + 1 * rgba[r * 4 * ncols + 4 * c + 2]) / 10;
+         return gray;
+      }
+      /*
+      this function is called each time you press the button to detect the faces
+      */
+      
+      
+      
+      function button_callback(field) {
+         // re-draw the image to clear previous results and get its RGBA pixel data
+         //ctx.drawImage(img, 0, 0);
+         //ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, canvas.width, canvas.height);
+         ratio = img.width / canvas.width;
+      
+         var rgba = ctx.getImageData(0, 0, 480, 360).data;
+         // prepare input to `run_cascade`
+         image = {
+             "pixels": rgba_to_grayscale(rgba, 360, 480),
+             "nrows": 360,
+             "ncols": 480,
+             "ldim": 480
+         }
+         params = {
+             "shiftfactor": 0.1, // move the detection window by 10% of its size
+             "minsize": 20, // minimum size of a face (not suitable for real-time detection, set it to 100 in that case)
+             "maxsize": 1000, // maximum size of a face
+             "scalefactor": 1.1 // for multiscale processing: resize the detection window by 10% when moving to the higher scale
+         }
+         // run the cascade over the image
+         // dets is an array that contains (r, c, s, q) quadruplets
+         // (representing row, column, scale and detection score)
+         dets = pico.run_cascade(image, facefinder_classify_region, params);
+         // cluster the obtained detections
+         dets = pico.cluster_detections(dets, 0.2); // set IoU threshold to 0.2
+         // draw results
+         qthresh = 5.0 // this constant is empirical: other cascades might require a different one
+         var found = "n";
+         var doalert = "y";
+         for (i = 0; i < dets.length; ++i)
+             // check the detection score
+             // if it's above the threshold, draw it
+      
+             if (dets[i][3] > qthresh) {
+      
+                 if (found == "n") {
+      
+                     var x = (dets[i][1]) * ratio;
+      
+                     var y = (dets[i][0]) * ratio;
+                     var w = (dets[i][2] / 2);
+                     var h = w * 1.333;
+      
+                 }
+                 found = "y";
+                 var zoom = 0.45 / ratio;
+                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                 ctx.canvas.width = 147;
+                 ctx.canvas.height = 196;
+                 ctx.drawImage(img, x - (w / (2 * zoom)), y - (h / (2 * zoom)), w / zoom, h / zoom, 0, 0, 147, 196);
+                 var croppedimage = document.getElementById('preview');
+                 croppedimage.src = canvas.toDataURL("image/png");
+                 var imagetobesent = canvas.toDataURL("image/png");
+      
+                 //Send to Database
+                 $.post('uploadfiletodatabase.php', {
+                     token: token, application:application, field:field, imagetobesent: imagetobesent
+                 }, function(response) {
+                     console.log(response);
+                     var message = response;
+                     
+                     if (message[0] == '1') {
+                         alert("Fehler: " + message.substr(1, message.length - 1));
+                     }               
+					location.reload();
+                 });
+                 doalert = "n";
+      
+             }
+      
+         if (doalert == "y") {
+             alert("Achtung: Es wurde kein Gesicht auf deinem Foto erkannt. Vielleicht ist die Fotoqualität nicht ausreichend oder es gibt andere Gründe, wieso die Erkennung nicht funktioniert. Bitte lade deshalb ein ANDERES Bild hoch! Bei weiteren Problemen wenden Sie sich an die Schul-IT.");
+             ctx.clearRect(0, 0, canvas.width, canvas.height);
+             ctx.strokeStyle = "#FF0000";
+             ctx.lineWidth = 10;
+             ctx.beginPath();
+             ctx.moveTo(0, 0);
+             ctx.lineTo(250, 330);
+             ctx.stroke();
+             ctx.beginPath();
+             ctx.moveTo(255, 0);
+             ctx.lineTo(0, 330);
+             ctx.stroke();
+             document.getElementById("file").value = "";
+      
+         }
+      
+      
+      
+      }
+      
+      
+      
+      
+      var loadFile = function(event,field) {
+      
+         var file = event.target.files[0];
+         var breite = 250;
+         img.src = URL.createObjectURL(file);
+         img.onload = function() {
+      
+             canvas.width = breite;
+             canvas.height = img.height / (img.width / breite);
+             ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, breite, img.height / (img.width / breite));
+             button_callback(field);
+             var im = document.getElementById('user');
+      
+      
+      
+             im.setAttribute('xlink:href', canvas.toDataURL("image/png"));
+             im.setAttribute('width', X);
+             im.setAttribute('height', Y);
+      
+         }
+      
+      
+      
+      
+      };
+
+	 
+ </script>
+
+ </html>

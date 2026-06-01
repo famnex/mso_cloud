@@ -308,6 +308,220 @@ router.delete('/sph-credentials', (req, res) => {
   }
 });
 
+/**
+ * ==========================================================================
+ * Schülerportal Integration Routes
+ * ==========================================================================
+ */
+
+/**
+ * Validiert die studentische E-Mail-Adresse und sendet einen temporären Anmeldelink per SMTP.
+ */
+router.post('/student-link', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'E-Mail-Adresse ist erforderlich.' });
+  }
+
+  try {
+    // Überprüfen, ob ein Benutzer mit dieser E-Mail-Adresse existiert und ein Schülerprofil hat
+    const user = db.prepare(`
+      SELECT u.id, u.username, sp.account_status 
+      FROM users u 
+      JOIN student_profiles sp ON u.id = sp.user_id 
+      WHERE u.email = ?
+    `).get(email.trim());
+
+    if (!user) {
+      return res.status(404).json({ 
+        error: 'Diese E-Mail-Adresse ist bei der Registrierung nicht hinterlegt oder Ihr Zugang ist noch nicht freigeschaltet. Bitte warten Sie die Begrüßungsmail ab!' 
+      });
+    }
+
+    if (user.account_status === 'false') {
+      // Schüler existiert, ist aber noch nicht freigeschaltet -> "Noch in Bearbeitung" E-Mail senden (analog PHP)
+      const mailHtml = `
+        <h2>Guten Tag,</h2>
+        Sie haben versucht, sich mit dieser E-Mail-Adresse beim Schülerportal der Modellschule Obersberg in Bad Hersfeld anzumelden.<br><br>
+        Leider wurde Ihre Anmeldung noch nicht final bearbeitet, sodass wir Sie noch um etwas Geduld bitten.<br>
+        Wir senden Ihnen eine Begrüßungsmail, sobald Ihr Zugang freigeschaltet ist.<br><br>
+        Mit freundlichen Grüßen<br>
+        Modellschule Obersberg<br><br>
+        <i>Diese E-Mail wurde automatisch erstellt.</i>
+      `;
+      
+      await mail.sendMail(email.trim(), '[MSO] Schülerportal Anmeldung', mailHtml);
+      return res.json({ 
+        success: true, 
+        pending: true, 
+        message: 'Ihre Anmeldung ist noch in Bearbeitung. Sie erhalten eine E-Mail mit weiteren Informationen.' 
+      });
+    }
+
+    // Token erzeugen (24 Bytes -> 48 Hex-Zeichen) und 20 Minuten Gültigkeit
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+    
+    // Alte offene Tokens dieses Benutzers löschen
+    db.prepare('DELETE FROM student_tokens WHERE user_id = ?').run(user.id);
+    
+    // Neuen Token speichern
+    db.prepare(`
+      INSERT INTO student_tokens (user_id, token, expires_at)
+      VALUES (?, ?, ?)
+    `).run(user.id, token, expiresAt);
+
+    // Anmeldelink generieren (auf Basis der anfragenden Hostadresse)
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const loginLink = `${protocol}://${host}/?student_token=${token}`;
+
+    const mailHtml = `
+      <h2>Guten Tag,</h2>
+      vielen Dank, dass Sie sich mit dieser E-Mail-Adresse beim Schülerportal der Modellschule Obersberg in Bad Hersfeld angemeldet haben.<br><br>
+      Um sich im System anzumelden, können Sie folgenden Link nutzen:<br>
+      <a href="${loginLink}"><b>Schülerportal MSO Cloud</b></a><br><br>
+      Dieser Link ist für 20 Minuten gültig. Sollte er abgelaufen sein, dann können Sie sich erneut über die Anmeldeseite der MSO Cloud anmelden.<br><br>
+      Mit freundlichen Grüßen<br>
+      Modellschule Obersberg<br><br>
+      <i>Diese E-Mail wurde automatisch erstellt.</i>
+    `;
+
+    // E-Mail senden
+    try {
+      await mail.sendMail(email.trim(), '[MSO] Schülerportal Anmeldelink', mailHtml);
+    } catch (mailError) {
+      console.warn('WARNUNG: E-Mail-Versand fehlgeschlagen (SMTP nicht konfiguriert?). Der Link wird dennoch generiert:', mailError.message);
+    }
+    
+    // Konsolenprotokollierung zur einfachen lokalen Verifikation/Entwicklung
+    console.log(`=================================================`);
+    console.log(` Schülerportal-Link generiert für: ${email.trim()}`);
+    console.log(` Link: ${loginLink}`);
+    console.log(`=================================================`);
+
+    res.json({ 
+      success: true, 
+      message: 'Ein Anmeldelink wurde an Ihre E-Mail-Adresse versendet. Bitte prüfen Sie auch Ihren Spam-Ordner.' 
+    });
+  } catch (error) {
+    console.error('Fehler beim Generieren des Schüler-Links:', error);
+    res.status(500).json({ error: 'Fehler beim Generieren des Links: ' + error.message });
+  }
+});
+
+/**
+ * Führt den automatischen Login durch, wenn ein gültiges E-Mail-Token übergeben wird.
+ */
+router.post('/student-token-login', (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: 'Token ist erforderlich.' });
+  }
+
+  try {
+    // Ungenutztes, noch nicht abgelaufenes Token in DB suchen
+    const nowStr = new Date().toISOString();
+    const row = db.prepare(`
+      SELECT * FROM student_tokens 
+      WHERE token = ? AND expires_at > ? AND used = 0
+    `).get(token, nowStr);
+
+    if (!row) {
+      return res.status(400).json({ 
+        error: 'Der Anmeldelink ist ungültig oder abgelaufen (20 Minuten Gültigkeit).' 
+      });
+    }
+
+    // Token als verwendet markieren
+    db.prepare('UPDATE student_tokens SET used = 1 WHERE id = ?').run(row.id);
+
+    // Zuordnung des Benutzers
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
+    if (!user) {
+      return res.status(404).json({ error: 'Der zugehörige Schüler-Account existiert nicht mehr.' });
+    }
+
+    // Express-Sitzung erstellen
+    const groups = JSON.parse(user.groups || '[]');
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      groups: groups,
+      isLdap: false
+    };
+
+    res.json({ 
+      success: true, 
+      message: 'Erfolgreich über E-Mail-Link angemeldet.', 
+      user: req.session.user 
+    });
+  } catch (error) {
+    console.error('Fehler beim E-Mail Token-Login:', error);
+    res.status(500).json({ error: 'Fehler beim Login: ' + error.message });
+  }
+});
+
+/**
+ * Ruft die detaillierten Schülerportal-Stammdaten des angemeldeten Benutzers ab.
+ */
+router.get('/student-profile', (req, res) => {
+  const user = req.session.user;
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  try {
+    const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(user.id);
+    if (!profile) {
+      return res.status(404).json({ error: 'Kein Schülerportal-Profil für diesen Account hinterlegt.' });
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Fehler beim Abrufen des Schülerprofils:', error);
+    res.status(500).json({ error: 'Fehler beim Laden des Profils: ' + error.message });
+  }
+});
+
+/**
+ * Speichert das über Pico.js face-cropped Base64-Passbild ab und aktualisiert den Ausweisstatus.
+ */
+router.post('/student-photo', (req, res) => {
+  const user = req.session.user;
+  const { image } = req.body;
+
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  if (!image) {
+    return res.status(400).json({ error: 'Keine Bilddatei übergeben.' });
+  }
+
+  if (!image.startsWith('data:image/png') && !image.startsWith('data:image/jpeg')) {
+    return res.status(400).json({ error: 'Ungültiges Bildformat. Nur PNG und JPEG erlaubt.' });
+  }
+
+  try {
+    const result = db.prepare(`
+      UPDATE student_profiles
+      SET card_image = ?, card_status = 'Bild eingereicht'
+      WHERE user_id = ?
+    `).run(image, user.id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Schülerportal-Profil existiert nicht.' });
+    }
+
+    res.json({ success: true, message: 'Passbild erfolgreich hochgeladen und zur Prüfung eingereicht.' });
+  } catch (error) {
+    console.error('Fehler beim Speichern des Passbilds:', error);
+    res.status(500).json({ error: 'Fehler beim Speichern: ' + error.message });
+  }
+});
+
 router.encrypt = encrypt;
 router.decrypt = decrypt;
 

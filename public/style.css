@@ -1223,3 +1223,32 @@ input:checked + .slider:before {
   flex-shrink: 0;
   box-shadow: 0 0 4px #f43f5e;
 }
+
+/* Schülerportal & Login-Tabs CSS */
+.login-tab-btn:hover {
+  color: var(--text-primary) !important;
+}
+
+.login-tab-btn.active {
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--accent-color) !important;
+}
+
+.student-grid {
+  animation: fadeIn 0.4s ease;
+}
+
+.student-table td {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.student-table tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 900px) {
+  .student-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

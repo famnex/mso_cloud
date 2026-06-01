@@ -53,6 +53,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 5. URL auf OAuth-Redirects prüfen
   checkOauthRedirect();
 
+  // 6. URL auf Schülerportal-Tokens prüfen
+  checkStudentToken();
+
+  // 7. Pico.js Gesichtserkennungs-Kaskade initialisieren
+  initFaceFinder();
+
   // Tooltip initialisieren
   initTooltips();
 });
@@ -106,8 +112,14 @@ async function checkAuthStatus() {
 
 function renderAuthenticatedHeader() {
   const isAdmin = currentUser.role === 'admin';
+  const isStudent = currentUser.groups && currentUser.groups.includes('Schueler');
+  
   const adminBtnHtml = isAdmin 
     ? `<button class="btn btn-secondary" onclick="openAdminView()"><i class="fa-solid fa-screwdriver-wrench"></i> Admin-Bereich</button>`
+    : '';
+
+  const studentBtnHtml = isStudent
+    ? `<button class="btn btn-secondary" onclick="openStudentView()"><i class="fa-solid fa-graduation-cap"></i> Schülerportal</button>`
     : '';
 
   authSection.innerHTML = `
@@ -116,6 +128,7 @@ function renderAuthenticatedHeader() {
         <i class="fa-solid fa-user-circle"></i>
         <span>Eingeloggt als <strong>${currentUser.username}</strong></span>
       </div>
+      ${studentBtnHtml}
       ${adminBtnHtml}
       <button class="btn btn-danger" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Abmelden</button>
     </div>
@@ -176,6 +189,7 @@ async function handleLogout() {
       currentUser = null;
       renderAnonymousHeader();
       closeAdminView();
+      closeStudentView();
       await loadTiles();
       await loadActiveMessages();
     }
@@ -2160,5 +2174,351 @@ function toggleEditorSource() {
     wysiwyg.style.display = 'block';
     if (btn) btn.classList.remove('active');
     isSourceView = false;
+  }
+}
+
+/* ==========================================================================
+   7. Schülerportal Integration Logik
+   ========================================================================== */
+let facefinder_classify_region = function(r, c, s, pixels, ldim) { return -1.0; };
+
+function initFaceFinder() {
+  const cascadeurl = 'https://raw.githubusercontent.com/nenadmarkus/pico/c2e81f9d23cc11d1a612fd21e4f9de0921a5d0d9/rnt/cascades/facefinder';
+  fetch(cascadeurl).then(function(response) {
+     response.arrayBuffer().then(function(buffer) {
+         const bytes = new Int8Array(buffer);
+         facefinder_classify_region = pico.unpack_cascade(bytes);
+         console.log('* pico.js facefinder cascade loaded successfully');
+     });
+  }).catch(err => {
+     console.error('Fehler beim Laden des Pico.js Facefinders:', err);
+  });
+}
+
+function switchLoginTab(tab) {
+  const credentialsBtn = document.getElementById('login-tab-credentials-btn');
+  const emailBtn = document.getElementById('login-tab-email-btn');
+  const loginForm = document.getElementById('login-form');
+  const emailForm = document.getElementById('student-email-form');
+
+  if (tab === 'credentials') {
+    credentialsBtn.classList.add('active');
+    emailBtn.classList.remove('active');
+    loginForm.style.display = 'block';
+    emailForm.style.display = 'none';
+  } else if (tab === 'email') {
+    emailBtn.classList.add('active');
+    credentialsBtn.classList.remove('active');
+    loginForm.style.display = 'none';
+    emailForm.style.display = 'block';
+  }
+}
+
+async function handleStudentLinkRequest(event) {
+  event.preventDefault();
+  const email = document.getElementById('student-email').value.trim();
+  const privacyChecked = document.getElementById('student-privacy-check').checked;
+  const alertBox = document.getElementById('login-alert');
+
+  alertBox.style.display = 'none';
+  alertBox.className = 'alert alert-danger';
+
+  if (!email) {
+    alertBox.innerText = 'Bitte geben Sie Ihre E-Mail-Adresse ein.';
+    alertBox.style.display = 'block';
+    return;
+  }
+
+  if (!privacyChecked) {
+    alertBox.innerText = 'Bitte stimmen Sie der digitalen Verarbeitung Ihrer Daten zu.';
+    alertBox.style.display = 'block';
+    return;
+  }
+
+  try {
+    const res = await fetch('api/auth/student-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      alertBox.className = 'alert alert-success';
+      alertBox.innerText = data.message;
+      alertBox.style.display = 'block';
+      document.getElementById('student-email-form').reset();
+    } else {
+      throw new Error(data.error || 'Fehler beim Anfordern des Links.');
+    }
+  } catch (err) {
+    alertBox.className = 'alert alert-danger';
+    alertBox.innerText = err.message;
+    alertBox.style.display = 'block';
+  }
+}
+
+function checkStudentToken() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const studentToken = urlParams.get('student_token');
+  if (studentToken) {
+    handleStudentTokenLogin(studentToken);
+  }
+}
+
+async function handleStudentTokenLogin(token) {
+  // URL bereinigen
+  const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+  window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+
+  try {
+    const res = await fetch('api/auth/student-token-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      currentUser = data.user;
+      renderAuthenticatedHeader();
+      await loadTiles();
+      await loadActiveMessages();
+      openStudentView();
+    } else {
+      alert(data.error || 'Anmeldelink ungültig oder abgelaufen.');
+    }
+  } catch (err) {
+    console.error('Fehler bei Token-Login:', err);
+    alert('Serverfehler während des Login-Vorgangs.');
+  }
+}
+
+function openStudentView() {
+  const mainView = document.getElementById('main-view');
+  const studentView = document.getElementById('student-view');
+  const adminView = document.getElementById('admin-view');
+
+  if (adminView) adminView.style.display = 'none';
+  if (mainView) mainView.style.display = 'none';
+  if (studentView) {
+    studentView.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  loadStudentProfile();
+}
+
+function closeStudentView() {
+  const mainView = document.getElementById('main-view');
+  const studentView = document.getElementById('student-view');
+
+  if (studentView) studentView.style.display = 'none';
+  if (mainView) mainView.style.display = 'block';
+}
+
+async function loadStudentProfile() {
+  try {
+    const res = await fetch('api/auth/student-profile');
+    if (!res.ok) throw new Error('Profil konnte nicht geladen werden.');
+    const profile = await res.json();
+
+    document.getElementById('student-first-name').innerText = profile.first_name || '-';
+    document.getElementById('student-last-name').innerText = profile.last_name || '-';
+    
+    if (profile.birth_date) {
+      const date = new Date(profile.birth_date);
+      if (!isNaN(date.getTime())) {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        document.getElementById('student-birth-date').innerText = `${day}.${month}.${year}`;
+      } else {
+        document.getElementById('student-birth-date').innerText = profile.birth_date;
+      }
+    } else {
+      document.getElementById('student-birth-date').innerText = '-';
+    }
+
+    document.getElementById('student-birth-place').innerText = profile.birth_place || '-';
+    document.getElementById('student-email-display').innerText = currentUser.email || '-';
+    document.getElementById('student-mso-username').innerText = currentUser.username || '-';
+    document.getElementById('student-mso-password').innerText = profile.start_password || '-';
+    document.getElementById('student-mediothek-number').innerText = profile.mediothek_number || '-';
+
+    const statusEl = document.getElementById('student-account-status');
+    if (profile.account_status === 'true') {
+      statusEl.innerText = 'Aktiv';
+      statusEl.style.color = 'var(--success-color)';
+    } else {
+      statusEl.innerText = 'Noch inaktiv / In Bearbeitung';
+      statusEl.style.color = 'var(--warn-color)';
+    }
+
+    document.getElementById('student-dsgvo').innerText = profile.dsgvo_consent || 'Nein';
+    document.getElementById('student-wlan').innerText = profile.wlan_terms || 'Nein';
+    document.getElementById('student-ms365').innerText = profile.ms365_terms || 'Nein';
+    document.getElementById('student-paednetz').innerText = profile.paednetz_terms || 'Nein';
+    document.getElementById('student-videoconference').innerText = profile.videoconference_consent || 'Nein';
+    document.getElementById('student-card-processing').innerText = profile.card_processing_consent || 'Nein';
+
+    ['student-dsgvo', 'student-wlan', 'student-ms365', 'student-paednetz', 'student-videoconference', 'student-card-processing'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el.innerText === 'Ja') {
+        el.style.color = 'var(--success-color)';
+        el.style.fontWeight = '600';
+      } else {
+        el.style.color = 'var(--text-secondary)';
+        el.style.fontWeight = 'normal';
+      }
+    });
+
+    const cardStatusEl = document.getElementById('student-card-status');
+    cardStatusEl.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
+    
+    if (profile.card_status === 'Bild genehmigt') {
+      cardStatusEl.style.color = 'var(--success-color)';
+    } else if (profile.card_status === 'Bild eingereicht') {
+      cardStatusEl.style.color = 'var(--accent-color)';
+    } else if (profile.card_status === 'Bild abgelehnt') {
+      cardStatusEl.style.color = 'var(--danger-color)';
+    } else {
+      cardStatusEl.style.color = 'var(--warn-color)';
+    }
+
+    const previewImg = document.getElementById('student-photo-preview');
+    if (profile.card_image) {
+      previewImg.src = profile.card_image;
+    } else {
+      previewImg.src = 'https://cloud.mso-hef.de/launcher/media/user.png';
+    }
+
+    try {
+      const sphRes = await fetch('api/auth/sph-credentials');
+      const sphData = await sphRes.json();
+      if (sphData.exists) {
+        document.getElementById('student-sph-username-display').innerText = sphData.username;
+        document.getElementById('student-sph-password-display').innerText = '•••••••• (Im System hinterlegt)';
+      } else {
+        document.getElementById('student-sph-username-display').innerText = 'Keine SPH-Daten hinterlegt';
+        document.getElementById('student-sph-password-display').innerText = '-';
+      }
+    } catch (sphErr) {
+      console.error('Fehler beim Laden der SPH-Zugangsdaten:', sphErr);
+    }
+
+  } catch (err) {
+    console.error('Fehler beim Laden des Schülerprofils:', err);
+  }
+}
+
+function handleStudentPhotoSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const uploadBtn = document.getElementById('student-photo-upload-btn');
+  const originalBtnHtml = uploadBtn.innerHTML;
+  uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verarbeite Bild...';
+  uploadBtn.disabled = true;
+
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  img.onload = function() {
+    const canvas = document.getElementById('student-photo-canvas');
+    const ctx = canvas.getContext("2d");
+    const breite = 250;
+    const targetHeight = img.height / (img.width / breite);
+    
+    canvas.width = breite;
+    canvas.height = targetHeight;
+    ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, breite, targetHeight);
+    
+    const ratio = img.width / canvas.width;
+    const rgba = ctx.getImageData(0, 0, breite, targetHeight).data;
+    
+    function rgba_to_grayscale(rgbaData, nrows, ncols) {
+      const gray = new Uint8Array(nrows * ncols);
+      for (let r = 0; r < nrows; ++r) {
+        for (let c = 0; c < ncols; ++c) {
+          gray[r * ncols + c] = (2 * rgbaData[r * 4 * ncols + 4 * c + 0] + 7 * rgbaData[r * 4 * ncols + 4 * c + 1] + 1 * rgbaData[r * 4 * ncols + 4 * c + 2]) / 10;
+        }
+      }
+      return gray;
+    }
+    
+    const image = {
+      "pixels": rgba_to_grayscale(rgba, targetHeight, breite),
+      "nrows": targetHeight,
+      "ncols": breite,
+      "ldim": breite
+    };
+    
+    const params = {
+      "shiftfactor": 0.1,
+      "minsize": 20,
+      "maxsize": 1000,
+      "scalefactor": 1.1
+    };
+    
+    let dets = pico.run_cascade(image, facefinder_classify_region, params);
+    dets = pico.cluster_detections(dets, 0.2);
+    
+    const qthresh = 5.0;
+    let found = false;
+    
+    for (let i = 0; i < dets.length; ++i) {
+      if (dets[i][3] > qthresh) {
+        if (!found) {
+          const x = dets[i][1] * ratio;
+          const y = dets[i][0] * ratio;
+          const w = dets[i][2] / 2;
+          const h = w * 1.333;
+          
+          const zoom = 0.45 / ratio;
+          
+          canvas.width = 147;
+          canvas.height = 196;
+          ctx.clearRect(0, 0, 147, 196);
+          ctx.drawImage(img, x - (w / (2 * zoom)), y - (h / (2 * zoom)), w / zoom, h / zoom, 0, 0, 147, 196);
+          
+          const croppedBase64 = canvas.toDataURL("image/png");
+          document.getElementById('student-photo-preview').src = croppedBase64;
+          
+          uploadCroppedPhoto(croppedBase64, originalBtnHtml);
+          found = true;
+          break;
+        }
+      }
+    }
+    
+    if (!found) {
+      alert("Achtung: Es wurde kein Gesicht auf Ihrem Foto erkannt. Bitte laden Sie ein gut ausgeleuchtetes Porträtfoto hoch, auf dem Ihr Gesicht frontal und deutlich zu sehen ist.");
+      uploadBtn.innerHTML = originalBtnHtml;
+      uploadBtn.disabled = false;
+    }
+  };
+}
+
+async function uploadCroppedPhoto(croppedBase64, originalBtnHtml) {
+  const uploadBtn = document.getElementById('student-photo-upload-btn');
+  try {
+    const res = await fetch('api/auth/student-photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: croppedBase64 })
+    });
+    const data = await res.json();
+    
+    if (res.ok) {
+      alert("Erfolg: Ihr Passbild wurde erfolgreich hochgeladen und zur Prüfung eingereicht.");
+      await loadStudentProfile();
+    } else {
+      alert("Fehler beim Hochladen: " + (data.error || 'Serverfehler'));
+    }
+  } catch (err) {
+    console.error('Fehler beim Upload:', err);
+    alert('Serverfehler während des Hochladens.');
+  } finally {
+    uploadBtn.innerHTML = originalBtnHtml;
+    uploadBtn.disabled = false;
   }
 }

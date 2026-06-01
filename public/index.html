@@ -451,14 +451,112 @@
     </div>
   </main>
 
+  <!-- SCHÜLERPORTAL VIEW (Standardmäßig ausgeblendet) -->
+  <main id="student-view" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+      <div>
+        <h2 style="font-weight:700; font-size:1.8rem; letter-spacing:-0.5px; color: var(--accent-color);"><i class="fa-solid fa-graduation-cap"></i> Schülerportal</h2>
+        <p style="color:var(--text-secondary); margin-top:5px;">Hier finden Sie Ihre MSO-Zugangsdaten, erteilten Einwilligungen und können Ihr Ausweisbild verwalten.</p>
+      </div>
+      <button class="btn btn-secondary" onclick="closeStudentView()">
+        <i class="fa-solid fa-arrow-left-long"></i> Zurück zum Portal (Lobby)
+      </button>
+    </div>
+
+    <div class="student-grid" style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 25px;">
+      
+      <!-- Linker Bereich: Stammdaten & Zugangsdaten -->
+      <div style="display: flex; flex-direction: column; gap: 25px;">
+        
+        <!-- Stammdaten-Tabelle -->
+        <div class="glass-panel" style="padding: 25px;">
+          <h3 style="font-weight:600; font-size:1.2rem; margin-bottom:15px; display:flex; align-items:center; gap:10px; color: var(--accent-color);">
+            <i class="fa-solid fa-user-gear"></i> Persönliche Daten & Zugangsdaten
+          </h3>
+          <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5; margin-bottom:15px;">
+            Das angezeigte Passwort ist das Startpasswort Ihres MSO-Accounts. Sobald Sie Ihr Passwort geändert haben, ist die Anzeige des Passworts nicht mehr korrekt. Eine Änderung dieser Stammdaten ist nur über das IT-Büro möglich.
+          </p>
+          
+          <table class="student-table" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <tbody>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Vorname</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:600;" id="student-first-name">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Nachname</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:600;" id="student-last-name">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Geburtsdatum</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-birth-date">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Geburtsort</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-birth-place">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">E-Mail-Adresse</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-email-display">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--accent-color); font-weight: 600;">MSO-Benutzername</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:700; color: var(--accent-color);" id="student-mso-username">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">MSO-Startpasswort</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:600; font-family:monospace;" id="student-mso-password">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Mediothek Lesenummer</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-mediothek-number">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Benutzername</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-sph-username-display">-</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Startpasswort</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-family:monospace;" id="student-sph-password-display">-</td></tr>
+              <tr><td style="padding: 10px 0; color: var(--text-secondary);">Benutzerkonto-Status</td><td style="padding: 10px 0; font-weight: 600;" id="student-account-status">-</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Zustimmungen & Einwilligungen -->
+        <div class="glass-panel" style="padding: 25px;">
+          <h3 style="font-weight:600; font-size:1.2rem; margin-bottom:15px; display:flex; align-items:center; gap:10px; color: var(--accent-color);">
+            <i class="fa-solid fa-file-signature"></i> Erteilte Einwilligungen & Vereinbarungen
+          </h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> DSGVO-Einwilligung: <span id="student-dsgvo">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> WLAN-Nutzung: <span id="student-wlan">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> MS365-Nutzung: <span id="student-ms365">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Pädnetz-Vereinbarung: <span id="student-paednetz">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Videokonferenzen: <span id="student-videoconference">-</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i> Ausweisverarbeitung: <span id="student-card-processing">-</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rechter Bereich: Schülerausweis Bild-Upload -->
+      <div style="display: flex; flex-direction: column; gap: 25px;">
+        <div class="glass-panel" style="padding: 25px; display: flex; flex-direction: column; align-items: center; text-align: center;">
+          <h3 style="font-weight:600; font-size:1.2rem; margin-bottom:15px; color: var(--accent-color); width: 100%;">
+            <i class="fa-solid fa-address-card"></i> Schülerausweis Passbild
+          </h3>
+          
+          <!-- Bild-Vorschau -->
+          <div style="width: 147px; height: 196px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+            <img id="student-photo-preview" src="https://cloud.mso-hef.de/launcher/media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild-Vorschau">
+            <canvas id="student-photo-canvas" width="147" height="196" style="display: none;"></canvas>
+          </div>
+
+          <div style="margin-bottom: 15px; font-size: 0.85rem;">
+            <strong>Ausweis-Status:</strong> <span id="student-card-status" style="font-weight: 600; color: var(--warn-color);">Bild ungeprüft / Kein Bild</span>
+          </div>
+
+          <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px;">
+            Ihr Passbild wird mithilfe einer automatischen **Gesichtserkennung (Pico.js)** zugeschnitten und zentriert. Bitte laden Sie ein gut ausgeleuchtetes Porträtfoto hoch, auf dem Ihr Gesicht klar erkennbar ist.
+          </div>
+
+          <!-- File Upload input (verborgen) -->
+          <input type="file" id="student-photo-input" accept=".jpg,.jpeg,.png,.bmp" style="display: none;" onchange="handleStudentPhotoSelect(event)">
+          
+          <button class="btn btn-primary" id="student-photo-upload-btn" onclick="document.getElementById('student-photo-input').click()" style="width: 100%; justify-content: center;">
+            <i class="fa-solid fa-camera"></i> Foto hochladen / ändern
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
   <!-- MODAL: LOGIN -->
   <div class="modal" id="login-modal">
-    <div class="modal-content glass-panel">
+    <div class="modal-content glass-panel" style="max-width: 500px;">
       <span class="close-btn" onclick="closeModal('login-modal')">&times;</span>
-      <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px; text-align:center;">Anmelden</h3>
+      
+      <!-- Login Tabs (Umschaltbar zwischen Normal- & Erstlogin) -->
+      <div class="login-tabs" style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 25px;">
+        <button type="button" class="login-tab-btn active" id="login-tab-credentials-btn" onclick="switchLoginTab('credentials')" style="flex: 1; padding: 12px; background: none; border: none; color: var(--text-primary); border-bottom: 2px solid var(--accent-color); font-weight: 600; cursor: pointer; font-size: 0.9rem; transition: all 0.2s ease; outline: none;">Mit Zugangsdaten</button>
+        <button type="button" class="login-tab-btn" id="login-tab-email-btn" onclick="switchLoginTab('email')" style="flex: 1; padding: 12px; background: none; border: none; color: var(--text-secondary); border-bottom: 2px solid transparent; font-weight: 500; cursor: pointer; font-size: 0.9rem; transition: all 0.2s ease; outline: none;">Erstlogin (Neuer Schüler)</button>
+      </div>
       
       <div id="login-alert" class="alert alert-danger" style="display:none;"></div>
 
+      <!-- FORM 1: STANDARD LOGIN -->
       <form id="login-form" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label for="login-username">Benutzername oder E-Mail</label>
@@ -475,6 +573,30 @@
 
         <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
           <i class="fa-solid fa-right-to-bracket"></i> Einloggen
+        </button>
+      </form>
+
+      <!-- FORM 2: EMAIL LOGIN (Erstlogin) -->
+      <form id="student-email-form" onsubmit="handleStudentLinkRequest(event)" style="display: none;">
+        <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px; text-align: left;">
+          Benutzerkonten inklusive Passwörter und weitere Daten können über das Schülerportal abgefragt werden. Tragen Sie bitte Ihre bei der Schulanmeldung hinterlegte E-Mail-Adresse ein.<br><br>
+          Sie erhalten kurz darauf einen sicheren Anmeldelink per E-Mail, der 20 Minuten lang gültig ist und Sie direkt in das System einloggt.
+        </div>
+        
+        <div class="form-group">
+          <label for="student-email">Ihre hinterlegte E-Mail-Adresse</label>
+          <input type="email" id="student-email" class="form-control" placeholder="z.B. max@mso-hef.de" autocomplete="off">
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+          <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.8rem; color: var(--text-secondary); font-weight: normal; line-height: 1.4; text-align: left; user-select: none;">
+            <input type="checkbox" id="student-privacy-check" style="margin-top: 2px; cursor: pointer; width: 16px; height: 16px;">
+            <span>Ich stimme zu, dass meine Daten digital verarbeitet werden. Weitere Informationen finden Sie in unserer Datenschutzerklärung.</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top: 10px;">
+          <i class="fa-solid fa-paper-plane"></i> Anmeldelink anfordern
         </button>
       </form>
     </div>
@@ -880,6 +1002,7 @@
   <div id="tooltip" class="tooltip-custom"></div>
 
   <!-- JAVASCRIPT LOGIC -->
+  <script src="pico.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

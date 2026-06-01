@@ -170,6 +170,50 @@ Speichert die Lesebestätigungen eingeloggter Benutzer für Nachrichten des Typs
 ---
 
 
+### Tabelle: `student_profiles`
+Speichert detaillierte Stammdaten, Zustimmungen und Ausweisbilder der Schüler.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `user_id` (PK, FK) | INTEGER | Verweis auf den Benutzer (`users.id`) |
+| `first_name` | TEXT | Vorname des Schülers |
+| `last_name` | TEXT | Nachname des Schülers |
+| `birth_date` | TEXT | Geburtsdatum des Schülers |
+| `birth_place` | TEXT | Geburtsort des Schülers |
+| `mediothek_number` | TEXT | Lesenummer der Mediothek |
+| `start_password` | TEXT | Klartext-Passwort zur Erstanzeige |
+| `account_status` | TEXT | Status des Benutzerkontos (`true`/`false`) |
+| `card_status` | TEXT | Ausweisbild-Prüfstatus (`Bild ungeprüft / Kein Bild`, `Bild eingereicht` etc.) |
+| `card_image` | TEXT | Base64-kodiertes Passbild für den Schülerausweis |
+| `dsgvo_consent` | TEXT | Zustimmung zur DSGVO |
+| `publish_consent` | TEXT | Zustimmung zur Veröffentlichung personenbezogener Daten |
+| `usage_consent` | TEXT | Zustimmung zur Verwendung von Daten |
+| `videoconference_consent` | TEXT | Zustimmung für Videokonferenzen |
+| `card_processing_consent` | TEXT | Zustimmung zur Ausweisbildverarbeitung |
+| `paednetz_terms` | TEXT | Nutzungsbedingungen Pädnetz zugestimmt |
+| `wlan_terms` | TEXT | Nutzungsbedingungen W-Lan zugestimmt |
+| `ms365_terms` | TEXT | Nutzungsbedingungen MS365 zugestimmt |
+| `paednetz_logging` | TEXT | Protokollierung Pädnetz zugestimmt |
+| `wlan_logging` | TEXT | Protokollierung W-Lan zugestimmt |
+| `ms365_logging` | TEXT | Protokollierung MS365 zugestimmt |
+| `onlinedienste_logging` | TEXT | Protokollierung Onlinedienste zugestimmt |
+
+---
+
+### Tabelle: `student_tokens`
+Verwaltet temporäre E-Mail-Anmeldelinks (Tokens) für den Schüler-Erstlogin.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
+| `user_id` (FK) | INTEGER | Verweis auf den Benutzer (`users.id`) |
+| `token` | TEXT (UNIQUE) | Sicheres 48-stelliges Zufalls-Token |
+| `expires_at` | DATETIME | Ablaufzeitpunkt (20 Minuten ab Generierung) |
+| `used` | INTEGER | Verbrauchsstatus (`0` = aktiv, `1` = verwendet) |
+| `created_at` | DATETIME | Erstellungszeitpunkt |
+
+---
+
 ### Tabelle: `applied_migrations`
 Erfasst alle erfolgreich importierten Datenbank-Migrationsdateien.
 

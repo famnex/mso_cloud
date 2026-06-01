@@ -124,7 +124,26 @@ async function testSmtpConnection(config) {
   return true;
 }
 
+/**
+ * Versendet eine allgemeine HTML-E-Mail über den konfigurierten SMTP-Server.
+ */
+async function sendMail(toEmail, subject, htmlContent) {
+  const transporter = createTransporter();
+  const from = getConfig('smtp_from', 'no-reply@mso-hef.de');
+
+  const info = await transporter.sendMail({
+    from: `"MSO Cloud" <${from}>`,
+    to: toEmail,
+    subject: subject,
+    html: htmlContent
+  });
+
+  console.log('E-Mail erfolgreich gesendet an:', toEmail, 'Betreff:', subject, 'MessageID:', info.messageId);
+  return info;
+}
+
 module.exports = {
   sendResetMail,
-  testSmtpConnection
+  testSmtpConnection,
+  sendMail
 };
