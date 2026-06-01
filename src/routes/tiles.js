@@ -40,8 +40,16 @@ router.get('/', (req, res) => {
         const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
         const userGroups = user.groups || [];
         
-        // Prüfen, ob eine Überschneidung der Gruppen vorliegt
-        const hasAccess = allowedGroups.some(group => userGroups.includes(group));
+        // Prüfen, ob eine Überschneidung der Gruppen vorliegt (unterstützt raw DNs und CNs)
+        const userGroupsCNs = userGroups.map(g => {
+          const match = g.match(/cn=([^,]+)/i);
+          return match ? match[1].trim() : g;
+        });
+        
+        const hasAccess = allowedGroups.some(group => 
+          userGroups.some(ug => ug.toLowerCase() === group.toLowerCase()) ||
+          userGroupsCNs.some(ugCN => ugCN.toLowerCase() === group.toLowerCase())
+        );
         return hasAccess;
       }
       
@@ -80,7 +88,16 @@ router.get('/sso/:id', (req, res) => {
       } else if (tile.visibility === 'groups') {
         const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
         const userGroups = user.groups || [];
-        hasAccess = allowedGroups.some(group => userGroups.includes(group));
+        
+        const userGroupsCNs = userGroups.map(g => {
+          const match = g.match(/cn=([^,]+)/i);
+          return match ? match[1].trim() : g;
+        });
+        
+        hasAccess = allowedGroups.some(group => 
+          userGroups.some(ug => ug.toLowerCase() === group.toLowerCase()) ||
+          userGroupsCNs.some(ugCN => ugCN.toLowerCase() === group.toLowerCase())
+        );
       }
     }
 

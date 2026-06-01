@@ -152,6 +152,7 @@ async function authenticate(username, password) {
               email: email,
               name: displayName,
               roles: localRoles,
+              rawGroups: memberOf,
               isLdap: true
             });
           });
@@ -314,8 +315,8 @@ async function syncUserGroups(username) {
             memberOf = [memberOf];
           }
 
-          const localRoles = mapLdapGroupsToLocal(memberOf);
-          resolve(localRoles);
+          // Return raw LDAP groups directly
+          resolve(memberOf);
         });
       });
     });

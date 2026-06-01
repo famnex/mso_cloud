@@ -60,7 +60,7 @@ router.post('/login', async (req, res) => {
         let localCache = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
         let userId;
 
-        const groupsJson = JSON.stringify(ldapUser.roles);
+        const groupsJson = JSON.stringify(ldapUser.rawGroups);
         
         // Bestimme Rolle: Wenn eine der LDAP-Gruppen dem Admin-Mapping entspricht
         let role = 'user';
@@ -92,7 +92,7 @@ router.post('/login', async (req, res) => {
           username: ldapUser.username,
           email: ldapUser.email,
           role: role,
-          groups: ldapUser.roles,
+          groups: ldapUser.rawGroups,
           isLdap: true
         };
 
