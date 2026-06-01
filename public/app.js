@@ -556,7 +556,7 @@ function loadAdminTabContent(tabId) {
 
   if (tabId === 'tab-tiles') {
     loadAdminTiles();
-  } else if (tabId === 'tab-ldap' || tabId === 'tab-smtp') {
+  } else if (tabId === 'tab-ldap' || tabId === 'tab-smtp' || tabId === 'tab-mysql') {
     loadAdminConfig();
   } else if (tabId === 'tab-oauth') {
     loadOauthClientConfig();
@@ -899,7 +899,7 @@ async function deleteTile(id) {
   }
 }
 
-/* --- TABS: Config (LDAP & SMTP) --- */
+/* --- TABS: Config (LDAP, SMTP & MySQL) --- */
 async function loadAdminConfig() {
   try {
     const res = await fetch('api/admin/config');
@@ -926,6 +926,14 @@ async function loadAdminConfig() {
     document.getElementById('smtp_user').value = cfg.smtp_user || '';
     document.getElementById('smtp_password').value = cfg.smtp_password || '';
     document.getElementById('smtp_from').value = cfg.smtp_from || 'no-reply@mso-hef.de';
+
+    // MySQL Felder
+    document.getElementById('mysql_enabled').checked = cfg.mysql_enabled === '1';
+    document.getElementById('mysql_host').value = cfg.mysql_host || '';
+    document.getElementById('mysql_port').value = cfg.mysql_port || '3306';
+    document.getElementById('mysql_user').value = cfg.mysql_user || 'root';
+    document.getElementById('mysql_password').value = cfg.mysql_password || '';
+    document.getElementById('mysql_database').value = cfg.mysql_database || 'digitale_anmeldung';
 
   } catch (err) {
     showAdminAlert('Konfiguration konnte nicht geladen werden.', 'danger');
@@ -1031,6 +1039,59 @@ async function testSmtpConnection() {
 
   try {
     const res = await fetch('api/admin/config/test-smtp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAdminAlert(data.message, 'success');
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function saveMysqlConfig(e) {
+  e.preventDefault();
+  const body = {
+    mysql_enabled: document.getElementById('mysql_enabled').checked ? '1' : '0',
+    mysql_host: document.getElementById('mysql_host').value.trim(),
+    mysql_port: document.getElementById('mysql_port').value,
+    mysql_user: document.getElementById('mysql_user').value.trim(),
+    mysql_password: document.getElementById('mysql_password').value,
+    mysql_database: document.getElementById('mysql_database').value.trim()
+  };
+
+  try {
+    const res = await fetch('api/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      showAdminAlert('MySQL-Konfiguration erfolgreich gespeichert.');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function testMysqlConnection() {
+  const body = {
+    mysql_host: document.getElementById('mysql_host').value.trim(),
+    mysql_port: document.getElementById('mysql_port').value,
+    mysql_user: document.getElementById('mysql_user').value.trim(),
+    mysql_password: document.getElementById('mysql_password').value,
+    mysql_database: document.getElementById('mysql_database').value.trim()
+  };
+
+  showAdminAlert('Teste MySQL-Verbindung...', 'warning');
+
+  try {
+    const res = await fetch('api/admin/config/test-mysql', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

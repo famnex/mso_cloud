@@ -5,6 +5,7 @@ const { db, getConfig, setConfig } = require('../db');
 const ldap = require('../ldap');
 const mail = require('../mail');
 const updater = require('../updater');
+const studentDb = require('../student_db');
 
 /**
  * Middleware zur Absicherung aller Admin-Routen.
@@ -49,7 +50,14 @@ router.get('/config', (req, res) => {
       smtp_secure: getConfig('smtp_secure', '0'),
       smtp_user: getConfig('smtp_user', ''),
       smtp_password: getConfig('smtp_password') ? '********' : '',
-      smtp_from: getConfig('smtp_from', 'no-reply@mso-hef.de')
+      smtp_from: getConfig('smtp_from', 'no-reply@mso-hef.de'),
+
+      mysql_enabled: getConfig('mysql_enabled', '0'),
+      mysql_host: getConfig('mysql_host', ''),
+      mysql_port: getConfig('mysql_port', '3306'),
+      mysql_user: getConfig('mysql_user', 'root'),
+      mysql_password: getConfig('mysql_password') ? '********' : '',
+      mysql_database: getConfig('mysql_database', 'digitale_anmeldung')
     };
     res.json(config);
   } catch (error) {
@@ -61,13 +69,14 @@ router.get('/config', (req, res) => {
  * Speichert Konfigurationseinstellungen.
  * Maskierte Passwörter werden nicht überschrieben!
  */
-router.post('/config', (req, res) => {
+router.post('/config', async (req, res) => {
   try {
     const keys = [
       'ldap_enabled', 'ldap_url', 'ldap_port', 'ldap_secure', 'ldap_tls_verify',
       'ldap_base_dn', 'ldap_bind_dn', 'ldap_user_attribute', 'ldap_mail_attribute', 
       'ldap_name_attribute', 'ldap_upn_suffix',
-      'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from'
+      'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from',
+      'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database'
     ];
 
     // Standard-Keys sichern
@@ -84,6 +93,12 @@ router.post('/config', (req, res) => {
     if (req.body.smtp_password && req.body.smtp_password !== '********') {
       setConfig('smtp_password', req.body.smtp_password.trim());
     }
+    if (req.body.mysql_password && req.body.mysql_password !== '********') {
+      setConfig('mysql_password', req.body.mysql_password.trim());
+    }
+
+    // Reaktiv den MySQL-Verbindungspool im laufenden Betrieb neu laden
+    await studentDb.reconnectMySQL();
 
     res.json({ success: true, message: 'Einstellungen erfolgreich gespeichert.' });
   } catch (error) {
@@ -131,6 +146,31 @@ router.post('/config/test-smtp', async (req, res) => {
     res.status(400).json({ error: 'SMTP-Verbindungsfehler: ' + errMsg });
   }
 });
+
+/**
+ * Testet die MySQL-Schulanmeldungsdatenbank-Verbindung live.
+ */
+router.post('/config/test-mysql', async (req, res) => {
+  const config = { ...req.body };
+
+  if (config.mysql_password === '********') {
+    config.mysql_password = getConfig('mysql_password', '');
+  }
+
+  try {
+    await studentDb.testMySQLConnection({
+      host: config.mysql_host,
+      port: config.mysql_port,
+      user: config.mysql_user,
+      password: config.mysql_password,
+      database: config.mysql_database
+    });
+    res.json({ success: true, message: 'MySQL-Verbindung erfolgreich hergestellt und verifiziert!' });
+  } catch (error) {
+    res.status(400).json({ error: 'MySQL-Verbindungsfehler: ' + error.message });
+  }
+});
+
 
 /* ==========================================================================
    1b. OAuth 2.0 Client Konfiguration
@@ -637,14 +677,9 @@ router.delete('/messages/:id', (req, res) => {
 /**
  * Ruft alle Schülerprofile inkl. Benutzername und E-Mail ab.
  */
-router.get('/students', (req, res) => {
+router.get('/students', async (req, res) => {
   try {
-    const students = db.prepare(`
-      SELECT sp.*, u.username, u.email
-      FROM student_profiles sp
-      JOIN users u ON sp.user_id = u.id
-      ORDER BY sp.last_name ASC, sp.first_name ASC
-    `).all();
+    const students = await studentDb.getAllStudents();
     res.json(students);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -654,18 +689,12 @@ router.get('/students', (req, res) => {
 /**
  * Genehmigt das Ausweisbild eines Schülers.
  */
-router.post('/students/:id/approve', (req, res) => {
+router.post('/students/:id/approve', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = db.prepare(`
-      UPDATE student_profiles
-      SET card_status = 'Bild genehmigt'
-      WHERE user_id = ?
-    `).run(id);
-    
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Profil nicht gefunden.' });
-    }
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(id);
+    const email = user ? user.email : '';
+    await studentDb.approvePhoto(id, email);
     res.json({ success: true, message: 'Passbild erfolgreich genehmigt.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -675,18 +704,12 @@ router.post('/students/:id/approve', (req, res) => {
 /**
  * Lehnt das Ausweisbild eines Schülers ab.
  */
-router.post('/students/:id/reject', (req, res) => {
+router.post('/students/:id/reject', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = db.prepare(`
-      UPDATE student_profiles
-      SET card_status = 'Bild abgelehnt'
-      WHERE user_id = ?
-    `).run(id);
-    
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Profil nicht gefunden.' });
-    }
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(id);
+    const email = user ? user.email : '';
+    await studentDb.rejectPhoto(id, email);
     res.json({ success: true, message: 'Passbild abgelehnt.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -696,18 +719,12 @@ router.post('/students/:id/reject', (req, res) => {
 /**
  * Löscht/resettet das Ausweisbild eines Schülers.
  */
-router.delete('/students/:id/photo', (req, res) => {
+router.delete('/students/:id/photo', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = db.prepare(`
-      UPDATE student_profiles
-      SET card_image = NULL, card_status = 'Bild ungeprüft / Kein Bild'
-      WHERE user_id = ?
-    `).run(id);
-    
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Profil nicht gefunden.' });
-    }
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(id);
+    const email = user ? user.email : '';
+    await studentDb.deletePhoto(id, email);
     res.json({ success: true, message: 'Passbild erfolgreich gelöscht.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -717,23 +734,20 @@ router.delete('/students/:id/photo', (req, res) => {
 /**
  * Aktualisiert Stammdaten eines Schülerprofils.
  */
-router.put('/students/:id', (req, res) => {
+router.put('/students/:id', async (req, res) => {
   const { id } = req.params;
   const { first_name, last_name, birth_date, birth_place, mediothek_number, account_status } = req.body;
   try {
-    db.prepare(`
-      UPDATE student_profiles
-      SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, mediothek_number = ?, account_status = ?
-      WHERE user_id = ?
-    `).run(
-      first_name || '', 
-      last_name || '', 
-      birth_date || null, 
-      birth_place || '', 
-      mediothek_number || '', 
-      account_status || 'false', 
-      id
-    );
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(id);
+    const email = user ? user.email : '';
+    await studentDb.updateStudentProfile(id, email, {
+      first_name,
+      last_name,
+      birth_date,
+      birth_place,
+      mediothek_number,
+      account_status
+    });
     res.json({ success: true, message: 'Schülerprofil erfolgreich aktualisiert.' });
   } catch (error) {
     res.status(500).json({ error: error.message });

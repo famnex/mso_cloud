@@ -228,3 +228,48 @@ Erfasst alle erfolgreich importierten Datenbank-Migrationsdateien.
 ## 3. Datenbank-Update-Skripte für GitHub
 Bei zukünftigen Updates über GitHub vergleicht der Updater den Ordner `/migrations` und führt neue `.sql`-Dateien automatisch aus.
 Jede neue Migration muss als separate Datei (z.B. `002_add_new_fields.sql`) hinterlegt werden.
+
+---
+
+## 4. Zentrale MySQL-Datenbank-Integration (Produktionsbetrieb)
+
+Im Produktionsbetrieb (wenn MySQL-Verbindungsdaten in den Umgebungsvariablen wie `MYSQL_HOST` gesetzt sind) werden die Daten des Schülerportals (Stammdaten & Zugänge), des digitalen Schülerausweises sowie des Erstlogins (E-Mail-Tokens) aus einer zentralen MySQL-Datenbank bezogen und dort aktualisiert. Alle anderen Funktionen der MSO Cloud verweilen autark auf der lokalen SQLite-Datenbank.
+
+### MySQL-Tabellenübersicht
+
+#### Tabelle: `fieldvalues`
+Speichert die dynamischen Anmeldedaten und Profileigenschaften der Schüler basierend auf ihrer Antrags-ID (`application`).
+*   `application` (INTEGER) - ID des Schülerantrags.
+*   `field` (INTEGER) - Feld-ID der Eigenschaft (z. B. `18` für E-Mail, `1` für Vorname, `2` für Nachname, `3` für Geburtsdatum, `147` für MSO Startpasswort, `158` für Ausweisstatus, `164` für SPH-Startpasswort).
+*   `value` (TEXT) - Der eingetragene Wert des Feldes (oder Subfield-ID bei Select-Typen).
+
+#### Tabelle: `applications`
+Verwaltet den allgemeinen Status eines Schülerantrags.
+*   `ID` (INTEGER, PK) - ID des Antrags (entspricht `fieldvalues.application`).
+*   `status` (INTEGER) - Bearbeitungsstatus (`10` = Freigeschaltet/Aktiv, `< 10` = In Bearbeitung/Ausstehend).
+
+#### Tabelle: `schueleremailtokens`
+Verwaltet die temporären Token-Anmeldelinks für den E-Mail-Erstlogin.
+*   `token` (VARCHAR, UNIQUE) - 48-stelliges zufälliges Hex-Token.
+*   `IDapplication` (INTEGER) - Verweis auf die Antrags-ID in `applications`.
+*   `state` (INTEGER) - Status des Tokens (`0` = neu, `1` = verwendet).
+*   `datetime` (DATETIME) - Erstellungszeitpunkt des Tokens (20 Minuten Gültigkeit).
+
+#### Tabelle: `images`
+Speichert das per Gesichtserkennung (Pico.js) zugeschnittene Passbild der Schüler.
+*   `application` (INTEGER) - Die Antrags-ID.
+*   `field` (INTEGER) - Das Bildfeld (immer `37` für Schülerausweise).
+*   `file` (MEDIUMTEXT / LONGTEXT) - Das Base64-kodierte Passbild des Schülers.
+
+#### Tabelle: `documentation`
+Protokolliert alle Erhebungs-, Änderungs- und Abfrageprozesse zu Prüf- und Revisionszwecken.
+*   `user` (INTEGER, NULLABLE) - Ausführender Backend-Nutzer.
+*   `application` (INTEGER, NULLABLE) - Betroffene Antrags-ID.
+*   `category` (VARCHAR) - Log-Kategorie (`Information`, `Warnung`, `Fehler`, `Kritisch`).
+*   `task` (VARCHAR) - Art des Vorgangs (`Erhebung/Veränderung`, `Abfrage`, `Übermittlung`, `Löschung`).
+*   `page` (VARCHAR) - Modul/Name des Scripts (z. B. `sendmaillogin`, `lobby`, `uploadfiletodatabase`).
+*   `element` (VARCHAR, NULLABLE) - Betroffenes Feld oder Datenbanktabelle.
+*   `comment` (TEXT) - Beschreibung des Ereignisses.
+*   `value` (TEXT, NULLABLE) - Genutzter Wert (z. B. E-Mail-Adresse oder geändertes Feld).
+*   `ip` (VARCHAR) - IP-Adresse des ausführenden Clients.
+

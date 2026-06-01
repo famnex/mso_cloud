@@ -136,6 +136,9 @@
           <li class="admin-nav-item" onclick="switchTab('tab-smtp', this)">
             <i class="fa-solid fa-envelope-open-text"></i> E-Mail (SMTP)
           </li>
+          <li class="admin-nav-item" onclick="switchTab('tab-mysql', this)">
+            <i class="fa-solid fa-database"></i> Schulanmeldungs-DB
+          </li>
           <li class="admin-nav-item" onclick="switchTab('tab-oauth', this)">
             <i class="fa-solid fa-shield-halved"></i> OAuth 2.0 SSO
           </li>
@@ -310,6 +313,44 @@
             <div style="display:flex; gap:15px; margin-top:30px;">
               <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
               <button type="button" class="btn btn-secondary" onclick="testSmtpConnection()"><i class="fa-solid fa-circle-question"></i> Verbindung testen</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB: MYSQL -->
+        <div class="admin-tab" id="tab-mysql">
+          <h3 style="font-weight:600; margin-bottom:20px;">Schulanmeldungs-Datenbank (MySQL)</h3>
+          <form id="mysql-form" onsubmit="saveMysqlConfig(event)">
+            <div class="form-group" style="margin-bottom:25px;">
+              <label>MySQL-Verbindung aktivieren</label>
+              <label class="switch">
+                <input type="checkbox" id="mysql_enabled" value="1">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="mysql_host">Datenbank-Host (Serveradresse) *</label>
+              <input type="text" id="mysql_host" class="form-control" placeholder="z. B. localhost oder IP-Adresse" required>
+            </div>
+            <div class="form-group">
+              <label for="mysql_port">Port *</label>
+              <input type="number" id="mysql_port" class="form-control" value="3306" required min="1" max="65535">
+            </div>
+            <div class="form-group">
+              <label for="mysql_user">Benutzername *</label>
+              <input type="text" id="mysql_user" class="form-control" placeholder="z. B. root" required>
+            </div>
+            <div class="form-group">
+              <label for="mysql_password">Passwort</label>
+              <input type="password" id="mysql_password" class="form-control" placeholder="MySQL-Passwort">
+            </div>
+            <div class="form-group">
+              <label for="mysql_database">Datenbankname *</label>
+              <input type="text" id="mysql_database" class="form-control" placeholder="z. B. digitale_anmeldung" required>
+            </div>
+            <div style="display:flex; gap:15px; margin-top:30px;">
+              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+              <button type="button" class="btn btn-secondary" onclick="testMysqlConnection()"><i class="fa-solid fa-circle-question"></i> Verbindung testen</button>
             </div>
           </form>
         </div>

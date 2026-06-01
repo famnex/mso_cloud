@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { db, getConfig } = require('../db');
 const ldap = require('../ldap');
 const mail = require('../mail');
+const studentDb = require('../student_db');
 
 /**
  * Holt den aktuellen Benutzer aus der Session.
@@ -324,21 +325,16 @@ router.post('/student-link', async (req, res) => {
   }
 
   try {
-    // Überprüfen, ob ein Benutzer mit dieser E-Mail-Adresse existiert und ein Schülerprofil hat
-    const user = db.prepare(`
-      SELECT u.id, u.username, sp.account_status 
-      FROM users u 
-      JOIN student_profiles sp ON u.id = sp.user_id 
-      WHERE u.email = ?
-    `).get(email.trim());
+    // Überprüfen, ob der Schüler existiert und seinen Freigabestatus holen (MySQL / SQLite)
+    const userStatus = await studentDb.getStudentByEmail(email);
 
-    if (!user) {
+    if (!userStatus) {
       return res.status(404).json({ 
         error: 'Diese E-Mail-Adresse ist bei der Registrierung nicht hinterlegt oder Ihr Zugang ist noch nicht freigeschaltet. Bitte warten Sie die Begrüßungsmail ab!' 
       });
     }
 
-    if (user.account_status === 'false') {
+    if (userStatus.account_status === 'false') {
       // Schüler existiert, ist aber noch nicht freigeschaltet -> "Noch in Bearbeitung" E-Mail senden (analog PHP)
       const mailHtml = `
         <h2>Guten Tag,</h2>
@@ -360,16 +356,9 @@ router.post('/student-link', async (req, res) => {
 
     // Token erzeugen (24 Bytes -> 48 Hex-Zeichen) und 20 Minuten Gültigkeit
     const token = crypto.randomBytes(24).toString('hex');
-    const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
     
-    // Alte offene Tokens dieses Benutzers löschen
-    db.prepare('DELETE FROM student_tokens WHERE user_id = ?').run(user.id);
-    
-    // Neuen Token speichern
-    db.prepare(`
-      INSERT INTO student_tokens (user_id, token, expires_at)
-      VALUES (?, ?, ?)
-    `).run(user.id, token, expiresAt);
+    // Token in DB speichern (MySQL / SQLite)
+    await studentDb.createStudentToken(email, token, req.ip);
 
     // Anmeldelink generieren (auf Basis der anfragenden Hostadresse)
     const host = req.get('host');
@@ -413,45 +402,21 @@ router.post('/student-link', async (req, res) => {
 /**
  * Führt den automatischen Login durch, wenn ein gültiges E-Mail-Token übergeben wird.
  */
-router.post('/student-token-login', (req, res) => {
+router.post('/student-token-login', async (req, res) => {
   const { token } = req.body;
   if (!token) {
     return res.status(400).json({ error: 'Token ist erforderlich.' });
   }
 
   try {
-    // Ungenutztes, noch nicht abgelaufenes Token in DB suchen
-    const nowStr = new Date().toISOString();
-    const row = db.prepare(`
-      SELECT * FROM student_tokens 
-      WHERE token = ? AND expires_at > ? AND used = 0
-    `).get(token, nowStr);
+    const result = await studentDb.verifyStudentToken(token, req.ip);
 
-    if (!row) {
-      return res.status(400).json({ 
-        error: 'Der Anmeldelink ist ungültig oder abgelaufen (20 Minuten Gültigkeit).' 
-      });
-    }
-
-    // Token als verwendet markieren
-    db.prepare('UPDATE student_tokens SET used = 1 WHERE id = ?').run(row.id);
-
-    // Zuordnung des Benutzers
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
-    if (!user) {
-      return res.status(404).json({ error: 'Der zugehörige Schüler-Account existiert nicht mehr.' });
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
     }
 
     // Express-Sitzung erstellen
-    const groups = JSON.parse(user.groups || '[]');
-    req.session.user = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      groups: groups,
-      isLdap: false
-    };
+    req.session.user = result.user;
 
     res.json({ 
       success: true, 
@@ -467,14 +432,14 @@ router.post('/student-token-login', (req, res) => {
 /**
  * Ruft die detaillierten Schülerportal-Stammdaten des angemeldeten Benutzers ab.
  */
-router.get('/student-profile', (req, res) => {
+router.get('/student-profile', async (req, res) => {
   const user = req.session.user;
   if (!user) {
     return res.status(401).json({ error: 'Nicht angemeldet.' });
   }
 
   try {
-    const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(user.id);
+    const profile = await studentDb.getStudentProfile(user);
     if (!profile) {
       return res.status(404).json({ error: 'Kein Schülerportal-Profil für diesen Account hinterlegt.' });
     }
@@ -488,7 +453,7 @@ router.get('/student-profile', (req, res) => {
 /**
  * Speichert das über Pico.js face-cropped Base64-Passbild ab und aktualisiert den Ausweisstatus.
  */
-router.post('/student-photo', (req, res) => {
+router.post('/student-photo', async (req, res) => {
   const user = req.session.user;
   const { image } = req.body;
 
@@ -505,16 +470,7 @@ router.post('/student-photo', (req, res) => {
   }
 
   try {
-    const result = db.prepare(`
-      UPDATE student_profiles
-      SET card_image = ?, card_status = 'Bild eingereicht'
-      WHERE user_id = ?
-    `).run(image, user.id);
-
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Schülerportal-Profil existiert nicht.' });
-    }
-
+    await studentDb.updateStudentPhoto(user.id, user.email, image);
     res.json({ success: true, message: 'Passbild erfolgreich hochgeladen und zur Prüfung eingereicht.' });
   } catch (error) {
     console.error('Fehler beim Speichern des Passbilds:', error);
