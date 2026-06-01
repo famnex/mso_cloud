@@ -151,3 +151,10 @@ Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in 
   1. *Benutzerprofil & Zugänge* (Stammdaten & Upload)
   2. *Schülerausweis* (Digitaler Ausweis)
   3. *Abmelden* (Logout)
+
+### D. Schüler-Datenbank & Ausweis-Verwaltung (Administration)
+* **Übersicht**: Ein neuer, eigenständiger Tab „Schüler-Datenbank & Ausweise“ im Administrations-Backend listet alle eingereichten Schülerprofile auf. Admins können Profile nach Vor-/Nachname, E-Mail-Adresse und Benutzername filtern und durchsuchen.
+* **Filterung**: Es stehen Filter zur gezielten Selektion bereit (z. B. nur Profile, deren Passbilder auf die Freigabe warten).
+* **Bild-Freigabe & Lightbox**: Eingereichte Passbilder werden in der Tabelle als Miniaturansicht dargestellt. Durch Anklicken des Bildes öffnet sich eine glassmorphe Lightbox-Großansicht. Der Administrator kann das Bild direkt freigeben („Bild genehmigt“), ablehnen („Bild abgelehnt“) oder unwiderruflich aus der Datenbank löschen.
+* **Stammdaten & Einwilligungen**: Es werden Geburtsdatum, E-Mail und Mediotheksnummer übersichtlich dargestellt. Erteilte datenschutzrechtliche und nutzungsbedingte Einwilligungen (DSGVO, WLAN, MS365, Pädnetz) werden kompakt als farblich markierte Badges visualisiert.
+

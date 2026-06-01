@@ -564,6 +564,8 @@ function loadAdminTabContent(tabId) {
     loadAdminLdapMappings();
   } else if (tabId === 'tab-users') {
     loadAdminUsers();
+  } else if (tabId === 'tab-students') {
+    loadAdminStudents();
   } else if (tabId === 'tab-messages') {
     loadAdminMessages();
   } else if (tabId === 'tab-system') {
@@ -2655,3 +2657,178 @@ function closeCardView() {
   if (cardView) cardView.style.display = 'none';
   if (mainView) mainView.style.display = 'block';
 }
+
+/* --- TAB: Schüler-Datenbank & Ausweis-Verwaltung --- */
+async function loadAdminStudents() {
+  const tbody = document.getElementById('admin-students-table-body');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Schülerdaten...</td></tr>';
+
+  try {
+    const res = await fetch('api/admin/students');
+    const students = await res.json();
+
+    const filterVal = document.getElementById('admin-students-filter').value;
+    const searchVal = document.getElementById('admin-students-search').value.toLowerCase().trim();
+
+    tbody.innerHTML = '';
+    
+    const filtered = students.filter(student => {
+      // 1. Status Filter
+      if (filterVal === 'eingereicht' && student.card_status !== 'Bild eingereicht') return false;
+      if (filterVal === 'genehmigt' && student.card_status !== 'Bild genehmigt') return false;
+      if (filterVal === 'abgelehnt' && student.card_status !== 'Bild abgelehnt') return false;
+      if (filterVal === 'none' && (student.card_status && student.card_status !== 'Bild ungeprüft / Kein Bild')) return false;
+
+      // 2. Search Filter (first_name, last_name, email, username)
+      if (searchVal) {
+        const fullName = `${student.first_name || ''} ${student.last_name || ''}`.toLowerCase();
+        const email = (student.email || '').toLowerCase();
+        const username = (student.username || '').toLowerCase();
+        if (!fullName.includes(searchVal) && !email.includes(searchVal) && !username.includes(searchVal)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-secondary);">Keine passenden Schülerprofile gefunden.</td></tr>';
+      return;
+    }
+
+    filtered.forEach(student => {
+      // Passbild Spalte
+      let imgHtml = '';
+      if (student.card_image) {
+        imgHtml = `<img src="${student.card_image}" style="width: 45px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); cursor: pointer;" onclick="viewLargeImage('${student.card_image}', '${student.first_name} ${student.last_name}')" title="Bild vergrößern">`;
+      } else {
+        imgHtml = `<img src="media/user.png" style="width: 45px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); opacity: 0.4;">`;
+      }
+
+      // Geburtsdatum
+      let formattedDate = '-';
+      if (student.birth_date) {
+        try {
+          formattedDate = new Date(student.birth_date).toLocaleDateString('de-DE');
+        } catch (e) {}
+      }
+
+      // Ausweis Status Label
+      let statusLabel = '';
+      if (student.card_status === 'Bild genehmigt') {
+        statusLabel = '<span class="user-badge" style="font-size:0.75rem; background:rgba(74,222,128,0.1); color:var(--success-color); font-weight:600;"><i class="fa-solid fa-circle-check"></i> Genehmigt (Aktiv)</span>';
+      } else if (student.card_status === 'Bild eingereicht') {
+        statusLabel = '<span class="user-badge" style="font-size:0.75rem; background:rgba(46,139,250,0.1); color:var(--accent-color); font-weight:600;"><i class="fa-solid fa-circle-notch fa-spin"></i> Wartend auf Freigabe</span>';
+      } else if (student.card_status === 'Bild abgelehnt') {
+        statusLabel = '<span class="user-badge" style="font-size:0.75rem; background:rgba(239,68,68,0.1); color:var(--danger-color); font-weight:600;"><i class="fa-solid fa-circle-xmark"></i> Abgelehnt</span>';
+      } else {
+        statusLabel = '<span class="user-badge" style="font-size:0.75rem; background:rgba(251,191,36,0.1); color:var(--warn-color); font-weight:600;"><i class="fa-solid fa-circle-question"></i> Kein Bild / Ungeprüft</span>';
+      }
+
+      // Einwilligungen Spalte (Kompakte Tags)
+      const consents = [];
+      if (student.dsgvo_consent === 'Ja') consents.push('<span style="color:var(--success-color); margin-right:5px;" title="DSGVO-Einwilligung erteilt">DSGVO</span>');
+      if (student.wlan_terms === 'Ja') consents.push('<span style="color:var(--success-color); margin-right:5px;" title="WLAN-Nutzungsvereinbarung erteilt">WLAN</span>');
+      if (student.ms365_terms === 'Ja') consents.push('<span style="color:var(--success-color); margin-right:5px;" title="MS365-Nutzungsvereinbarung erteilt">MS365</span>');
+      if (student.paednetz_terms === 'Ja') consents.push('<span style="color:var(--success-color);" title="Pädnetz-Vereinbarung erteilt">Pädnetz</span>');
+      
+      const consentHtml = consents.length > 0 
+        ? `<div style="display:flex; flex-wrap:wrap; gap:4px; font-size:0.75rem; font-weight:600;">${consents.join('')}</div>`
+        : '<span style="color:var(--text-secondary); font-size:0.75rem;">Keine</span>';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="padding: 10px 5px; text-align: center;">${imgHtml}</td>
+        <td><strong>${student.first_name || ''} ${student.last_name || ''}</strong><br><span style="font-size:0.75rem; color:var(--text-secondary);">${student.username}</span></td>
+        <td>${formattedDate}</td>
+        <td style="font-size:0.85rem;">${student.email || ''}</td>
+        <td><code style="font-size:0.85rem; letter-spacing:1px;">${student.mediothek_number || '-'}</code></td>
+        <td>${statusLabel}</td>
+        <td>${consentHtml}</td>
+        <td class="actions-cell">
+          <button class="btn btn-success btn-icon" onclick="approveStudentPhoto(${student.user_id})" title="Bild freigeben" ${student.card_image ? '' : 'disabled'}><i class="fa-solid fa-circle-check"></i></button>
+          <button class="btn btn-secondary btn-icon" onclick="rejectStudentPhoto(${student.user_id})" title="Bild ablehnen" ${student.card_image ? '' : 'disabled'} style="color:var(--warn-color);"><i class="fa-solid fa-circle-xmark"></i></button>
+          <button class="btn btn-danger btn-icon" onclick="deleteStudentPhoto(${student.user_id})" title="Bild löschen" ${student.card_image ? '' : 'disabled'}><i class="fa-solid fa-trash-can"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--error-color);">Fehler beim Laden: ${err.message}</td></tr>`;
+  }
+}
+
+async function approveStudentPhoto(userId) {
+  try {
+    const res = await fetch(`api/admin/students/${userId}/approve`, { method: 'POST' });
+    if (res.ok) {
+      showAdminAlert('Ausweisbild erfolgreich genehmigt.');
+      loadAdminStudents();
+    } else {
+      const data = await res.json();
+      showAdminAlert(data.error || 'Fehler beim Genehmigen des Bildes.', 'danger');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function rejectStudentPhoto(userId) {
+  try {
+    const res = await fetch(`api/admin/students/${userId}/reject`, { method: 'POST' });
+    if (res.ok) {
+      showAdminAlert('Ausweisbild wurde abgelehnt.');
+      loadAdminStudents();
+    } else {
+      const data = await res.json();
+      showAdminAlert(data.error || 'Fehler beim Ablehnen des Bildes.', 'danger');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function deleteStudentPhoto(userId) {
+  if (!confirm('Möchten Sie dieses Passbild wirklich unwiderruflich löschen? Der Schüler muss dann ein neues Foto hochladen.')) return;
+  try {
+    const res = await fetch(`api/admin/students/${userId}/photo`, { method: 'DELETE' });
+    if (res.ok) {
+      showAdminAlert('Ausweisbild erfolgreich gelöscht.');
+      loadAdminStudents();
+    } else {
+      const data = await res.json();
+      showAdminAlert(data.error || 'Fehler beim Löschen des Bildes.', 'danger');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+function viewLargeImage(base64Data, studentName) {
+  // Simple Lightbox modal directly in JS
+  let modal = document.getElementById('admin-lightbox-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'admin-lightbox-modal';
+    modal.className = 'modal';
+    modal.style.zIndex = '3000';
+    modal.innerHTML = `
+      <div class="modal-content glass-panel" style="max-width: 400px; text-align: center; position: relative; padding: 25px;">
+        <span class="close-btn" onclick="document.getElementById('admin-lightbox-modal').style.display='none'" style="position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer;">&times;</span>
+        <h3 id="lightbox-title" style="font-weight:600; margin-bottom:15px; font-size:1.1rem; color:var(--accent-color);"></h3>
+        <div style="width: 240px; height: 320px; border-radius: 8px; overflow: hidden; border: 2px solid rgba(255,255,255,0.15); margin: 0 auto 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <img id="lightbox-img" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <button class="btn btn-secondary" onclick="document.getElementById('admin-lightbox-modal').style.display='none'" style="width: 100%; justify-content: center;">Schließen</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('lightbox-title').innerText = `Passbild von ${studentName}`;
+  document.getElementById('lightbox-img').src = base64Data;
+  modal.style.display = 'flex';
+}
+

@@ -630,4 +630,114 @@ router.delete('/messages/:id', (req, res) => {
   }
 });
 
+/* ==========================================================================
+   8. Schüler-Datenbank & Ausweis-Verwaltung (Students)
+   ========================================================================== */
+
+/**
+ * Ruft alle Schülerprofile inkl. Benutzername und E-Mail ab.
+ */
+router.get('/students', (req, res) => {
+  try {
+    const students = db.prepare(`
+      SELECT sp.*, u.username, u.email
+      FROM student_profiles sp
+      JOIN users u ON sp.user_id = u.id
+      ORDER BY sp.last_name ASC, sp.first_name ASC
+    `).all();
+    res.json(students);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Genehmigt das Ausweisbild eines Schülers.
+ */
+router.post('/students/:id/approve', (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = db.prepare(`
+      UPDATE student_profiles
+      SET card_status = 'Bild genehmigt'
+      WHERE user_id = ?
+    `).run(id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Profil nicht gefunden.' });
+    }
+    res.json({ success: true, message: 'Passbild erfolgreich genehmigt.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Lehnt das Ausweisbild eines Schülers ab.
+ */
+router.post('/students/:id/reject', (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = db.prepare(`
+      UPDATE student_profiles
+      SET card_status = 'Bild abgelehnt'
+      WHERE user_id = ?
+    `).run(id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Profil nicht gefunden.' });
+    }
+    res.json({ success: true, message: 'Passbild abgelehnt.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Löscht/resettet das Ausweisbild eines Schülers.
+ */
+router.delete('/students/:id/photo', (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = db.prepare(`
+      UPDATE student_profiles
+      SET card_image = NULL, card_status = 'Bild ungeprüft / Kein Bild'
+      WHERE user_id = ?
+    `).run(id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Profil nicht gefunden.' });
+    }
+    res.json({ success: true, message: 'Passbild erfolgreich gelöscht.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Aktualisiert Stammdaten eines Schülerprofils.
+ */
+router.put('/students/:id', (req, res) => {
+  const { id } = req.params;
+  const { first_name, last_name, birth_date, birth_place, mediothek_number, account_status } = req.body;
+  try {
+    db.prepare(`
+      UPDATE student_profiles
+      SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, mediothek_number = ?, account_status = ?
+      WHERE user_id = ?
+    `).run(
+      first_name || '', 
+      last_name || '', 
+      birth_date || null, 
+      birth_place || '', 
+      mediothek_number || '', 
+      account_status || 'false', 
+      id
+    );
+    res.json({ success: true, message: 'Schülerprofil erfolgreich aktualisiert.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
