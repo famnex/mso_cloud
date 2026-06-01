@@ -231,9 +231,11 @@ async function loadTiles() {
         </div>
         <div class="tile-body">
           <h4 class="tile-title">${tile.title}</h4>
-          <p class="tile-description">${tile.description || ''}</p>
-          <div class="unavailable-label"><i class="fa-solid fa-circle-exclamation"></i> Dienst momentan nicht verfügbar.</div>
-          <div class="time-locked-label"><i class="fa-solid fa-lock"></i> Aktiv von ${tile.time_limit_start || '08:00'} bis ${tile.time_limit_end || '16:00'} Uhr</div>
+          <div class="tile-bottom-content">
+            <p class="tile-description">${tile.description || ''}</p>
+            <div class="unavailable-label"><i class="fa-solid fa-circle-exclamation"></i> Dienst momentan nicht verfügbar.</div>
+            <div class="time-locked-label"><i class="fa-solid fa-lock"></i> Aktiv von ${tile.time_limit_start || '08:00'} bis ${tile.time_limit_end || '16:00'} Uhr</div>
+          </div>
         </div>
         <div class="tile-bg-glow"></div>
       `;

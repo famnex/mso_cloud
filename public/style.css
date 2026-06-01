@@ -337,6 +337,14 @@ main {
   z-index: 2;
   margin-top: 20px;
   width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tile-bottom-content {
+  width: 100%;
 }
 
 .tile-title {
