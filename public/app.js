@@ -579,7 +579,7 @@ async function loadAdminTiles() {
         <td style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
         <td><strong>${tile.title}</strong></td>
         <td style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
-        <td>${isBi ? `<i class="bi ${tile.icon}"></i>` : `<i class="fa-solid ${tile.icon || 'fa-cubes'}"></i>`} <code>${tile.icon}</code></td>
+        <td>${isBi ? `<i class="bi ${tile.icon}" style="font-size: 1.25rem;"></i>` : `<i class="fa-solid ${tile.icon || 'fa-cubes'}" style="font-size: 1.25rem;"></i>`}</td>
         <td><span class="user-badge" style="font-size:0.75rem;">${tile.visibility}${groupsLabel}</span></td>
         <td><code>${tile.sso_type}</code></td>
         <td>${tile.sort_order}</td>
