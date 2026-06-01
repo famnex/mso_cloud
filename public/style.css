@@ -1225,6 +1225,20 @@ input:checked + .slider:before {
 }
 
 /* Schülerportal & Login-Tabs CSS */
+.login-tab-btn {
+  flex: 1;
+  padding: 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
 .login-tab-btn:hover {
   color: var(--text-primary) !important;
 }
@@ -1232,6 +1246,7 @@ input:checked + .slider:before {
 .login-tab-btn.active {
   color: var(--text-primary) !important;
   border-bottom-color: var(--accent-color) !important;
+  font-weight: 600 !important;
 }
 
 .student-grid {
