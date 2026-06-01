@@ -230,8 +230,15 @@ function checkTileStatus(tileId, link) {
   const card = document.getElementById(`tile-card-${tileId}`);
   let requestCompleted = false;
 
+  // Falls der Link ein direkter Moodle OAuth2-Login-Link ist, pinge das Moodle-Hauptverzeichnis an
+  // (da der direkte Login-Link ohne Session-Kontext zu einem Redirect/Fehler im externen Checker führt)
+  let pingLink = link;
+  if (link && link.includes('/auth/oauth2/login.php')) {
+    pingLink = link.split('/auth/oauth2/login.php')[0] + '/';
+  }
+
   // Verwende dieselbe API wie im Original, aber mit vollem Pfad gegen CORS (oder Proxy)
-  const checkerUrl = `https://cloud.mso-hef.de/launcher/check_links.php?link=${encodeURIComponent(link)}`;
+  const checkerUrl = `https://cloud.mso-hef.de/launcher/check_links.php?link=${encodeURIComponent(pingLink)}`;
 
   // AJAX-Request zur Statusprüfung
   const xhr = new XMLHttpRequest();
