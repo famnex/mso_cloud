@@ -12,7 +12,7 @@
 <body>
 
   <!-- HEADER -->
-  <header style="display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; height: 75px; background: rgba(18, 18, 18, 0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06); position: sticky; top: 0; z-index: 100;">
+  <header>
     
     <!-- ANONYMOUS HEADER -->
     <div id="header-anonymous" style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
@@ -69,19 +69,17 @@
         <!-- User Display Name & Avatar Group with Dropdown -->
         <div style="position: relative; display: flex; align-items: center; gap: 12px;">
           <!-- Avatar Circle -->
-          <div class="user-avatar-circle" onclick="toggleUserDropdown(event)" style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 2px solid var(--accent-color); cursor: pointer; box-shadow: 0 0 10px rgba(2,64,134,0.3); transition: transform 0.2s ease;">
+          <div class="user-avatar-circle" onclick="toggleUserDropdown(event)">
             <img id="header-user-avatar" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" onerror="this.src='media/user.png'">
           </div>
           
           <!-- User Dropdown Menu (Right Aligned) -->
-          <div id="header-user-dropdown" class="user-dropdown glass-panel" style="display: none; position: absolute; top: 50px; right: 0; min-width: 210px; padding: 10px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 1000; background: rgba(20,20,20,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+          <div id="header-user-dropdown" class="user-dropdown glass-panel" style="display: none;">
             <!-- Name header inside dropdown -->
-            <div style="padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: 600; color: var(--accent-color); font-size: 0.95rem; text-align: left; background: rgba(255,255,255,0.02); border-top-left-radius: 8px; border-top-right-radius: 8px;" id="header-full-name">
-              Name Laden...
-            </div>
+            <div class="dropdown-user-name" id="header-full-name">Name Laden...</div>
             <a href="#" onclick="navigateTo('profile', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-user-gear" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Benutzerprofil & Zugänge</a>
             <a href="#" onclick="navigateTo('card', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis</a>
-            <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 5px 0;"></div>
+            <div class="dropdown-divider"></div>
             <a href="#" onclick="handleLogout()" style="display: block; padding: 10px 20px; color: #f43f5e; text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-right-from-bracket" style="margin-right: 10px; width: 16px;"></i> Abmelden</a>
           </div>
         </div>

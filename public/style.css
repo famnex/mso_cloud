@@ -20,6 +20,7 @@
   
   --shadow-main: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
   --glass-blur: 14px;
+  --header-bg: rgba(18, 18, 18, 0.4);
 }
 
 [data-theme="light"] {
@@ -43,6 +44,7 @@
   
   --shadow-main: 0 12px 30px 0 rgba(0, 0, 0, 0.1);
   --glass-blur: 12px;
+  --header-bg: rgba(255, 255, 255, 0.45);
 }
 
 * {
@@ -90,17 +92,18 @@ body {
 
 /* Header */
 header {
-  height: 70px;
-  padding: 0 40px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
+  padding: 15px 30px;
+  height: 75px;
+  background: var(--header-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--panel-border);
-  background: rgba(0, 0, 0, 0.15);
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(8px);
 }
 
 .logo-section {
@@ -123,6 +126,59 @@ header {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+.user-dropdown {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  min-width: 210px;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow-main);
+  z-index: 1000;
+  background: var(--panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Dropdown Name Header */
+.dropdown-user-name {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 600;
+  color: var(--accent-color);
+  font-size: 0.95rem;
+  text-align: left;
+  background: rgba(46, 139, 250, 0.05);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+/* Dropdown Divider */
+.dropdown-divider {
+  border-top: 1px solid var(--panel-border);
+  margin: 5px 0;
+}
+
+/* User Avatar Circle in Header */
+.user-avatar-circle {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--accent-color);
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--accent-glow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.user-avatar-circle:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+
 
 .nav-controls {
   display: flex;
@@ -186,14 +242,17 @@ header {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   color: var(--text-primary);
   font-size: 1.1rem;
+  transition: all 0.25s ease;
 }
 
 .btn-icon:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--card-bg-hover);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
   transform: scale(1.05);
 }
 
@@ -854,9 +913,9 @@ input:checked + .slider:before {
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow-main);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -875,7 +934,7 @@ input:checked + .slider:before {
   width: 100%;
   max-width: 100%;
   min-width: 100%;
-  min-height: 280px;
+  min-height: 200px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1013,7 +1072,7 @@ input:checked + .slider:before {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--panel-border);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -1148,24 +1207,24 @@ input:checked + .slider:before {
 }
 
 .news-dropdown {
-  position: absolute;
-  top: 45px;
-  right: 0;
-  width: 300px;
-  border-radius: 8px;
-  background: rgba(26, 26, 26, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  z-index: 1000;
+  position: fixed;
+  top: 75px;
+  right: 12px;
+  width: min(320px, calc(100vw - 24px));
+  border-radius: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow-main);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 2000;
   display: none;
   animation: slideDown 0.2s ease;
 }
 
 .news-dropdown-header {
   padding: 12px 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--panel-border);
   font-weight: 700;
   font-size: 0.85rem;
   color: var(--accent-color);
@@ -1186,7 +1245,7 @@ input:checked + .slider:before {
   font-size: 0.85rem;
   color: var(--text-primary);
   cursor: pointer;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--panel-border);
   transition: background 0.2s ease;
   display: flex;
   align-items: center;
@@ -1199,7 +1258,7 @@ input:checked + .slider:before {
 }
 
 .news-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--card-bg-hover);
 }
 
 .news-dropdown-item.confirmed {
@@ -1271,10 +1330,10 @@ input:checked + .slider:before {
 .site-footer {
   margin-top: auto;
   padding: 20px 30px;
-  background: rgba(18, 18, 18, 0.4);
+  background: var(--header-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--panel-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1328,6 +1387,31 @@ input:checked + .slider:before {
   }
   .tile-description {
     font-size: 0.75rem !important;
+  }
+
+  /* News Carousel Mobile */
+  .news-carousel-container {
+    padding: 14px 12px !important;
+    border-radius: 10px !important;
+  }
+  .news-slide {
+    padding: 0 28px !important;
+    min-height: 140px !important;
+  }
+  .news-title {
+    font-size: 1rem !important;
+  }
+  .news-body {
+    font-size: 0.85rem !important;
+  }
+  .news-nav-btn {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 0.75rem !important;
+  }
+  .news-always-show-label {
+    font-size: 0.78rem !important;
+    padding: 6px 10px !important;
   }
 }
 
