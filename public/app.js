@@ -1286,29 +1286,10 @@ async function loadAdminUsers() {
         ? '<strong style="color:var(--error-color);">Admin</strong>' 
         : 'Benutzer';
 
-      let groupsHtml = '';
-      if (user.is_ldap === 1) {
-        const rawStr = (user.groups || []).join(', ');
-        const mappedStr = (user.mapped_groups || []).join(', ');
-        
-        groupsHtml = `
-          <div class="groups-cell-container">
-            <div class="groups-cell-inner">
-              <span class="raw-groups" title="Rohe LDAP-Gruppen">${rawStr || 'keine'}</span>
-              ${mappedStr ? `<span class="mapped-badge" title="Lokale Zielgruppen laut Mapping"><i class="fa-solid fa-link"></i> Mapped: ${mappedStr}</span>` : ''}
-            </div>
-          </div>
-        `;
-      } else {
-        const groupsStr = (user.groups || []).join(', ');
-        groupsHtml = `
-          <div class="groups-cell-container">
-            <div class="groups-cell-inner">
-              <span>${groupsStr || 'keine'}</span>
-            </div>
-          </div>
-        `;
-      }
+      // Nur gemappte Gruppen anzeigen (für LDAP) bzw. lokale Gruppen (für lokale User)
+      const groupsStr = user.is_ldap === 1 
+        ? (user.mapped_groups || []).join(', ') 
+        : (user.groups || []).join(', ');
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -1316,7 +1297,7 @@ async function loadAdminUsers() {
         <td>${user.email || ''}</td>
         <td>${typeLabel}</td>
         <td>${roleLabel}</td>
-        <td>${groupsHtml}</td>
+        <td><span style="font-size:0.85rem; color:var(--text-secondary);">${groupsStr || 'keine'}</span></td>
         <td style="font-size:0.8rem; color:var(--text-secondary);">${new Date(user.created_at).toLocaleDateString('de-DE')}</td>
         <td class="actions-cell">
           <button class="btn btn-secondary btn-icon" onclick="openUserForm(${JSON.stringify(user).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-user-pen"></i></button>
@@ -1354,7 +1335,7 @@ function openUserForm(user = null) {
     document.getElementById('user_username').disabled = true;
     document.getElementById('user_email').value = user.email || '';
     document.getElementById('user_role').value = user.role;
-    document.getElementById('user_groups').value = (user.groups || []).join(', ');
+    document.getElementById('user_groups').value = (user.groups || []).join('\n');
     
     document.getElementById('user_password').required = false;
     document.getElementById('user-pass-hint').style.display = 'block';
@@ -1376,7 +1357,7 @@ async function saveUserForm(e) {
   const id = document.getElementById('user-id-field').value;
   
   const groupsRaw = document.getElementById('user_groups').value;
-  const groups = groupsRaw ? groupsRaw.split(',').map(g => g.trim()).filter(g => g) : [];
+  const groups = groupsRaw ? groupsRaw.split(/[,\n]/).map(g => g.trim()).filter(g => g) : [];
 
   const body = {
     username: document.getElementById('user_username').value.trim(),
