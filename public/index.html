@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <title>MSO Cloud - Die digitalen Dienste der MSO</title>
   <!-- CSS -->
   <link rel="stylesheet" href="style.css">
-  <!-- FONTS & ICONS -->
-  <script src="https://kit.fontawesome.com/a974660f94.js" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- FONTS & ICONS (Self-hosted for GDPR compliance) -->
+  <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="assets/bootstrap-icons/bootstrap-icons.min.css">
 </head>
 <body>
 
@@ -508,6 +507,18 @@
         <div class="admin-tab" id="tab-system">
           <h3 style="font-weight:600; margin-bottom:20px;">Systemwartung & GitHub-Updates</h3>
           
+          <!-- Allgemeine Einstellungen -->
+          <div class="glass-panel" style="padding: 25px; background: rgba(0,0,0,0.15); margin-bottom: 25px;">
+            <h4 style="font-weight:600; margin-bottom:15px;"><i class="fa-solid fa-sliders"></i> Allgemeine Einstellungen</h4>
+            <form id="general-config-form" onsubmit="saveGeneralConfig(event)">
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label for="impressum_url">Impressum-URL *</label>
+                <input type="url" id="impressum_url" class="form-control" placeholder="https://www.mso-hef.de/impressum" required>
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+            </form>
+          </div>
+
           <div class="glass-panel" style="padding: 25px; background: rgba(0,0,0,0.15); margin-bottom: 25px;">
             <h4 style="font-weight:600; margin-bottom:15px;">System-Informationen</h4>
             <div style="display:flex; flex-direction:column; gap:10px; font-size:0.95rem;">
@@ -1384,6 +1395,18 @@
       </div>
     </div>
   </div>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div>
+      <span>&copy; 2026 Modellschule Obersberg. Alle Rechte vorbehalten.</span>
+    </div>
+    <div>
+      <a id="footer-impressum-link" href="https://www.mso-hef.de/impressum" target="_blank">
+        <i class="fa-solid fa-scale-balanced"></i> Impressum
+      </a>
+    </div>
+  </footer>
 
   <!-- TOOLTIP ELEMENT -->
   <div id="tooltip" class="tooltip-custom"></div>

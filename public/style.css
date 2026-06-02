@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
   /* Dark Mode Palette (Standard) */
@@ -50,7 +49,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
@@ -1265,6 +1264,47 @@ input:checked + .slider:before {
 @media (max-width: 900px) {
   .student-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* Footer Styles */
+.site-footer {
+  margin-top: auto;
+  padding: 20px 30px;
+  background: rgba(18, 18, 18, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.site-footer a {
+  color: var(--accent-color);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.site-footer a:hover {
+  color: var(--accent-hover, #2e8bfa);
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .site-footer {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+    padding: 15px;
   }
 }
 

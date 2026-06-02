@@ -22,10 +22,11 @@ Speichert alle globalen Konfigurationswerte der Anwendung (LDAP, SMTP, Setup-Sta
 | `key` (PK) | TEXT | Eindeutiger Konfigurationsschlüssel |
 | `value` | TEXT | Der Wert des Schlüssels (als String oder JSON) |
 
-**Initial gesetzte Werte:**
+**Initial gesetzte / Konfigurierbare Werte:**
 * `setup_completed`: `'1'` (nach Abschluss des Assistenten)
 * `ldap_enabled`: `'0'` (standardmäßig deaktiviert)
 * `smtp_from`: `'no-reply@mso-hef.de'`
+* `impressum_url`: `'https://www.mso-hef.de/impressum'` (Standardwert, vom Admin konfigurierbar)
 
 ---
 

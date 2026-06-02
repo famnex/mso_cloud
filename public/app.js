@@ -95,6 +95,13 @@ async function checkAuthStatus() {
     const res = await fetch('api/auth/me');
     const data = await res.json();
 
+    if (data.impressum_url) {
+      const footerLink = document.getElementById('footer-impressum-link');
+      if (footerLink) {
+        footerLink.href = data.impressum_url;
+      }
+    }
+
     if (data.logged_in) {
       currentUser = data.user;
       renderAuthenticatedHeader();
@@ -951,6 +958,12 @@ async function loadAdminConfig() {
     document.getElementById('mysql_password').value = cfg.mysql_password || '';
     document.getElementById('mysql_database').value = cfg.mysql_database || 'digitale_anmeldung';
 
+    // Allgemeine Felder
+    const impressumInput = document.getElementById('impressum_url');
+    if (impressumInput) {
+      impressumInput.value = cfg.impressum_url || 'https://www.mso-hef.de/impressum';
+    }
+
   } catch (err) {
     showAdminAlert('Konfiguration konnte nicht geladen werden.', 'danger');
   }
@@ -1089,6 +1102,30 @@ async function saveMysqlConfig(e) {
     });
     if (res.ok) {
       showAdminAlert('MySQL-Konfiguration erfolgreich gespeichert.');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function saveGeneralConfig(e) {
+  e.preventDefault();
+  const body = {
+    impressum_url: document.getElementById('impressum_url').value.trim()
+  };
+
+  try {
+    const res = await fetch('api/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      showAdminAlert('Allgemeine Einstellungen erfolgreich gespeichert.');
+      const footerLink = document.getElementById('footer-impressum-link');
+      if (footerLink) {
+        footerLink.href = body.impressum_url;
+      }
     }
   } catch (err) {
     showAdminAlert(err.message, 'danger');
@@ -2623,7 +2660,7 @@ function toggleEditorSource() {
 let facefinder_classify_region = function(r, c, s, pixels, ldim) { return -1.0; };
 
 function initFaceFinder() {
-  const cascadeurl = 'https://raw.githubusercontent.com/nenadmarkus/pico/c2e81f9d23cc11d1a612fd21e4f9de0921a5d0d9/rnt/cascades/facefinder';
+  const cascadeurl = 'media/facefinder';
   fetch(cascadeurl).then(function(response) {
      response.arrayBuffer().then(function(buffer) {
          const bytes = new Int8Array(buffer);

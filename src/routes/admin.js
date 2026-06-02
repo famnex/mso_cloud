@@ -57,7 +57,9 @@ router.get('/config', (req, res) => {
       mysql_port: getConfig('mysql_port', '3306'),
       mysql_user: getConfig('mysql_user', 'root'),
       mysql_password: getConfig('mysql_password') ? '********' : '',
-      mysql_database: getConfig('mysql_database', 'digitale_anmeldung')
+      mysql_database: getConfig('mysql_database', 'digitale_anmeldung'),
+
+      impressum_url: getConfig('impressum_url', 'https://www.mso-hef.de/impressum')
     };
     res.json(config);
   } catch (error) {
@@ -76,7 +78,8 @@ router.post('/config', async (req, res) => {
       'ldap_base_dn', 'ldap_bind_dn', 'ldap_user_attribute', 'ldap_mail_attribute', 
       'ldap_name_attribute', 'ldap_upn_suffix',
       'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from',
-      'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database'
+      'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database',
+      'impressum_url'
     ];
 
     // Standard-Keys sichern

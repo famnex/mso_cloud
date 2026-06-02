@@ -12,10 +12,11 @@ const studentDb = require('../student_db');
  */
 router.get('/me', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  const impressumUrl = getConfig('impressum_url', 'https://www.mso-hef.de/impressum');
   if (req.session.user) {
-    res.json({ logged_in: true, user: req.session.user });
+    res.json({ logged_in: true, user: req.session.user, impressum_url: impressumUrl });
   } else {
-    res.json({ logged_in: false });
+    res.json({ logged_in: false, impressum_url: impressumUrl });
   }
 });
 
