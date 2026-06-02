@@ -45,7 +45,8 @@ router.post('/login', async (req, res) => {
           email: localUser.email,
           role: localUser.role,
           groups: groups,
-          isLdap: false
+          isLdap: false,
+          display_name: localUser.display_name || ''
         };
         req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
         const isOauth = !!req.session.oauthQuery;
@@ -79,16 +80,16 @@ router.post('/login', async (req, res) => {
           // Cache aktualisieren
           db.prepare(`
             UPDATE users 
-            SET email = ?, role = ?, groups = ?, is_ldap = 1 
+            SET email = ?, role = ?, groups = ?, is_ldap = 1, display_name = ?
             WHERE id = ?
-          `).run(ldapUser.email, role, groupsJson, localCache.id);
+          `).run(ldapUser.email, role, groupsJson, ldapUser.name, localCache.id);
           userId = localCache.id;
         } else {
           // Neu anlegen
           const info = db.prepare(`
-            INSERT INTO users (username, email, password_hash, role, groups, is_ldap)
-            VALUES (?, ?, NULL, ?, ?, 1)
-          `).run(username, ldapUser.email, role, groupsJson);
+            INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name)
+            VALUES (?, ?, NULL, ?, ?, 1, ?)
+          `).run(username, ldapUser.email, role, groupsJson, ldapUser.name);
           userId = info.lastInsertRowId;
         }
 
@@ -98,7 +99,8 @@ router.post('/login', async (req, res) => {
           email: ldapUser.email,
           role: role,
           groups: ldapUser.rawGroups,
-          isLdap: true
+          isLdap: true,
+          display_name: ldapUser.name
         };
         req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
 

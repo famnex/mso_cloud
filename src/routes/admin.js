@@ -440,7 +440,7 @@ router.delete('/ldap-mappings/:id', (req, res) => {
 router.get('/users', (req, res) => {
   try {
     // Passwörter nicht auslesen!
-    const users = db.prepare('SELECT id, username, email, role, groups, is_ldap, created_at FROM users ORDER BY username ASC').all();
+    const users = db.prepare('SELECT id, username, email, role, groups, is_ldap, created_at, display_name FROM users ORDER BY username ASC').all();
     
     // JSON-String parsen und LDAP Mappings auflösen
     const formatted = users.map(user => {
@@ -464,7 +464,7 @@ router.get('/users', (req, res) => {
 
 router.post('/users', (req, res) => {
   try {
-    const { username, email, password, role, groups } = req.body;
+    const { username, email, password, role, groups, display_name } = req.body;
 
     if (!username || !email || !password || !role) {
       return res.status(400).json({ error: 'Username, E-Mail, Passwort und Rolle sind erforderlich.' });
@@ -472,11 +472,12 @@ router.post('/users', (req, res) => {
 
     const hash = bcrypt.hashSync(password, 10);
     const groupsJson = JSON.stringify(groups || []);
+    const displayName = (display_name && display_name.trim() !== '') ? display_name.trim() : username.trim();
 
     db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, groups, is_ldap)
-      VALUES (?, ?, ?, ?, ?, 0)
-    `).run(username.trim(), email.trim(), hash, role, groupsJson);
+      INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name)
+      VALUES (?, ?, ?, ?, ?, 0, ?)
+    `).run(username.trim(), email.trim(), hash, role, groupsJson, displayName);
 
     res.json({ success: true, message: 'Benutzer erfolgreich angelegt.' });
   } catch (error) {
@@ -490,9 +491,9 @@ router.post('/users', (req, res) => {
 router.put('/users/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { email, role, groups, password } = req.body;
+    const { email, role, groups, password, display_name } = req.body;
 
-    const user = db.prepare('SELECT is_ldap FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT is_ldap, username FROM users WHERE id = ?').get(id);
     if (!user) {
       return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
     }
@@ -512,21 +513,22 @@ router.put('/users/:id', (req, res) => {
     }
 
     const groupsJson = JSON.stringify(groups || []);
+    const displayName = (display_name && display_name.trim() !== '') ? display_name.trim() : user.username;
 
     // Passwort optional updaten
     if (password && password.trim() !== '') {
       const hash = bcrypt.hashSync(password, 10);
       db.prepare(`
         UPDATE users
-        SET email = ?, role = ?, groups = ?, password_hash = ?
+        SET email = ?, role = ?, groups = ?, password_hash = ?, display_name = ?
         WHERE id = ?
-      `).run(email.trim(), role, groupsJson, hash, id);
+      `).run(email.trim(), role, groupsJson, hash, displayName, id);
     } else {
       db.prepare(`
         UPDATE users
-        SET email = ?, role = ?, groups = ?
+        SET email = ?, role = ?, groups = ?, display_name = ?
         WHERE id = ?
-      `).run(email.trim(), role, groupsJson, id);
+      `).run(email.trim(), role, groupsJson, displayName, id);
     }
 
     res.json({ success: true, message: 'Benutzer erfolgreich aktualisiert.' });

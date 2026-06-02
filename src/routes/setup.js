@@ -45,8 +45,8 @@ router.post('/run', (req, res) => {
 
     // Admin einfügen
     db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, groups, is_ldap)
-      VALUES (?, ?, ?, 'admin', '["Admin"]', 0)
+      INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name)
+      VALUES (?, ?, ?, 'admin', '["Admin"]', 0, 'System-Administrator')
     `).run(username, email, hash);
 
     // 3. Konfigurationswerte initialisieren

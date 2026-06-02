@@ -125,7 +125,7 @@ function renderAuthenticatedHeader() {
   if (headerAuth) headerAuth.style.display = 'flex';
 
   // Fallback initial
-  document.getElementById('header-full-name').innerText = currentUser.username;
+  document.getElementById('header-full-name').innerText = currentUser.display_name || currentUser.username;
   document.getElementById('header-user-avatar').src = 'media/user.png';
 
   // Render Admin Button right container if admin
@@ -2757,7 +2757,7 @@ async function loadStudentProfile() {
     const res = await fetch('api/auth/student-profile');
     if (!res.ok) {
       // Fallback für Nicht-Schüler / Admin-Accounts
-      document.getElementById('header-full-name').innerText = currentUser.username;
+      document.getElementById('header-full-name').innerText = currentUser.display_name || currentUser.username;
       document.getElementById('header-user-avatar').src = 'media/user.png';
       return;
     }
@@ -2903,7 +2903,7 @@ async function loadStudentProfile() {
   } catch (err) {
     console.error('Fehler beim Laden des Schülerprofils:', err);
     // Fallback bei Verbindungsfehlern
-    document.getElementById('header-full-name').innerText = currentUser.username;
+    document.getElementById('header-full-name').innerText = currentUser.display_name || currentUser.username;
     document.getElementById('header-user-avatar').src = 'media/user.png';
   }
 }

@@ -42,6 +42,7 @@ Verwaltet lokale Accounts und dient als Cache für angemeldete LDAP-Nutzer.
 | `role` | TEXT | Hauptrolle im System (`admin`, `user`) |
 | `groups` | TEXT | JSON-Array zugeordneter Gruppen (z.B. `["Lehrer", "Admin"]`) |
 | `is_ldap` | INTEGER | Flag für LDAP-Benutzer (`0` = lokal, `1` = LDAP) |
+| `display_name` | TEXT | Anzeigename des Benutzers (z. B. LDAP-displayName) |
 | `created_at` | DATETIME | Erstellungszeitpunkt |
 
 ---

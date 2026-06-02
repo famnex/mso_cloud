@@ -641,7 +641,8 @@ async function verifyStudentToken(token, ip) {
           email: user.email,
           role: user.role,
           groups: JSON.parse(user.groups || '[]'),
-          isLdap: false
+          isLdap: false,
+          display_name: user.display_name || ''
         }
       };
     }

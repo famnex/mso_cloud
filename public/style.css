@@ -1308,4 +1308,27 @@ input:checked + .slider:before {
   }
 }
 
+@media (max-width: 550px) {
+  .tiles-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+  .tile-card {
+    height: auto !important;
+    min-height: 140px !important;
+    padding: 15px !important;
+  }
+  .tile-icon-wrapper {
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 1.3rem !important;
+  }
+  .tile-title {
+    font-size: 0.95rem !important;
+  }
+  .tile-description {
+    font-size: 0.75rem !important;
+  }
+}
+
 
