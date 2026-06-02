@@ -244,6 +244,7 @@ async function loadTiles() {
       
       const isLocked = tile.is_time_locked === 1;
       const isSph = tile.link && tile.link.includes('login.schulportal.hessen.de');
+      const isBooking = tile.link && tile.link.toLowerCase().includes('/booking/');
       
       if (isLocked) {
         tileCard.className = 'tile-card glass-panel time-locked';
@@ -257,12 +258,21 @@ async function loadTiles() {
           tileCard.onclick = function(e) {
             handleSphClick(e, tile.id);
           };
+        } else if (isBooking) {
+          tileCard.onclick = function(e) {
+            handleBookingClick(e, tile.id);
+          };
         }
       }
       
-      const keyBtnHtml = (isSph && currentUser) 
-        ? `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`
-        : '';
+      let keyBtnHtml = '';
+      if (currentUser) {
+        if (isSph) {
+          keyBtnHtml = `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
+        } else if (isBooking) {
+          keyBtnHtml = `<button class="tile-key-btn" onclick="openBookingCredentialsModal(event, ${tile.id})" title="Buchungssystem-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
+        }
+      }
       
       tileCard.innerHTML = `
         <div class="tile-header">
@@ -670,7 +680,11 @@ async function loadAdminTiles() {
     tbody.innerHTML = '';
     tiles.forEach(tile => {
       const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
-      const groupsLabel = tile.visibility === 'groups' ? ` (${allowedGroups.join(', ')})` : '';
+      let visLabel = tile.visibility;
+      if (tile.visibility === 'public') visLabel = 'Öffentlich';
+      else if (tile.visibility === 'only_public') visLabel = 'Nur nicht angemeldet';
+      else if (tile.visibility === 'logged_in') visLabel = 'Nur angemeldet';
+      else if (tile.visibility === 'groups') visLabel = `Gruppen (${allowedGroups.join(', ')})`;
       
       const timeLockBadge = tile.time_limit_enabled === 1 
         ? ` <span class="user-badge" style="font-size:0.7rem; background:rgba(245,158,11,0.1); color:var(--warn-color); display:inline-flex; align-items:center; gap:3px;" title="Zeitsperre aktiv: ${tile.time_limit_start} - ${tile.time_limit_end} Uhr"><i class="fa-solid fa-lock"></i> ${tile.time_limit_start}-${tile.time_limit_end}</span>`
@@ -686,7 +700,7 @@ async function loadAdminTiles() {
         <td><strong>${tile.title}</strong>${timeLockBadge}</td>
         <td style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
         <td style="font-size: 1.25rem;">${renderIcon(tile.icon)}</td>
-        <td><span class="user-badge" style="font-size:0.75rem;">${tile.visibility}${groupsLabel}</span></td>
+        <td><span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></td>
         <td><code>${tile.sso_type}</code></td>
         <td>${tile.sort_order}</td>
         <td class="actions-cell">
@@ -1272,7 +1286,29 @@ async function loadAdminUsers() {
         ? '<strong style="color:var(--error-color);">Admin</strong>' 
         : 'Benutzer';
 
-      const groupsStr = (user.groups || []).join(', ');
+      let groupsHtml = '';
+      if (user.is_ldap === 1) {
+        const rawStr = (user.groups || []).join(', ');
+        const mappedStr = (user.mapped_groups || []).join(', ');
+        
+        groupsHtml = `
+          <div class="groups-cell-container">
+            <div class="groups-cell-inner">
+              <span class="raw-groups" title="Rohe LDAP-Gruppen">${rawStr || 'keine'}</span>
+              ${mappedStr ? `<span class="mapped-badge" title="Lokale Zielgruppen laut Mapping"><i class="fa-solid fa-link"></i> Mapped: ${mappedStr}</span>` : ''}
+            </div>
+          </div>
+        `;
+      } else {
+        const groupsStr = (user.groups || []).join(', ');
+        groupsHtml = `
+          <div class="groups-cell-container">
+            <div class="groups-cell-inner">
+              <span>${groupsStr || 'keine'}</span>
+            </div>
+          </div>
+        `;
+      }
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -1280,7 +1316,7 @@ async function loadAdminUsers() {
         <td>${user.email || ''}</td>
         <td>${typeLabel}</td>
         <td>${roleLabel}</td>
-        <td><span style="font-size:0.8rem; color:var(--text-secondary);">${groupsStr}</span></td>
+        <td>${groupsHtml}</td>
         <td style="font-size:0.8rem; color:var(--text-secondary);">${new Date(user.created_at).toLocaleDateString('de-DE')}</td>
         <td class="actions-cell">
           <button class="btn btn-secondary btn-icon" onclick="openUserForm(${JSON.stringify(user).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-user-pen"></i></button>
@@ -1825,6 +1861,134 @@ function proceedToSchulportal() {
   
   closeModal('sph-info-modal');
   window.location.href = `api/tiles/sso/${activeSphTileId}`;
+}
+
+/* --- Booking Autologin (classroombookings) --- */
+let activeBookingTileId = null;
+
+async function openBookingCredentialsModal(e, tileId) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  activeBookingTileId = tileId;
+  
+  // Modal anzeigen und Ladestatus setzen
+  document.getElementById('booking-credentials-status-loading').style.display = 'block';
+  document.getElementById('booking-credentials-existing').style.display = 'none';
+  document.getElementById('booking-credentials-form').style.display = 'none';
+  openModal('booking-credentials-modal');
+
+  try {
+    const res = await fetch('api/auth/booking-credentials');
+    const data = await res.json();
+
+    document.getElementById('booking-credentials-status-loading').style.display = 'none';
+
+    if (data.exists) {
+      document.getElementById('booking-credentials-username-display').innerText = data.username;
+      document.getElementById('booking-credentials-existing').style.display = 'block';
+    } else {
+      document.getElementById('booking-credentials-form').reset();
+      document.getElementById('booking-credentials-form').style.display = 'block';
+    }
+  } catch (err) {
+    console.error('Fehler beim Laden der Buchungssystem-Zugangsdaten:', err);
+    alert('Fehler beim Laden des Status.');
+    closeModal('booking-credentials-modal');
+  }
+}
+
+async function saveBookingCredentials(e) {
+  e.preventDefault();
+  const username = document.getElementById('booking_user').value.trim();
+  const password = document.getElementById('booking_password').value;
+
+  try {
+    const res = await fetch('api/auth/booking-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_username: username, booking_password: password })
+    });
+
+    if (res.ok) {
+      closeModal('booking-credentials-modal');
+      window.location.href = `api/tiles/sso/${activeBookingTileId}`;
+    } else {
+      const data = await res.json();
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    alert('Fehler beim Speichern: ' + err.message);
+  }
+}
+
+async function deleteBookingCredentials() {
+  if (!confirm('Möchtest du deine hinterlegten Buchungssystem-Zugangsdaten wirklich löschen? Der automatische Login wird damit deaktiviert.')) {
+    return;
+  }
+
+  try {
+    const res = await fetch('api/auth/booking-credentials', {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      alert('Zugangsdaten gelöscht.');
+      await openBookingCredentialsModal(null, activeBookingTileId);
+    } else {
+      const data = await res.json();
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    alert('Fehler beim Löschen: ' + err.message);
+  }
+}
+
+async function handleBookingClick(e, tileId) {
+  if (!currentUser) {
+    return;
+  }
+
+  e.preventDefault();
+  
+  try {
+    const res = await fetch('api/auth/booking-credentials');
+    const data = await res.json();
+
+    if (data.exists) {
+      window.location.href = `api/tiles/sso/${tileId}`;
+      return;
+    }
+
+    const alwaysShow = localStorage.getItem('booking_always_show_info') !== 'false';
+    if (!alwaysShow) {
+      window.location.href = `api/tiles/sso/${tileId}`;
+      return;
+    }
+
+    activeBookingTileId = tileId;
+    document.getElementById('booking-info-always-show').checked = true;
+    
+    document.getElementById('booking-info-link-credentials').onclick = (event) => {
+      closeModal('booking-info-modal');
+      openBookingCredentialsModal(event, tileId);
+    };
+
+    openModal('booking-info-modal');
+
+  } catch (err) {
+    console.error('Fehler bei Booking-Weiterleitungsprüfung:', err);
+    window.location.href = `api/tiles/sso/${tileId}`;
+  }
+}
+
+function proceedToBooking() {
+  const alwaysShow = document.getElementById('booking-info-always-show').checked;
+  localStorage.setItem('booking_always_show_info', alwaysShow ? 'true' : 'false');
+  
+  closeModal('booking-info-modal');
+  window.location.href = `api/tiles/sso/${activeBookingTileId}`;
 }
 
 /* ==========================================================================

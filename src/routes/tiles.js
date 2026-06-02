@@ -34,18 +34,22 @@ router.get('/', (req, res) => {
     
     // Alle Kacheln aus der Datenbank holen
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
-    
-    const visibleTiles = allTiles.filter(tile => {
+        const visibleTiles = allTiles.filter(tile => {
       // 1. Öffentlich sichtbare Kacheln
       if (tile.visibility === 'public') {
         return true;
+      }
+      
+      // 2. Nur öffentlich (nur für unangemeldete Benutzer)
+      if (tile.visibility === 'only_public') {
+        return !user;
       }
       
       // Für alle anderen Sichtbarkeiten muss der User eingeloggt sein
       if (!user) {
         return false;
       }
-      
+
       // Admin sieht grundsätzlich alles
       if (user.role === 'admin') {
         return true;
@@ -107,11 +111,12 @@ router.get('/sso/:id', (req, res) => {
     if (!tile) {
       return res.status(404).send('Dienst nicht gefunden.');
     }
-
     // Berechtigungsprüfung analog zum Kachelabruf
     let hasAccess = false;
     if (tile.visibility === 'public') {
       hasAccess = true;
+    } else if (tile.visibility === 'only_public') {
+      hasAccess = !user || (user && user.role === 'admin');
     } else if (user) {
       if (user.role === 'admin' || tile.visibility === 'logged_in') {
         hasAccess = true;
@@ -201,6 +206,51 @@ router.get('/sso/:id', (req, res) => {
         }
       } catch (err) {
         console.error('Fehler bei der Vorbereitung des SPH-Autologins:', err);
+      }
+    }
+
+    // Booking-Autologin prüfen: Falls der Link zum Buchungssystem führt und der User Zugangsdaten hinterlegt hat, Auto-POST senden
+    if (tile.link && tile.link.toLowerCase().includes('/booking/') && user) {
+      try {
+        const bookingCreds = db.prepare('SELECT * FROM user_booking_credentials WHERE user_id = ?').get(user.id);
+        if (bookingCreds) {
+          const authRouter = require('./auth');
+          const decryptedPassword = authRouter.decrypt(bookingCreds.booking_password);
+          
+          if (decryptedPassword) {
+            return res.send(`
+              <!DOCTYPE html>
+              <html lang="de">
+              <head>
+                <meta charset="UTF-8">
+                <title>Weiterleitung zum Buchungssystem...</title>
+                <style>
+                  body { font-family: sans-serif; background: #070e17; color: #f3f5f9; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                  .loader { border: 4px solid rgba(255,255,255,0.05); border-radius: 50%; border-top: 4px solid #2e8bfa; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                  p { color: #90a0b5; font-size: 1.1rem; }
+                </style>
+              </head>
+              <body>
+                <div class="loader"></div>
+                <p>Melde dich automatisch beim Buchungssystem an...</p>
+                
+                <form id="booking-login-form" method="POST" action="https://cloud.mso-hef.de/launcher/booking/index.php/login/submit">
+                  <input type="hidden" name="page" value="login">
+                  <input type="hidden" name="username" value="${escapeHtml(bookingCreds.booking_username)}">
+                  <input type="hidden" name="password" value="${escapeHtml(decryptedPassword)}">
+                </form>
+
+                <script>
+                  document.getElementById('booking-login-form').submit();
+                </script>
+              </body>
+              </html>
+            `);
+          }
+        }
+      } catch (err) {
+        console.error('Fehler bei der Vorbereitung des Booking-Autologins:', err);
       }
     }
 

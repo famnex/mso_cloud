@@ -372,6 +372,76 @@ router.delete('/sph-credentials', (req, res) => {
 });
 
 /**
+ * Gibt den Status der hinterlegten Buchungssystem-Zugangsdaten für den aktuellen Benutzer aus.
+ */
+router.get('/booking-credentials', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  const user = req.session.user;
+
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  try {
+    const row = db.prepare('SELECT booking_username FROM user_booking_credentials WHERE user_id = ?').get(user.id);
+    if (row) {
+      res.json({ exists: true, username: row.booking_username });
+    } else {
+      res.json({ exists: false });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Speichert oder überschreibt die Buchungssystem-Zugangsdaten für den angemeldeten Benutzer.
+ */
+router.post('/booking-credentials', (req, res) => {
+  const user = req.session.user;
+  const { booking_username, booking_password } = req.body;
+
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  if (!booking_username || !booking_password) {
+    return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich.' });
+  }
+
+  try {
+    const encryptedPassword = encrypt(booking_password);
+    db.prepare(`
+      INSERT OR REPLACE INTO user_booking_credentials (user_id, booking_username, booking_password)
+      VALUES (?, ?, ?)
+    `).run(user.id, booking_username, encryptedPassword);
+
+    res.json({ success: true, message: 'Zugangsdaten für das Buchungssystem erfolgreich gespeichert.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Löscht die hinterlegten Buchungssystem-Zugangsdaten des angemeldeten Benutzers.
+ */
+router.delete('/booking-credentials', (req, res) => {
+  const user = req.session.user;
+
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  try {
+    db.prepare('DELETE FROM user_booking_credentials WHERE user_id = ?').run(user.id);
+    res.json({ success: true, message: 'Zugangsdaten erfolgreich gelöscht.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+/**
  * ==========================================================================
  * Schülerportal Integration Routes
  * ==========================================================================

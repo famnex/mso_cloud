@@ -240,6 +240,17 @@ Speichert persistente System- und Sicherheits-Protokolle (Audit Log).
 
 ---
 
+### Tabelle: `user_booking_credentials`
+Speichert die optionalen, verschlüsselten Zugangsdaten der Benutzer für das schulinterne Buchungssystem (classroombookings).
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `user_id` (PK, FK) | INTEGER | ID des zugehörigen Benutzers (`users.id`) |
+| `booking_username` | TEXT | Benutzername für das Buchungssystem |
+| `booking_password` | TEXT | Passwort für das Buchungssystem (gesichert AES-256 verschlüsselt hinterlegt) |
+
+---
+
 ## 3. Datenbank-Update-Skripte für GitHub
 Bei zukünftigen Updates über GitHub vergleicht der Updater den Ordner `/migrations` und führt neue `.sql`-Dateien automatisch aus.
 Jede neue Migration muss als separate Datei (z.B. `002_add_new_fields.sql`) hinterlegt werden.

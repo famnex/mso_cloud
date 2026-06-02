@@ -966,6 +966,7 @@
               <label for="tile_visibility">Sichtbarkeit im Portal</label>
               <select id="tile_visibility" class="form-control" onchange="toggleTileGroupsSelect()">
                 <option value="public">Öffentlich (Für jeden sichtbar)</option>
+                <option value="only_public">Nur nicht angemeldet (Nur für Personen, die NICHT eingeloggt sind)</option>
                 <option value="logged_in">Nur angemeldet (Jeder eingeloggte User)</option>
                 <option value="groups">Sicherheitsgruppen (Nur für ausgewählte Gruppen)</option>
               </select>
@@ -1255,6 +1256,87 @@
 
         <div style="display:flex; justify-content:flex-end; gap:15px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal('sph-credentials-modal')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BOOKING INFO POPUP -->
+  <div class="modal" id="booking-info-modal">
+    <div class="modal-content glass-panel" style="max-width: 550px;">
+      <span class="close-btn" onclick="closeModal('booking-info-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px; display:flex; align-items:center; gap:10px; color: var(--accent-color);">
+        <i class="fa-solid fa-circle-info"></i> Weiterleitung zum Buchungssystem
+      </h3>
+      
+      <div style="line-height: 1.6; font-size: 0.95rem; display: flex; flex-direction: column; gap: 15px;">
+        <p>
+          Wir leiten dich weiter zum schulinternen Raum- und Computer-Buchungssystem.
+        </p>
+        <p>
+          Möchtest du die MSO Cloud dauerhaft mit dem Buchungssystem verbinden? Dann gib <a href="#" id="booking-info-link-credentials" style="color: var(--warn-color); font-weight: 600; text-decoration: underline;">hier</a> deine Buchungssystem-Zugangsdaten ein. Danach wirst du immer automatisch angemeldet.
+        </p>
+        
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 10px 0;">
+        
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.9rem; color:var(--text-secondary); user-select: none;">
+          <input type="checkbox" id="booking-info-always-show" checked style="width:16px; height:16px; cursor:pointer;">
+          <span>Diese Meldung immer anzeigen</span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:25px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('booking-info-modal')">Abbrechen</button>
+        <button type="button" class="btn btn-primary" onclick="proceedToBooking()"><i class="fa-solid fa-share"></i> Weiter zum Buchungssystem</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: BOOKING CREDENTIALS -->
+  <div class="modal" id="booking-credentials-modal">
+    <div class="modal-content glass-panel">
+      <span class="close-btn" onclick="closeModal('booking-credentials-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-link" style="color: var(--warn-color);"></i> Buchungssystem Zugangsdaten</h3>
+      
+      <div id="booking-credentials-status-loading" style="text-align: center; padding: 20px;">
+        <i class="fa-solid fa-spinner fa-spin fa-xl" style="color: var(--accent-color);"></i>
+        <p style="margin-top: 10px; color: var(--text-secondary); font-size: 0.9rem;">Lade Status...</p>
+      </div>
+
+      <!-- Bereich: Bereits hinterlegt -->
+      <div id="booking-credentials-existing" style="display: none; text-align: center; padding: 10px 0;">
+        <p style="font-size: 0.95rem; margin-bottom: 20px; line-height:1.5;">
+          Für dein MSO-Cloud Konto sind aktuell Zugangsdaten für das Buchungssystem hinterlegt als:
+          <strong id="booking-credentials-username-display" style="color: var(--accent-color); font-size: 1.15rem; display: block; margin-top: 8px;"></strong>
+        </p>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 25px;">
+          Bei Klick auf die Buchungskachel wirst du automatisch mit diesen Daten angemeldet.
+        </p>
+        <button type="button" class="btn btn-danger" onclick="deleteBookingCredentials()" style="width: 100%;">
+          <i class="fa-solid fa-trash"></i> Zugangsdaten löschen
+        </button>
+      </div>
+
+      <!-- Bereich: Formular zum Eintragen -->
+      <form id="booking-credentials-form" onsubmit="saveBookingCredentials(event)" style="display: none;">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
+          Trage hier deine Anmeldedaten für das schulinternen Raum- und Computer-Buchungssystem ein. Diese werden verschlüsselt in der Datenbank gespeichert und für das automatische Login beim Öffnen der Kachel verwendet.
+        </p>
+        
+        <div class="form-group">
+          <label for="booking_user">Benutzername (AD-Konto / Schulnetz-Benutzername)</label>
+          <input type="text" id="booking_user" class="form-control" required placeholder="z.B. max.mustermann">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 25px;">
+          <label for="booking_password">Buchungssystem Passwort</label>
+          <input type="password" id="booking_password" class="form-control" required placeholder="Dein Buchungssystem Passwort">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:15px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('booking-credentials-modal')">Abbrechen</button>
           <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
         </div>
       </form>

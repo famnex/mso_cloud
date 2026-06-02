@@ -208,6 +208,21 @@ function mapLdapGroupsToLocal(ldapGroups) {
         const groupDN = group.toLowerCase();
         const mappingDN = mapping.ldap_group_dn.toLowerCase();
         
+        // Wildcard-Abgleich (unterstützt '*' an jeder Stelle im Pfad oder Namen)
+        if (mappingDN.includes('*')) {
+          const regexStr = '^' + mappingDN.replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*') + '$';
+          const regex = new RegExp(regexStr);
+          
+          if (regex.test(groupDN)) return true;
+          
+          // Falls das Mapping kein "=" enthält, gleichent wir es mit dem extrahierten CN ab
+          if (!mappingDN.includes('=')) {
+            const cn = getCNfromDN(group).toLowerCase();
+            if (regex.test(cn)) return true;
+          }
+          return false;
+        }
+
         // 1. Exakter Treffer (falls der Nutzer den vollen DN hinterlegt hat)
         if (groupDN === mappingDN) return true;
         
@@ -503,5 +518,6 @@ module.exports = {
   testConnection,
   syncUserGroups,
   findUserByEmail,
-  changePassword
+  changePassword,
+  mapLdapGroupsToLocal
 };

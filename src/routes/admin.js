@@ -374,6 +374,9 @@ router.get('/groups', (req, res) => {
       }
     }
 
+    // 3. Sicherstellen, dass "Admin" immer in der Gruppenliste existiert
+    groups.add('Admin');
+
     res.json(Array.from(groups).sort());
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -436,11 +439,19 @@ router.get('/users', (req, res) => {
     // Passwörter nicht auslesen!
     const users = db.prepare('SELECT id, username, email, role, groups, is_ldap, created_at FROM users ORDER BY username ASC').all();
     
-    // JSON-String parsen
-    const formatted = users.map(user => ({
-      ...user,
-      groups: JSON.parse(user.groups || '[]')
-    }));
+    // JSON-String parsen und LDAP Mappings auflösen
+    const formatted = users.map(user => {
+      const rawGroups = JSON.parse(user.groups || '[]');
+      let mappedGroups = [];
+      if (user.is_ldap === 1) {
+        mappedGroups = ldap.mapLdapGroupsToLocal(rawGroups);
+      }
+      return {
+        ...user,
+        groups: rawGroups,
+        mapped_groups: mappedGroups
+      };
+    });
     
     res.json(formatted);
   } catch (error) {
