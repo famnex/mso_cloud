@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { db } = require('../db');
+const ldap = require('../ldap');
 
 /**
  * Prüft, ob eine Kachel aktuell zeitlich gesperrt ist.
@@ -65,14 +66,20 @@ router.get('/', (req, res) => {
         const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
         const userGroups = user.groups || [];
         
+        let effectiveGroups = [...userGroups];
+        if (user.isLdap) {
+          const mapped = ldap.mapLdapGroupsToLocal(userGroups);
+          effectiveGroups = effectiveGroups.concat(mapped);
+        }
+        
         // Prüfen, ob eine Überschneidung der Gruppen vorliegt (unterstützt raw DNs und CNs)
-        const userGroupsCNs = userGroups.map(g => {
+        const userGroupsCNs = effectiveGroups.map(g => {
           const match = g.match(/cn=([^,]+)/i);
           return match ? match[1].trim() : g;
         });
         
         const hasAccess = allowedGroups.some(group => 
-          userGroups.some(ug => ug.toLowerCase() === group.toLowerCase()) ||
+          effectiveGroups.some(ug => ug.toLowerCase() === group.toLowerCase()) ||
           userGroupsCNs.some(ugCN => ugCN.toLowerCase() === group.toLowerCase())
         );
         return hasAccess;
@@ -124,13 +131,19 @@ router.get('/sso/:id', (req, res) => {
         const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
         const userGroups = user.groups || [];
         
-        const userGroupsCNs = userGroups.map(g => {
+        let effectiveGroups = [...userGroups];
+        if (user.isLdap) {
+          const mapped = ldap.mapLdapGroupsToLocal(userGroups);
+          effectiveGroups = effectiveGroups.concat(mapped);
+        }
+        
+        const userGroupsCNs = effectiveGroups.map(g => {
           const match = g.match(/cn=([^,]+)/i);
           return match ? match[1].trim() : g;
         });
         
         hasAccess = allowedGroups.some(group => 
-          userGroups.some(ug => ug.toLowerCase() === group.toLowerCase()) ||
+          effectiveGroups.some(ug => ug.toLowerCase() === group.toLowerCase()) ||
           userGroupsCNs.some(ugCN => ugCN.toLowerCase() === group.toLowerCase())
         );
       }
