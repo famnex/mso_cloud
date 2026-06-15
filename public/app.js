@@ -543,8 +543,16 @@ window.onclick = function(event) {
    6. Admin Control Panel Logik
    ========================================================================== */
 function openAdminView() {
-  mainView.style.display = 'none';
-  adminView.style.display = 'block';
+  const studentView = document.getElementById('student-view');
+  const cardView = document.getElementById('card-view');
+
+  if (mainView) mainView.style.display = 'none';
+  if (studentView) studentView.style.display = 'none';
+  if (cardView) cardView.style.display = 'none';
+  if (adminView) {
+    adminView.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
   loadAdminTabContent('tab-tiles');
 }
 
