@@ -213,8 +213,6 @@ async function getStudentProfile(user) {
         return getLocalProfile(user.id);
       }
 
-      const applicationId = emailRows[0].application;
-
       const [fieldRows] = await pool.query(`
         SELECT fv.field, f.type, 
                CASE WHEN f.type IN ('select', 'radio', 'checkboxes') THEN sf.value ELSE fv.value END AS value
