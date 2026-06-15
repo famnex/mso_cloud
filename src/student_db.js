@@ -180,15 +180,36 @@ function getLocalAllStudents() {
  * Holt das Schülerprofil wahlweise aus MySQL oder SQLite.
  */
 async function getStudentProfile(user) {
-  const email = (user && user.email || '').trim();
-  if (pool && email && email.includes('@')) {
+  if (pool) {
     try {
-      const [emailRows] = await pool.query(
-        'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
-        [email]
-      );
+      let applicationId = null;
       
-      if (emailRows.length === 0) {
+      // 1. Primär nach Benutzernamen (Feld 146) suchen
+      if (user && user.username) {
+        const [userRows] = await pool.query(
+          'SELECT application FROM fieldvalues WHERE field = 146 AND value = ?',
+          [user.username.trim()]
+        );
+        if (userRows.length > 0) {
+          applicationId = userRows[0].application;
+        }
+      }
+      
+      // 2. Sekundär nach E-Mail (Feld 18) suchen
+      if (!applicationId && user && user.email) {
+        const email = user.email.trim();
+        if (email && email.includes('@')) {
+          const [emailRows] = await pool.query(
+            'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
+            [email]
+          );
+          if (emailRows.length > 0) {
+            applicationId = emailRows[0].application;
+          }
+        }
+      }
+      
+      if (!applicationId) {
         return getLocalProfile(user.id);
       }
 
@@ -227,14 +248,31 @@ async function getStudentProfile(user) {
  * Hilfsfunktion zur Ermittlung der Antrags-ID aus der E-Mail oder einer virtuellen User-ID (>= 1000).
  */
 async function getApplicationId(userId, email) {
-  const trimmedEmail = (email || '').trim();
-  if (trimmedEmail && trimmedEmail.includes('@')) {
-    const [rows] = await pool.query(
-      'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
-      [trimmedEmail]
-    );
-    if (rows.length > 0) {
-      return rows[0].application;
+  if (pool) {
+    // 1. Primär über den Benutzernamen (aus der SQLite-DB anhand der userId geladen) suchen
+    if (userId) {
+      const localUser = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+      if (localUser && localUser.username) {
+        const [rows] = await pool.query(
+          'SELECT application FROM fieldvalues WHERE field = 146 AND value = ?',
+          [localUser.username.trim()]
+        );
+        if (rows.length > 0) {
+          return rows[0].application;
+        }
+      }
+    }
+
+    // 2. Sekundär über die E-Mail suchen (nur wenn valide)
+    const trimmedEmail = (email || '').trim();
+    if (trimmedEmail && trimmedEmail.includes('@')) {
+      const [rows] = await pool.query(
+        'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
+        [trimmedEmail]
+      );
+      if (rows.length > 0) {
+        return rows[0].application;
+      }
     }
   }
   if (userId && parseInt(userId, 10) >= 1000) {
