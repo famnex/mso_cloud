@@ -40,7 +40,40 @@ router.get('/authorize', (req, res) => {
       return res.redirect('/novus/index.html?login_redirect=oauth');
     }
 
+    // 2b. Sicherstellen, dass die User-ID in der Session gesetzt ist (Auto-Provision)
+    // Schüler oder LDAP-Nutzer, die sich über die MSO Cloud anmelden, ohne jemals Moodle
+    // manuell genutzt zu haben, haben möglicherweise keine users-Zeile / keine ID in der Session.
+    if (!req.session.user.id) {
+      const username = req.session.user.username;
+      const email = req.session.user.email || '';
+
+      // Versuche, den Benutzer anhand des Benutzernamens aus der DB zu laden
+      let dbUser = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+
+      if (!dbUser && email) {
+        // Fallback: Suche per E-Mail
+        dbUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+      }
+
+      if (!dbUser) {
+        // Benutzer existiert noch nicht in der lokalen DB → anlegen
+        console.log(`OAuth: User "${username}" nicht in DB gefunden – lege Eintrag an.`);
+        const groups = JSON.stringify(req.session.user.groups || []);
+        const displayName = req.session.user.display_name || req.session.user.name || username;
+        const info = db.prepare(`
+          INSERT INTO users (username, email, role, groups, is_ldap, display_name)
+          VALUES (?, ?, ?, ?, 1, ?)
+        `).run(username, email, req.session.user.role || 'user', groups, displayName);
+        req.session.user.id = info.lastInsertRowid;
+      } else {
+        req.session.user.id = dbUser.id;
+      }
+
+      console.log(`OAuth: User-ID für "${username}" in Session gesetzt: ${req.session.user.id}`);
+    }
+
     // 3. Wenn angemeldet: Authorization Code generieren
+
     const code = crypto.randomBytes(16).toString('hex'); // 32-stellig
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 Minuten Gültigkeit
 
@@ -178,16 +211,22 @@ router.get('/userinfo', (req, res) => {
     }
 
     // 2. Benutzerdaten laden
-    const user = db.prepare('SELECT id, username, email, role, groups FROM users WHERE id = ?').get(tokenRow.user_id);
+    const user = db.prepare('SELECT id, username, email, role, groups, display_name FROM users WHERE id = ?').get(tokenRow.user_id);
     if (!user) {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Zugehöriger Benutzer existiert nicht mehr.' });
     }
 
-    // 3. Vornamen und Nachnamen intelligent aus Benutzername oder E-Mail extrahieren
+    // 3. Vornamen und Nachnamen intelligent bestimmen
+    // Priorität: display_name aus LDAP > Trennung am Punkt im Benutzernamen > Fallback auf Benutzernamen
     let firstname = user.username;
     let lastname = user.username;
 
-    if (user.username.includes('.')) {
+    if (user.display_name && user.display_name.trim()) {
+      // display_name aus LDAP (z. B. "Max Mustermann")
+      const parts = user.display_name.trim().split(/\s+/);
+      firstname = parts[0];
+      lastname = parts.slice(1).join(' ') || parts[0];
+    } else if (user.username.includes('.')) {
       const parts = user.username.split('.');
       firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
       lastname = parts.slice(1).join(' ');
