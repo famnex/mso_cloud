@@ -180,11 +180,12 @@ function getLocalAllStudents() {
  * Holt das Schülerprofil wahlweise aus MySQL oder SQLite.
  */
 async function getStudentProfile(user) {
-  if (pool) {
+  const email = (user && user.email || '').trim();
+  if (pool && email && email.includes('@')) {
     try {
       const [emailRows] = await pool.query(
         'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
-        [user.email]
+        [email]
       );
       
       if (emailRows.length === 0) {
@@ -226,10 +227,11 @@ async function getStudentProfile(user) {
  * Hilfsfunktion zur Ermittlung der Antrags-ID aus der E-Mail oder einer virtuellen User-ID (>= 1000).
  */
 async function getApplicationId(userId, email) {
-  if (email) {
+  const trimmedEmail = (email || '').trim();
+  if (trimmedEmail && trimmedEmail.includes('@')) {
     const [rows] = await pool.query(
       'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
-      [email.trim()]
+      [trimmedEmail]
     );
     if (rows.length > 0) {
       return rows[0].application;
@@ -471,15 +473,16 @@ async function updateStudentProfile(userId, email, data) {
  * Sucht nach einem Schüler anhand der registrierten E-Mail-Adresse.
  */
 async function getStudentByEmail(email) {
-  if (pool) {
+  const trimmedEmail = (email || '').trim();
+  if (pool && trimmedEmail && trimmedEmail.includes('@')) {
     try {
       const [rows] = await pool.query(`
         SELECT fv.application AS application_id, app.status AS status
         FROM fieldvalues fv
         JOIN applications app ON fv.application = app.ID
         WHERE fv.field = 18 AND fv.value = ?
-      `, [email.trim()]);
-
+      `, [trimmedEmail]);
+      
       if (rows.length > 0) {
         const app = rows[0];
         return {
@@ -516,12 +519,13 @@ async function getStudentByEmail(email) {
  */
 async function createStudentToken(email, token, ip) {
   let userId;
+  const trimmedEmail = (email || '').trim();
   
-  if (pool) {
+  if (pool && trimmedEmail && trimmedEmail.includes('@')) {
     try {
       const [rows] = await pool.query(
         'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
-        [email.trim()]
+        [trimmedEmail]
       );
       if (rows.length > 0) {
         const applicationId = rows[0].application;
