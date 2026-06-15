@@ -90,7 +90,7 @@ router.post('/login', async (req, res) => {
             INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name)
             VALUES (?, ?, NULL, ?, ?, 1, ?)
           `).run(username, ldapUser.email, role, groupsJson, ldapUser.name);
-          userId = info.lastInsertRowId;
+          userId = info.lastInsertRowid;
         }
 
         req.session.user = {

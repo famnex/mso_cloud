@@ -559,7 +559,7 @@ async function createStudentToken(email, token, ip) {
             INSERT INTO users (username, email, role, groups, is_ldap)
             VALUES (?, ?, 'user', '["Schueler"]', 0)
           `).run(username, email.trim());
-          userId = info.lastInsertRowId;
+          userId = info.lastInsertRowid;
 
           db.prepare(`
             INSERT OR IGNORE INTO student_profiles (user_id, first_name, last_name, card_status)
@@ -705,7 +705,7 @@ async function verifyStudentToken(token, ip) {
               INSERT INTO users (username, email, role, groups, is_ldap)
               VALUES (?, ?, 'user', ?, 0)
             `).run(username, email);
-            userId = info.lastInsertRowId;
+            userId = info.lastInsertRowid;
 
             db.prepare(`
               INSERT OR IGNORE INTO student_profiles (user_id, first_name, last_name, card_status)
