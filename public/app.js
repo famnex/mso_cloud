@@ -117,7 +117,12 @@ async function checkAuthStatus() {
 }
 
 function renderAuthenticatedHeader() {
-  const isStudent = currentUser.groups && currentUser.groups.includes('Schueler');
+  const isStudent = currentUser.groups && currentUser.groups.some(g => {
+    const match = g.match(/cn=([^,]+)/i);
+    const cn = match ? match[1].trim() : g;
+    const lowerCn = cn.toLowerCase();
+    return lowerCn === 'schueler' || lowerCn === 'schüler' || lowerCn.includes('schueler') || lowerCn.includes('schüler');
+  });
 
   const headerAnon = document.getElementById('header-anonymous');
   const headerAuth = document.getElementById('header-authenticated');
