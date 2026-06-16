@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { db, getConfig, setConfig } = require('../db');
+const { db, getConfig, setConfig, logEvent } = require('../db');
 const { getOrCreateOidcKeys, getOidcBaseUrl, openidConfigurationHandler, jwksHandler } = require('../oidcHelper');
 
 /**
@@ -313,6 +313,11 @@ router.post('/token', (req, res) => {
         user_role: userRole
       };
 
+      console.log('OIDC ID-Token Claims:', JSON.stringify(payload, null, 2));
+      if (typeof logEvent === 'function') {
+        logEvent('info', 'oidc_token_claims', `OIDC ID-Token Claims für User: ${user.username}`, payload, req.ip);
+      }
+
       idToken = jwt.sign(payload, privateKeyPem, {
         algorithm: 'RS256',
         keyid: 'key-1'
@@ -425,6 +430,11 @@ router.get('/userinfo', (req, res) => {
       groups: cleanGroups,
       user_role: userRole
     };
+
+    console.log('OIDC Userinfo Claims:', JSON.stringify(claims, null, 2));
+    if (typeof logEvent === 'function') {
+      logEvent('info', 'oidc_userinfo_claims', `OIDC Userinfo Claims für User: ${user.username}`, claims, req.ip);
+    }
 
     console.log(`OIDC-Userinfo erfolgreich ausgeliefert für User: ${user.username}`);
     res.json(claims);
