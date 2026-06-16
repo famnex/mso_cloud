@@ -226,7 +226,8 @@ router.post('/token', (req, res) => {
         name: `${firstname} ${lastname}`,
         given_name: firstname,
         family_name: lastname,
-        email: user.email || ''
+        email: user.email || '',
+        preferred_username: user.username
       };
 
       idToken = jwt.sign(payload, privateKeyPem, {
