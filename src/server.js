@@ -72,6 +72,14 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tiles', require('./routes/tiles'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/admin', require('./routes/admin'));
+// OIDC standardisierte Pfade auf Root-Ebene (Redirects auf die API-Endpunkte für WebUntis OIDC Auto-Discovery)
+app.get('/.well-known/openid-configuration', (req, res) => {
+  res.redirect('/api/oauth/.well-known/openid-configuration');
+});
+app.get('/jwks', (req, res) => {
+  res.redirect('/api/oauth/jwks');
+});
+
 app.use('/api/oauth', require('./routes/oauth'));
 
 // Fallback für SPA (sendet immer index.html, falls kein statischer Ordner matched)

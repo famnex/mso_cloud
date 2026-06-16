@@ -1,7 +1,40 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const { db } = require('../db');
+const jwt = require('jsonwebtoken');
+const { db, getConfig, setConfig } = require('../db');
+
+/**
+ * Holt das RSA-Schlüsselpaar für OIDC aus der Datenbank.
+ * Falls keines existiert, wird es einmalig generiert und persistiert.
+ */
+function getOrCreateOidcKeys() {
+  let privateKeyPem = getConfig('oidc_private_key');
+  let publicKeyPem = getConfig('oidc_public_key');
+
+  if (!privateKeyPem || !publicKeyPem) {
+    console.log('OIDC: Generiere neues RSA-Schlüsselpaar (2048 Bit) für RS256...');
+    const { generateKeyPairSync } = crypto;
+    const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem'
+      },
+      privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem'
+      }
+    });
+    privateKeyPem = privateKey;
+    publicKeyPem = publicKey;
+    setConfig('oidc_private_key', privateKeyPem);
+    setConfig('oidc_public_key', publicKeyPem);
+    console.log('OIDC: RSA-Schlüsselpaar erfolgreich in config-Tabelle gespeichert.');
+  }
+
+  return { privateKeyPem, publicKeyPem };
+}
 
 /**
  * Endpoint 1: Authorization Endpoint (GET /api/oauth/authorize)
@@ -167,12 +200,74 @@ router.post('/token', (req, res) => {
 
     console.log(`Access Token erfolgreich generiert für Client ${clientId} (User ID ${codeRow.user_id})`);
 
+    // 6. ID-Token Generierung für OIDC (RS256 signiert)
+    let idToken = null;
+    const user = db.prepare('SELECT id, username, email, role, groups, display_name FROM users WHERE id = ?').get(codeRow.user_id);
+    
+    if (user) {
+      let firstname = user.username;
+      let lastname = user.username;
+
+      if (user.display_name && user.display_name.trim()) {
+        const parts = user.display_name.trim().split(/\s+/);
+        firstname = parts[0];
+        lastname = parts.slice(1).join(' ') || parts[0];
+      } else if (user.username.includes('.')) {
+        const parts = user.username.split('.');
+        firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        lastname = parts.slice(1).join(' ');
+        lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+      } else if (user.email && user.email.includes('@')) {
+        const prefix = user.email.split('@')[0];
+        if (prefix.includes('.')) {
+          const parts = prefix.split('.');
+          firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+          lastname = parts.slice(1).join(' ');
+          lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+        }
+      }
+
+      if (user.username.toLowerCase() === 'admin') {
+        firstname = 'System';
+        lastname = 'Administrator';
+      }
+
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const host = req.get('host');
+      const issuer = `${protocol}://${host}/api/oauth`;
+
+      const { privateKeyPem } = getOrCreateOidcKeys();
+
+      const payload = {
+        iss: issuer,
+        sub: String(user.id),
+        aud: clientId,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000),
+        name: `${firstname} ${lastname}`,
+        given_name: firstname,
+        family_name: lastname,
+        email: user.email || ''
+      };
+
+      idToken = jwt.sign(payload, privateKeyPem, {
+        algorithm: 'RS256',
+        keyid: 'key-1'
+      });
+    }
+
     // Standard OAuth2 Response
-    res.json({
+    const responseJson = {
       access_token: accessToken,
       token_type: 'Bearer',
       expires_in: 3600
-    });
+    };
+
+    if (idToken) {
+      responseJson.id_token = idToken;
+    }
+
+    res.json(responseJson);
   } catch (error) {
     console.error('Fehler im OAuth-Token-Endpoint:', error);
     res.status(500).json({ error: 'server_error', error_description: error.message });
@@ -269,6 +364,59 @@ router.get('/userinfo', (req, res) => {
     res.json(claims);
   } catch (error) {
     console.error('Fehler im OAuth-Userinfo-Endpoint:', error);
+    res.status(500).json({ error: 'server_error', error_description: error.message });
+  }
+});
+
+/**
+ * OIDC Discovery Document (GET /api/oauth/.well-known/openid-configuration)
+ */
+router.get('/.well-known/openid-configuration', (req, res) => {
+  try {
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const host = req.get('host');
+    const issuer = `${protocol}://${host}/api/oauth`;
+
+    res.json({
+      issuer: issuer,
+      authorization_endpoint: `${issuer}/authorize`,
+      token_endpoint: `${issuer}/token`,
+      userinfo_endpoint: `${issuer}/userinfo`,
+      jwks_uri: `${issuer}/jwks`,
+      response_types_supported: ['code'],
+      subject_types_supported: ['public'],
+      id_token_signing_alg_values_supported: ['RS256'],
+      scopes_supported: ['openid', 'profile', 'email'],
+      token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
+      claims_supported: ['sub', 'iss', 'auth_time', 'name', 'given_name', 'family_name', 'email']
+    });
+  } catch (error) {
+    console.error('OIDC: Fehler im Discovery-Endpoint:', error);
+    res.status(500).json({ error: 'server_error', error_description: error.message });
+  }
+});
+
+/**
+ * JWKS (JSON Web Key Set) Endpoint (GET /api/oauth/jwks)
+ */
+router.get('/jwks', (req, res) => {
+  try {
+    const { publicKeyPem } = getOrCreateOidcKeys();
+    const publicKeyObj = crypto.createPublicKey(publicKeyPem);
+    const jwk = publicKeyObj.export({ format: 'jwk' });
+
+    res.json({
+      keys: [
+        {
+          ...jwk,
+          kid: 'key-1',
+          use: 'sig',
+          alg: 'RS256'
+        }
+      ]
+    });
+  } catch (error) {
+    console.error('OIDC: Fehler im JWKS-Endpoint:', error);
     res.status(500).json({ error: 'server_error', error_description: error.message });
   }
 });
