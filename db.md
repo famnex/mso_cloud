@@ -43,6 +43,7 @@ Verwaltet lokale Accounts und dient als Cache für angemeldete LDAP-Nutzer.
 | `groups` | TEXT | JSON-Array zugeordneter Gruppen (z.B. `["Lehrer", "Admin"]`) |
 | `is_ldap` | INTEGER | Flag für LDAP-Benutzer (`0` = lokal, `1` = LDAP) |
 | `display_name` | TEXT | Anzeigename des Benutzers (z. B. LDAP-displayName) |
+| `dn` | TEXT | Distinguished Name des LDAP-Benutzers (falls über LDAP authentifiziert) |
 | `created_at` | DATETIME | Erstellungszeitpunkt |
 
 ---

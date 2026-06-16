@@ -174,7 +174,8 @@ async function authenticate(username, password) {
               name: displayName,
               roles: localRoles,
               rawGroups: memberOf,
-              isLdap: true
+              isLdap: true,
+              dn: userDn
             });
           });
         });

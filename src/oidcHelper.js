@@ -66,7 +66,7 @@ function openidConfigurationHandler(req, res) {
       id_token_signing_alg_values_supported: ['RS256'],
       scopes_supported: ['openid', 'profile', 'email'],
       token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
-      claims_supported: ['sub', 'iss', 'auth_time', 'name', 'given_name', 'family_name', 'email', 'preferred_username']
+      claims_supported: ['sub', 'iss', 'auth_time', 'name', 'given_name', 'family_name', 'email', 'preferred_username', 'user_role']
     });
   } catch (error) {
     console.error('OIDC: Fehler im Discovery-Endpoint:', error);

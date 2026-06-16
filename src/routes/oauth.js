@@ -17,6 +17,57 @@ function normalizeUri(uri) {
 }
 
 /**
+ * Ermittelt die Benutzerrolle (lehrer, schueler, forbidden) anhand von Gruppen, E-Mail-Suffix und Profilen.
+ */
+function determineUserRole(userId, username, email, role, groupsStr, dn) {
+  // 1. Wenn in der Tabelle student_profiles vorhanden -> schueler
+  const isStudent = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(userId);
+  if (isStudent) {
+    return 'schueler';
+  }
+
+  // 2. Gruppen analysieren
+  const groups = JSON.parse(groupsStr || '[]');
+  for (const group of groups) {
+    const g = group.toLowerCase();
+    if (g === 'lehrer' || g.includes('cn=lehrer') || g.includes('ou=lehrer') ||
+        g === 'teacher' || g.includes('cn=teacher') || g.includes('ou=teacher') ||
+        g.includes('lehrkräfte') || g.includes('cn=lehrkr') || g.includes('ou=lehrkr')) {
+      return 'lehrer';
+    }
+    if (g === 'schueler' || g.includes('cn=schueler') || g.includes('ou=schueler') ||
+        g === 'schüler' || g.includes('cn=schüler') || g.includes('ou=schüler') ||
+        g === 'student' || g.includes('cn=student') || g.includes('ou=student') ||
+        g.includes('schülerschaft') || g.includes('cn=schueler') || g.includes('ou=schueler')) {
+      return 'schueler';
+    }
+  }
+
+  // 3. DN/OU des Benutzers selbst analysieren (z.B. "CN=Max Mustermann,OU=Lehrer,DC=mso,DC=local")
+  if (dn) {
+    const dnLower = dn.toLowerCase();
+    if (dnLower.includes('ou=lehrer') || dnLower.includes('ou=teacher') || dnLower.includes('ou=lehrkräfte')) {
+      return 'lehrer';
+    }
+    if (dnLower.includes('ou=schueler') || dnLower.includes('ou=schüler') || dnLower.includes('ou=student') || dnLower.includes('ou=schülerschaft')) {
+      return 'schueler';
+    }
+  }
+
+  // 4. E-Mail-Suffix-Check
+  if (email && email.toLowerCase().endsWith('@mso-hef.de')) {
+    return 'lehrer';
+  }
+
+  // 5. Fallback auf System-Rolle (Admin ist meistens Lehrer/Personal)
+  if (role === 'admin') {
+    return 'lehrer';
+  }
+
+  return 'forbidden';
+}
+
+/**
  * Endpoint 1: Authorization Endpoint (GET /api/oauth/authorize)
  * Leitet den Benutzer zum Login weiter (falls unauthenticated) oder generiert direkt einen Authorization Code.
  */
@@ -74,10 +125,11 @@ router.get('/authorize', (req, res) => {
         console.log(`OAuth: User "${username}" nicht in DB gefunden – lege Eintrag an.`);
         const groups = JSON.stringify(req.session.user.groups || []);
         const displayName = req.session.user.display_name || req.session.user.name || username;
+        const dn = req.session.user.dn || null;
         const info = db.prepare(`
-          INSERT INTO users (username, email, role, groups, is_ldap, display_name)
-          VALUES (?, ?, ?, ?, 1, ?)
-        `).run(username, email, req.session.user.role || 'user', groups, displayName);
+          INSERT INTO users (username, email, role, groups, is_ldap, display_name, dn)
+          VALUES (?, ?, ?, ?, 1, ?, ?)
+        `).run(username, email, req.session.user.role || 'user', groups, displayName, dn);
         req.session.user.id = info.lastInsertRowid;
       } else {
         req.session.user.id = dbUser.id;
@@ -183,7 +235,7 @@ router.post('/token', (req, res) => {
 
     // 6. ID-Token Generierung für OIDC (RS256 signiert)
     let idToken = null;
-    const user = db.prepare('SELECT id, username, email, role, groups, display_name FROM users WHERE id = ?').get(codeRow.user_id);
+    const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn FROM users WHERE id = ?').get(codeRow.user_id);
     
     if (user) {
       let firstname = user.username;
@@ -214,8 +266,8 @@ router.post('/token', (req, res) => {
       }
 
       const issuer = getOidcBaseUrl(req);
-
       const { privateKeyPem } = getOrCreateOidcKeys();
+      const userRole = determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
 
       const payload = {
         iss: issuer,
@@ -227,7 +279,8 @@ router.post('/token', (req, res) => {
         given_name: firstname,
         family_name: lastname,
         email: user.email || '',
-        preferred_username: user.username
+        preferred_username: user.username,
+        user_role: userRole
       };
 
       idToken = jwt.sign(payload, privateKeyPem, {
@@ -286,7 +339,7 @@ router.get('/userinfo', (req, res) => {
     }
 
     // 2. Benutzerdaten laden
-    const user = db.prepare('SELECT id, username, email, role, groups, display_name FROM users WHERE id = ?').get(tokenRow.user_id);
+    const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn FROM users WHERE id = ?').get(tokenRow.user_id);
     if (!user) {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Zugehöriger Benutzer existiert nicht mehr.' });
     }
@@ -328,6 +381,8 @@ router.get('/userinfo', (req, res) => {
       return match ? match[1].trim() : g;
     });
 
+    const userRole = determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
+
     const claims = {
       sub: String(user.id),
       username: user.username,
@@ -337,7 +392,8 @@ router.get('/userinfo', (req, res) => {
       given_name: firstname,
       family_name: lastname,
       role: user.role,
-      groups: cleanGroups
+      groups: cleanGroups,
+      user_role: userRole
     };
 
     console.log(`OIDC-Userinfo erfolgreich ausgeliefert für User: ${user.username}`);
@@ -358,4 +414,5 @@ router.get('/.well-known/openid-configuration', openidConfigurationHandler);
  */
 router.get('/jwks', jwksHandler);
 
+router.determineUserRole = determineUserRole;
 module.exports = router;

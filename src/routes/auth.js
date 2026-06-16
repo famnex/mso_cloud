@@ -80,16 +80,16 @@ router.post('/login', async (req, res) => {
           // Cache aktualisieren
           db.prepare(`
             UPDATE users 
-            SET email = ?, role = ?, groups = ?, is_ldap = 1, display_name = ?
+            SET email = ?, role = ?, groups = ?, is_ldap = 1, display_name = ?, dn = ?
             WHERE id = ?
-          `).run(ldapUser.email, role, groupsJson, ldapUser.name, localCache.id);
+          `).run(ldapUser.email, role, groupsJson, ldapUser.name, ldapUser.dn, localCache.id);
           userId = localCache.id;
         } else {
           // Neu anlegen
           const info = db.prepare(`
-            INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name)
-            VALUES (?, ?, NULL, ?, ?, 1, ?)
-          `).run(username, ldapUser.email, role, groupsJson, ldapUser.name);
+            INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name, dn)
+            VALUES (?, ?, NULL, ?, ?, 1, ?, ?)
+          `).run(username, ldapUser.email, role, groupsJson, ldapUser.name, ldapUser.dn);
           userId = info.lastInsertRowid;
         }
 
@@ -100,7 +100,8 @@ router.post('/login', async (req, res) => {
           role: role,
           groups: ldapUser.rawGroups,
           isLdap: true,
-          display_name: ldapUser.name
+          display_name: ldapUser.name,
+          dn: ldapUser.dn
         };
         req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
 
