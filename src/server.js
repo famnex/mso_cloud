@@ -72,13 +72,13 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tiles', require('./routes/tiles'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/admin', require('./routes/admin'));
-// OIDC standardisierte Pfade auf Root-Ebene (Redirects auf die API-Endpunkte für WebUntis OIDC Auto-Discovery)
-app.get('/.well-known/openid-configuration', (req, res) => {
-  res.redirect('/api/oauth/.well-known/openid-configuration');
-});
-app.get('/jwks', (req, res) => {
-  res.redirect('/api/oauth/jwks');
-});
+// OIDC standardisierte Pfade auf Root-Ebene (Direkte JSON-Antworten ohne Redirect für Auto-Discovery)
+const { openidConfigurationHandler, jwksHandler } = require('./oidcHelper');
+app.get('/.well-known/openid-configuration', openidConfigurationHandler);
+app.get('/novus/.well-known/openid-configuration', openidConfigurationHandler);
+app.get('/jwks', jwksHandler);
+app.get('/novus/jwks', jwksHandler);
+
 
 app.use('/api/oauth', require('./routes/oauth'));
 

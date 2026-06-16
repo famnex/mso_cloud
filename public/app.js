@@ -1180,8 +1180,8 @@ async function loadOauthClientConfig() {
     document.getElementById('moodle-oauth-auth-url').innerText = `${fullBaseUrl}/api/oauth/authorize`;
     document.getElementById('moodle-oauth-token-url').innerText = `${fullBaseUrl}/api/oauth/token`;
     document.getElementById('moodle-oauth-user-url').innerText = `${fullBaseUrl}/api/oauth/userinfo`;
-    document.getElementById('oidc-discovery-url').innerText = `${protocol}//${host}/.well-known/openid-configuration`;
-    document.getElementById('oidc-jwks-url').innerText = `${protocol}//${host}/jwks`;
+    document.getElementById('oidc-discovery-url').innerText = `${fullBaseUrl}/.well-known/openid-configuration`;
+    document.getElementById('oidc-jwks-url').innerText = `${fullBaseUrl}/jwks`;
 
     // 2. Clients vom Server abfragen
     const res = await fetch('api/admin/oauth-clients');
