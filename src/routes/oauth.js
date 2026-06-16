@@ -156,10 +156,12 @@ router.get('/authorize', (req, res) => {
         const groups = JSON.stringify(req.session.user.groups || []);
         const displayName = req.session.user.display_name || req.session.user.name || username;
         const dn = req.session.user.dn || null;
+        const firstName = req.session.user.givenName || null;
+        const lastName = req.session.user.sn || null;
         const info = db.prepare(`
-          INSERT INTO users (username, email, role, groups, is_ldap, display_name, dn)
-          VALUES (?, ?, ?, ?, 1, ?, ?)
-        `).run(username, email, req.session.user.role || 'user', groups, displayName, dn);
+          INSERT INTO users (username, email, role, groups, is_ldap, display_name, dn, first_name, last_name)
+          VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)
+        `).run(username, email, req.session.user.role || 'user', groups, displayName, dn, firstName, lastName);
         req.session.user.id = info.lastInsertRowid;
       } else {
         req.session.user.id = dbUser.id;
@@ -265,28 +267,33 @@ router.post('/token', (req, res) => {
 
     // 6. ID-Token Generierung für OIDC (RS256 signiert)
     let idToken = null;
-    const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn FROM users WHERE id = ?').get(codeRow.user_id);
+    const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn, first_name, last_name FROM users WHERE id = ?').get(codeRow.user_id);
     
     if (user) {
-      let firstname = user.username;
-      let lastname = user.username;
+      let firstname = user.first_name || '';
+      let lastname = user.last_name || '';
 
-      if (user.display_name && user.display_name.trim()) {
-        const parts = user.display_name.trim().split(/\s+/);
-        firstname = parts[0];
-        lastname = parts.slice(1).join(' ') || parts[0];
-      } else if (user.username.includes('.')) {
-        const parts = user.username.split('.');
-        firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-        lastname = parts.slice(1).join(' ');
-        lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
-      } else if (user.email && user.email.includes('@')) {
-        const prefix = user.email.split('@')[0];
-        if (prefix.includes('.')) {
-          const parts = prefix.split('.');
+      if (!firstname && !lastname) {
+        firstname = user.username;
+        lastname = user.username;
+
+        if (user.display_name && user.display_name.trim()) {
+          const parts = user.display_name.trim().split(/\s+/);
+          firstname = parts[0];
+          lastname = parts.slice(1).join(' ') || parts[0];
+        } else if (user.username.includes('.')) {
+          const parts = user.username.split('.');
           firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
           lastname = parts.slice(1).join(' ');
           lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+        } else if (user.email && user.email.includes('@')) {
+          const prefix = user.email.split('@')[0];
+          if (prefix.includes('.')) {
+            const parts = prefix.split('.');
+            firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            lastname = parts.slice(1).join(' ');
+            lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+          }
         }
       }
 
@@ -374,33 +381,36 @@ router.get('/userinfo', (req, res) => {
     }
 
     // 2. Benutzerdaten laden
-    const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn FROM users WHERE id = ?').get(tokenRow.user_id);
+    const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn, first_name, last_name FROM users WHERE id = ?').get(tokenRow.user_id);
     if (!user) {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Zugehöriger Benutzer existiert nicht mehr.' });
     }
 
     // 3. Vornamen und Nachnamen intelligent bestimmen
-    // Priorität: display_name aus LDAP > Trennung am Punkt im Benutzernamen > Fallback auf Benutzernamen
-    let firstname = user.username;
-    let lastname = user.username;
+    let firstname = user.first_name || '';
+    let lastname = user.last_name || '';
 
-    if (user.display_name && user.display_name.trim()) {
-      // display_name aus LDAP (z. B. "Max Mustermann")
-      const parts = user.display_name.trim().split(/\s+/);
-      firstname = parts[0];
-      lastname = parts.slice(1).join(' ') || parts[0];
-    } else if (user.username.includes('.')) {
-      const parts = user.username.split('.');
-      firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-      lastname = parts.slice(1).join(' ');
-      lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
-    } else if (user.email && user.email.includes('@')) {
-      const prefix = user.email.split('@')[0];
-      if (prefix.includes('.')) {
-        const parts = prefix.split('.');
+    if (!firstname && !lastname) {
+      firstname = user.username;
+      lastname = user.username;
+
+      if (user.display_name && user.display_name.trim()) {
+        const parts = user.display_name.trim().split(/\s+/);
+        firstname = parts[0];
+        lastname = parts.slice(1).join(' ') || parts[0];
+      } else if (user.username.includes('.')) {
+        const parts = user.username.split('.');
         firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
         lastname = parts.slice(1).join(' ');
         lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+      } else if (user.email && user.email.includes('@')) {
+        const prefix = user.email.split('@')[0];
+        if (prefix.includes('.')) {
+          const parts = prefix.split('.');
+          firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+          lastname = parts.slice(1).join(' ');
+          lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+        }
       }
     }
 

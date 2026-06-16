@@ -44,6 +44,8 @@ Verwaltet lokale Accounts und dient als Cache für angemeldete LDAP-Nutzer.
 | `is_ldap` | INTEGER | Flag für LDAP-Benutzer (`0` = lokal, `1` = LDAP) |
 | `display_name` | TEXT | Anzeigename des Benutzers (z. B. LDAP-displayName) |
 | `dn` | TEXT | Distinguished Name des LDAP-Benutzers (falls über LDAP authentifiziert) |
+| `first_name` | TEXT | Vorname des LDAP-Benutzers (aus givenName) |
+| `last_name` | TEXT | Nachname des LDAP-Benutzers (aus sn) |
 | `created_at` | DATETIME | Erstellungszeitpunkt |
 
 ---

@@ -100,7 +100,7 @@ async function authenticate(username, password) {
       const opts = {
         filter: userFilter,
         scope: 'sub',
-        attributes: ['dn', mailAttr, nameAttr, 'memberOf', 'cn']
+        attributes: ['dn', mailAttr, nameAttr, 'memberOf', 'cn', 'givenName', 'sn']
       };
 
       let userEntry = null;
@@ -164,6 +164,9 @@ async function authenticate(username, password) {
               memberOf = [memberOf];
             }
 
+            const givenName = userEntry.givenName || userEntry.givenname || '';
+            const sn = userEntry.sn || userEntry.SN || '';
+
             // Lokale Gruppen-Mappings abgleichen
             const localRoles = mapLdapGroupsToLocal(memberOf);
 
@@ -172,6 +175,8 @@ async function authenticate(username, password) {
               username: username,
               email: email,
               name: displayName,
+              givenName: givenName,
+              sn: sn,
               roles: localRoles,
               rawGroups: memberOf,
               isLdap: true,
