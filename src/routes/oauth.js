@@ -5,6 +5,16 @@ const jwt = require('jsonwebtoken');
 const { db, getConfig, setConfig } = require('../db');
 const { getOrCreateOidcKeys, getOidcBaseUrl, openidConfigurationHandler, jwksHandler } = require('../oidcHelper');
 
+/**
+ * Normalisiert eine URI für robusten Vergleich (entfernt trailing Slashes, gleicht http/https an).
+ */
+function normalizeUri(uri) {
+  if (!uri) return '';
+  let u = decodeURIComponent(uri).trim();
+  u = u.replace(/\/+$/, '');
+  u = u.replace(/^http:/, 'https:');
+  return u;
+}
 
 /**
  * Endpoint 1: Authorization Endpoint (GET /api/oauth/authorize)
@@ -30,9 +40,10 @@ router.get('/authorize', (req, res) => {
       return res.status(400).send('OAuth-Client nicht gefunden.');
     }
 
-    // Redirect-URI exakt abgleichen (oder Unterverzeichnis-Check, aber exakt ist am sichersten)
-    if (client.redirect_uri !== redirect_uri) {
-      return res.status(400).send('Die angegebene redirect_uri stimmt nicht mit der registrierten URI überein.');
+    // Redirect-URI abgleichen
+    if (normalizeUri(client.redirect_uri) !== normalizeUri(redirect_uri)) {
+      console.error(`OAuth Authorize Mismatch for client "${client_id}". Registered redirect_uri: "${client.redirect_uri}", Requested redirect_uri: "${redirect_uri}"`);
+      return res.status(400).send(`Die angegebene redirect_uri stimmt nicht mit der registrierten URI überein.\n\nRegistriert: ${client.redirect_uri}\nÜbergeben: ${redirect_uri}`);
     }
 
     // 2. Prüfen, ob der Benutzer angemeldet ist
@@ -147,7 +158,7 @@ router.post('/token', (req, res) => {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Der Code wurde bereits verwendet (Einweg-Schutz).' });
     }
 
-    if (codeRow.client_id !== clientId || codeRow.redirect_uri !== redirect_uri) {
+    if (codeRow.client_id !== clientId || normalizeUri(codeRow.redirect_uri) !== normalizeUri(redirect_uri)) {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Code-Mapping (client_id oder redirect_uri) stimmt nicht überein.' });
     }
 
