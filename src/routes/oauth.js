@@ -19,6 +19,12 @@ function normalizeUri(uri) {
 /**
  * Ermittelt die Benutzerrolle (lehrer, schueler, forbidden) anhand von Gruppen, E-Mail-Suffix und Profilen.
  */
+function getCNfromDN(dn) {
+  if (!dn) return '';
+  const match = dn.match(/cn=([^,]+)/i);
+  return match ? match[1].trim() : dn;
+}
+
 function determineUserRole(userId, username, email, role, groupsStr, dn) {
   // 1. Wenn in der Tabelle student_profiles vorhanden -> schueler
   const isStudent = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(userId);
@@ -26,40 +32,64 @@ function determineUserRole(userId, username, email, role, groupsStr, dn) {
     return 'schueler';
   }
 
-  // 2. Gruppen analysieren
+  // 2. Mappings aus der DB laden und abgleichen
   const groups = JSON.parse(groupsStr || '[]');
-  for (const group of groups) {
-    const g = group.toLowerCase();
-    if (g === 'lehrer' || g.includes('cn=lehrer') || g.includes('ou=lehrer') ||
-        g === 'teacher' || g.includes('cn=teacher') || g.includes('ou=teacher') ||
-        g.includes('lehrkräfte') || g.includes('cn=lehrkr') || g.includes('ou=lehrkr')) {
-      return 'lehrer';
-    }
-    if (g === 'schueler' || g.includes('cn=schueler') || g.includes('ou=schueler') ||
-        g === 'schüler' || g.includes('cn=schüler') || g.includes('ou=schüler') ||
-        g === 'student' || g.includes('cn=student') || g.includes('ou=student') ||
-        g.includes('schülerschaft') || g.includes('cn=schueler') || g.includes('ou=schueler')) {
-      return 'schueler';
+  if (groups.length > 0 || dn) {
+    try {
+      const mappings = db.prepare('SELECT ldap_group_dn, user_role FROM ldap_mappings').all();
+      
+      for (const mapping of mappings) {
+        if (!mapping.user_role) continue;
+        
+        const mappingDN = mapping.ldap_group_dn.toLowerCase();
+        
+        const checkMatch = (value) => {
+          if (!value) return false;
+          const valLower = value.toLowerCase();
+          
+          if (mappingDN.includes('*')) {
+            const regexStr = '^' + mappingDN.replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*') + '$';
+            const regex = new RegExp(regexStr);
+            
+            if (regex.test(valLower)) return true;
+            
+            if (!mappingDN.includes('=')) {
+              const cn = getCNfromDN(value).toLowerCase();
+              if (regex.test(cn)) return true;
+            }
+            return false;
+          }
+          
+          if (valLower === mappingDN) return true;
+          
+          const cn = getCNfromDN(value).toLowerCase();
+          return cn === mappingDN;
+        };
+
+        // 2a. Erst Gruppen des Benutzers abgleichen
+        const groupMatch = groups.some(checkMatch);
+        if (groupMatch) {
+          const mappedRole = mapping.user_role.trim().toLowerCase();
+          if (mappedRole) return mappedRole;
+        }
+
+        // 2b. Dann den DN des Benutzers selbst abgleichen (für OUs)
+        if (dn && checkMatch(dn)) {
+          const mappedRole = mapping.user_role.trim().toLowerCase();
+          if (mappedRole) return mappedRole;
+        }
+      }
+    } catch (err) {
+      console.error('Fehler bei der Rollenermittlung über LDAP-Mappings:', err);
     }
   }
 
-  // 3. DN/OU des Benutzers selbst analysieren (z.B. "CN=Max Mustermann,OU=Lehrer,DC=mso,DC=local")
-  if (dn) {
-    const dnLower = dn.toLowerCase();
-    if (dnLower.includes('ou=lehrer') || dnLower.includes('ou=teacher') || dnLower.includes('ou=lehrkräfte')) {
-      return 'lehrer';
-    }
-    if (dnLower.includes('ou=schueler') || dnLower.includes('ou=schüler') || dnLower.includes('ou=student') || dnLower.includes('ou=schülerschaft')) {
-      return 'schueler';
-    }
-  }
-
-  // 4. E-Mail-Suffix-Check
+  // 3. E-Mail-Suffix-Check
   if (email && email.toLowerCase().endsWith('@mso-hef.de')) {
     return 'lehrer';
   }
 
-  // 5. Fallback auf System-Rolle (Admin ist meistens Lehrer/Personal)
+  // 4. Fallback auf System-Rolle (Admin ist meistens Lehrer/Personal)
   if (role === 'admin') {
     return 'lehrer';
   }

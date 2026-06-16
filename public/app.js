@@ -1314,53 +1314,79 @@ function generateOauthClientSecret() {
   document.getElementById('oauth_client_secret').value = key;
 }
 
-/* --- TAB: LDAP Mappings --- */
+let allLdapMappings = [];
+
 async function loadAdminLdapMappings() {
   const tbody = document.getElementById('admin-mappings-table-body');
-  tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Mappings...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Mappings...</td></tr>';
 
   try {
     const res = await fetch('api/admin/ldap-mappings');
-    const mappings = await res.json();
+    allLdapMappings = await res.json();
 
     tbody.innerHTML = '';
-    mappings.forEach(map => {
+    allLdapMappings.forEach(map => {
       const tr = document.createElement('tr');
+      const roleText = map.user_role ? `<span class="user-badge" style="font-size:0.8rem; background:rgba(255,255,255,0.1); color:var(--text-primary);">${map.user_role}</span>` : '<span style="color:var(--text-secondary); font-size:0.8rem;">-</span>';
       tr.innerHTML = `
         <td style="font-family:monospace; font-size:0.8rem;">${map.ldap_group_dn}</td>
         <td><span class="user-badge" style="font-size:0.8rem; background:var(--accent-glow); color:var(--accent-color);">${map.local_group}</span></td>
+        <td>${roleText}</td>
         <td class="actions-cell">
+          <button class="btn btn-warning btn-icon" onclick="editLdapMapping(${map.id})" title="Bearbeiten"><i class="fa-solid fa-pen"></i></button>
           <button class="btn btn-danger btn-icon" onclick="deleteLdapMapping(${map.id})" title="Löschen"><i class="fa-solid fa-trash"></i></button>
         </td>
       `;
       tbody.appendChild(tr);
     });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--error-color);">Fehler beim Laden: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--error-color);">Fehler beim Laden: ${err.message}</td></tr>`;
   }
 }
 
 function openMappingForm() {
   document.getElementById('mapping-form').reset();
+  document.getElementById('map_id').value = '';
+  document.getElementById('mapping-modal-title').innerText = 'Neues LDAP-Mapping';
+  document.getElementById('mapping-submit-btn').innerText = 'Hinzufügen';
+  openModal('mapping-modal');
+}
+
+function editLdapMapping(id) {
+  const map = allLdapMappings.find(m => m.id === id);
+  if (!map) return;
+
+  document.getElementById('map_id').value = map.id;
+  document.getElementById('map_ldap_dn').value = map.ldap_group_dn;
+  document.getElementById('map_local_group').value = map.local_group;
+  document.getElementById('map_user_role').value = map.user_role || '';
+  
+  document.getElementById('mapping-modal-title').innerText = 'LDAP-Mapping bearbeiten';
+  document.getElementById('mapping-submit-btn').innerText = 'Speichern';
   openModal('mapping-modal');
 }
 
 async function saveMappingForm(e) {
   e.preventDefault();
+  const id = document.getElementById('map_id').value;
   const body = {
     ldap_group_dn: document.getElementById('map_ldap_dn').value.trim(),
-    local_group: document.getElementById('map_local_group').value.trim()
+    local_group: document.getElementById('map_local_group').value.trim(),
+    user_role: document.getElementById('map_user_role').value.trim()
   };
 
+  const url = id ? `api/admin/ldap-mappings/${id}` : 'api/admin/ldap-mappings';
+  const method = id ? 'PUT' : 'POST';
+
   try {
-    const res = await fetch('api/admin/ldap-mappings', {
-      method: 'POST',
+    const res = await fetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     if (res.ok) {
       closeModal('mapping-modal');
-      showAdminAlert('Gruppen-Mapping hinzugefügt.');
+      showAdminAlert(id ? 'Gruppen-Mapping aktualisiert.' : 'Gruppen-Mapping hinzugefügt.');
       loadAdminLdapMappings();
     } else {
       const data = await res.json();

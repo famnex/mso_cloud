@@ -77,6 +77,7 @@ Verknüpft Active-Directory/LDAP Gruppen-DNs mit lokalen MSO Cloud Sicherheitsgr
 | `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
 | `ldap_group_dn` | TEXT (UNIQUE) | Voller Distinguished Name der LDAP-Gruppe |
 | `local_group` | TEXT | Name der zugewiesenen lokalen Sicherheitsgruppe |
+| `user_role` | TEXT | Custom Claim Rolle für OIDC (frei beschreibbar, z.B. 'lehrer', 'schueler') |
 
 ---
 

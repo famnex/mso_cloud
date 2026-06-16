@@ -430,6 +430,7 @@
                 <tr>
                   <th>LDAP-Gruppe (DN)</th>
                   <th>Zugeordnete MSO-Gruppe</th>
+                  <th>Custom Claim Rolle</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
@@ -1044,9 +1045,10 @@
   <div class="modal" id="mapping-modal">
     <div class="modal-content glass-panel">
       <span class="close-btn" onclick="closeModal('mapping-modal')">&times;</span>
-      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px;">Neues LDAP-Mapping</h3>
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px;" id="mapping-modal-title">Neues LDAP-Mapping</h3>
       
       <form id="mapping-form" onsubmit="saveMappingForm(event)">
+        <input type="hidden" id="map_id">
         <div class="form-group">
           <label for="map_ldap_dn">LDAP-Gruppe Distinguished Name (DN)</label>
           <input type="text" id="map_ldap_dn" class="form-control" required placeholder="CN=Lehrer_MSO,OU=Groups,DC=mso-hef,DC=de">
@@ -1055,9 +1057,13 @@
           <label for="map_local_group">Lokale Zielgruppe</label>
           <input type="text" id="map_local_group" class="form-control" required placeholder="z.B. Lehrer">
         </div>
+        <div class="form-group">
+          <label for="map_user_role">Custom Claim Rolle (user_role)</label>
+          <input type="text" id="map_user_role" class="form-control" placeholder="z.B. lehrer oder schueler">
+        </div>
         <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:25px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal('mapping-modal')">Abbrechen</button>
-          <button type="submit" class="btn btn-primary">Hinzufügen</button>
+          <button type="submit" class="btn btn-primary" id="mapping-submit-btn">Hinzufügen</button>
         </div>
       </form>
     </div>
