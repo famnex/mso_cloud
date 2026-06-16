@@ -1167,6 +1167,8 @@ async function testMysqlConnection() {
 }
 
 /* --- TAB: OAuth 2.0 SSO --- */
+let oauthClientsCache = [];
+
 async function loadOauthClientConfig() {
   try {
     // 1. Dynamische Endpunkt-URLs im Hinweis-Bereich anzeigen
@@ -1178,34 +1180,103 @@ async function loadOauthClientConfig() {
     document.getElementById('moodle-oauth-auth-url').innerText = `${fullBaseUrl}/api/oauth/authorize`;
     document.getElementById('moodle-oauth-token-url').innerText = `${fullBaseUrl}/api/oauth/token`;
     document.getElementById('moodle-oauth-user-url').innerText = `${fullBaseUrl}/api/oauth/userinfo`;
+    document.getElementById('oidc-discovery-url').innerText = `${protocol}//${host}/.well-known/openid-configuration`;
+    document.getElementById('oidc-jwks-url').innerText = `${protocol}//${host}/jwks`;
 
-    // 2. Client-Konfiguration vom Server abfragen
-    const res = await fetch('api/admin/oauth-client');
-    const client = await res.json();
+    // 2. Clients vom Server abfragen
+    const res = await fetch('api/admin/oauth-clients');
+    const clients = await res.json();
+    oauthClientsCache = clients;
 
-    if (client) {
-      document.getElementById('oauth_client_id').value = client.client_id || '';
-      document.getElementById('oauth_client_secret').value = client.client_secret || '';
-      document.getElementById('oauth_redirect_uri').value = client.redirect_uri || '';
+    const tbody = document.getElementById('oauth-clients-list');
+    tbody.innerHTML = '';
+
+    if (clients.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-secondary);">Keine SSO-Clients registriert.</td></tr>';
+      return;
     }
+
+    clients.forEach(client => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:600;">${escapeHtml(client.client_name)}</td>
+        <td style="font-family:monospace; font-size:0.85rem;">${escapeHtml(client.client_id)}</td>
+        <td style="font-family:monospace; font-size:0.85rem; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(client.redirect_uri)}">
+          ${escapeHtml(client.redirect_uri)}
+        </td>
+        <td>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-secondary" onclick="openOauthClientForm(${client.id})" style="padding: 4px 8px; font-size:0.8rem;"><i class="fa-solid fa-pen-to-square"></i> Bearbeiten</button>
+            <button class="btn btn-danger" onclick="deleteOauthClient(${client.id})" style="padding: 4px 8px; font-size:0.8rem;"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
   } catch (err) {
     showAdminAlert('OAuth 2.0-Konfiguration konnte nicht geladen werden: ' + err.message, 'danger');
   }
 }
 
-async function saveOauthClientConfig(e) {
+async function openOauthClientForm(id = null) {
+  document.getElementById('oauth-client-form').reset();
+  document.getElementById('oauth_db_id').value = '';
+  document.getElementById('oauth-client-modal-title').innerText = id ? 'SSO-Client bearbeiten' : 'Neuer SSO-Client';
+
+  if (id) {
+    const client = oauthClientsCache.find(c => c.id === id);
+    if (client) {
+      document.getElementById('oauth_db_id').value = client.id;
+      document.getElementById('oauth_client_name').value = client.client_name || '';
+      document.getElementById('oauth_client_id').value = client.client_id || '';
+      document.getElementById('oauth_client_secret').value = client.client_secret || '';
+      document.getElementById('oauth_redirect_uri').value = client.redirect_uri || '';
+    }
+  }
+
+  openModal('oauth-client-modal');
+}
+
+async function saveOauthClientForm(e) {
   e.preventDefault();
+  const id = document.getElementById('oauth_db_id').value;
   const body = {
+    client_name: document.getElementById('oauth_client_name').value.trim(),
     client_id: document.getElementById('oauth_client_id').value.trim(),
     client_secret: document.getElementById('oauth_client_secret').value.trim(),
     redirect_uri: document.getElementById('oauth_redirect_uri').value.trim()
   };
 
+  const url = id ? `api/admin/oauth-clients/${id}` : 'api/admin/oauth-clients';
+  const method = id ? 'PUT' : 'POST';
+
   try {
-    const res = await fetch('api/admin/oauth-client', {
-      method: 'POST',
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      closeModal('oauth-client-modal');
+      showAdminAlert(data.message, 'success');
+      loadOauthClientConfig();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    alert('Fehler beim Speichern des SSO-Clients: ' + err.message);
+  }
+}
+
+async function deleteOauthClient(id) {
+  const client = oauthClientsCache.find(c => c.id === id);
+  const name = client ? client.client_name : 'diesen Client';
+  if (!confirm(`Möchtest du "${name}" wirklich unwiderruflich löschen?`)) return;
+
+  try {
+    const res = await fetch(`api/admin/oauth-clients/${id}`, {
+      method: 'DELETE'
     });
     const data = await res.json();
     if (res.ok) {
@@ -1215,12 +1286,15 @@ async function saveOauthClientConfig(e) {
       throw new Error(data.error);
     }
   } catch (err) {
-    showAdminAlert(err.message, 'danger');
+    alert('Fehler beim Löschen des SSO-Clients: ' + err.message);
   }
 }
 
 function generateOauthClientId() {
-  document.getElementById('oauth_client_id').value = 'moodle_' + Math.random().toString(36).substring(2, 10);
+  const nameInput = document.getElementById('oauth_client_name');
+  const namePrefix = nameInput ? nameInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : 'client';
+  const prefix = namePrefix ? namePrefix : 'client';
+  document.getElementById('oauth_client_id').value = prefix + '_' + Math.random().toString(36).substring(2, 10);
 }
 
 function generateOauthClientSecret() {

@@ -188,35 +188,77 @@ router.post('/config/test-mysql', async (req, res) => {
    ========================================================================== */
 
 /**
- * Holt die aktuellen Moodle OAuth-Client Zugangsdaten.
+ * Holt alle registrierten OAuth 2.0 / OIDC Clients.
  */
-router.get('/oauth-client', (req, res) => {
+router.get('/oauth-clients', (req, res) => {
   try {
-    const client = db.prepare("SELECT * FROM oauth_clients WHERE client_name = 'Moodle'").get();
-    res.json(client || null);
+    const clients = db.prepare('SELECT * FROM oauth_clients ORDER BY client_name ASC').all();
+    res.json(clients);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 /**
- * Speichert die OAuth-Client Zugangsdaten.
+ * Legt einen neuen OAuth 2.0 / OIDC Client an.
  */
-router.post('/oauth-client', (req, res) => {
+router.post('/oauth-clients', (req, res) => {
   try {
-    const { client_id, client_secret, redirect_uri } = req.body;
+    const { client_name, client_id, client_secret, redirect_uri } = req.body;
 
-    if (!client_id || !client_secret || !redirect_uri) {
-      return res.status(400).json({ error: 'Client-ID, Client-Secret und Redirect-URI sind Pflichtfelder.' });
+    if (!client_name || !client_id || !client_secret || !redirect_uri) {
+      return res.status(400).json({ error: 'Name, Client-ID, Client-Secret und Redirect-URI sind Pflichtfelder.' });
+    }
+
+    db.prepare(`
+      INSERT INTO oauth_clients (client_name, client_id, client_secret, redirect_uri)
+      VALUES (?, ?, ?, ?)
+    `).run(client_name.trim(), client_id.trim(), client_secret.trim(), redirect_uri.trim());
+
+    res.json({ success: true, message: 'SSO-Client erfolgreich hinzugefügt.' });
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Ein Client mit dieser Client-ID existiert bereits.' });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Aktualisiert einen registrierten OAuth 2.0 / OIDC Client.
+ */
+router.put('/oauth-clients/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { client_name, client_id, client_secret, redirect_uri } = req.body;
+
+    if (!client_name || !client_id || !client_secret || !redirect_uri) {
+      return res.status(400).json({ error: 'Name, Client-ID, Client-Secret und Redirect-URI sind Pflichtfelder.' });
     }
 
     db.prepare(`
       UPDATE oauth_clients
-      SET client_id = ?, client_secret = ?, redirect_uri = ?
-      WHERE client_name = 'Moodle'
-    `).run(client_id.trim(), client_secret.trim(), redirect_uri.trim());
+      SET client_name = ?, client_id = ?, client_secret = ?, redirect_uri = ?
+      WHERE id = ?
+    `).run(client_name.trim(), client_id.trim(), client_secret.trim(), redirect_uri.trim(), id);
 
-    res.json({ success: true, message: 'OAuth 2.0 SSO Konfiguration erfolgreich aktualisiert.' });
+    res.json({ success: true, message: 'SSO-Client erfolgreich aktualisiert.' });
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Ein Client mit dieser Client-ID existiert bereits.' });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Löscht einen registrierten OAuth 2.0 / OIDC Client.
+ */
+router.delete('/oauth-clients/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM oauth_clients WHERE id = ?').run(id);
+    res.json({ success: true, message: 'SSO-Client erfolgreich gelöscht.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

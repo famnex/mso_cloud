@@ -352,65 +352,64 @@
 
         <!-- TAB: OAUTH -->
         <div class="admin-tab" id="tab-oauth">
-          <h3 style="font-weight:600; margin-bottom:10px;">OAuth 2.0 / OpenID Connect SSO</h3>
-          <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:25px;">
-            Richten Sie MSO Cloud als Identity Provider (IdP) ein, damit Moodle und andere Dienste sich über MSO Cloud per Single Sign-On authentifizieren können.
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="font-weight:600; margin-bottom:0;">OAuth 2.0 / OpenID Connect SSO</h3>
+            <button class="btn btn-primary" onclick="openOauthClientForm()">
+              <i class="fa-solid fa-plus"></i> Neuer SSO-Client
+            </button>
+          </div>
+          <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:25px; line-height:1.5;">
+            Richten Sie die MSO Cloud als Identity Provider (IdP) ein, damit Moodle, WebUntis und andere Dienste sich über MSO Cloud per Single Sign-On authentifizieren können.
           </p>
 
-          <form id="oauth-client-form" onsubmit="saveOauthClientConfig(event)">
-            <div class="form-group">
-              <label for="oauth_client_id" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                <span>OAuth 2.0 Client-ID</span>
-                <button type="button" class="btn btn-secondary" onclick="generateOauthClientId()" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Generieren</button>
-              </label>
-              <input type="text" id="oauth_client_id" class="form-control" required placeholder="z. B. moodle_client">
-            </div>
-
-            <div class="form-group">
-              <label for="oauth_client_secret" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                <span>OAuth 2.0 Client-Secret (Geheimnis)</span>
-                <button type="button" class="btn btn-secondary" onclick="generateOauthClientSecret()" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px;"><i class="fa-solid fa-key"></i> Generieren</button>
-              </label>
-              <input type="text" id="oauth_client_secret" class="form-control" required placeholder="Sicheres Client-Geheimnis">
-            </div>
-
-            <div class="form-group">
-              <label for="oauth_redirect_uri">Erlaubte Redirect-URI (Callback-URL)</label>
-              <input type="url" id="oauth_redirect_uri" class="form-control" required placeholder="https://cloud.mso-hef.de/moodle/admin/oauth2callback.php">
-              <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
-                Kopieren Sie die Redirect-URI / Callback-URL aus den Moodle-OAuth2-Diensteinstellungen hier hinein.
-              </p>
-            </div>
-
-            <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-top: 25px; margin-bottom: 25px;">
-              <h4 style="font-weight:600; font-size:0.95rem; margin-bottom:10px; color:var(--accent-color);"><i class="fa-solid fa-circle-info"></i> Moodle OAuth 2.0 Konfigurationseinstellungen</h4>
-              <p style="font-size:0.8rem; line-height:1.4; color:var(--text-secondary); margin-bottom:10px;">
-                Tragen Sie in Moodle unter <em>Website-Administration -> Server -> OAuth 2-Dienste</em> einen neuen <strong>benutzerdefinierten Dienst</strong> mit folgenden URLs ein:
-              </p>
-              <table style="width:100%; font-size:0.8rem; border-collapse:collapse; color:var(--text-secondary);">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
                 <tr>
-                  <td style="padding:4px 0; font-weight:600; width:180px;">Authorization Endpoint:</td>
-                  <td style="padding:4px 0;"><code id="moodle-oauth-auth-url">https://cloud.mso-hef.de/novus/api/oauth/authorize</code></td>
+                  <th>Client-Name</th>
+                  <th>Client-ID</th>
+                  <th>Redirect-URI (Callback)</th>
+                  <th>Aktionen</th>
                 </tr>
-                <tr>
-                  <td style="padding:4px 0; font-weight:600;">Token Endpoint:</td>
-                  <td style="padding:4px 0;"><code id="moodle-oauth-token-url">https://cloud.mso-hef.de/novus/api/oauth/token</code></td>
-                </tr>
-                <tr>
-                  <td style="padding:4px 0; font-weight:600;">Userinfo Endpoint:</td>
-                  <td style="padding:4px 0;"><code id="moodle-oauth-user-url">https://cloud.mso-hef.de/novus/api/oauth/userinfo</code></td>
-                </tr>
-                <tr>
-                  <td style="padding:4px 0; font-weight:600;">Scopes:</td>
-                  <td style="padding:4px 0;"><code>openid profile email</code></td>
-                </tr>
-              </table>
-            </div>
+              </thead>
+              <tbody id="oauth-clients-list">
+                <!-- Wird dynamisch befüllt -->
+              </tbody>
+            </table>
+          </div>
 
-            <div style="display:flex; gap:15px; margin-top:30px;">
-              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
-            </div>
-          </form>
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-top: 30px;">
+            <h4 style="font-weight:600; font-size:0.95rem; margin-bottom:12px; color:var(--accent-color);"><i class="fa-solid fa-circle-info"></i> Globale OIDC / OAuth 2.0 Endpunkt-URLs</h4>
+            <p style="font-size:0.8rem; line-height:1.4; color:var(--text-secondary); margin-bottom:12px;">
+              Tragen Sie in Ihren Drittsystemen (z. B. Moodle, WebUntis) die folgenden Endpunkte ein:
+            </p>
+            <table style="width:100%; font-size:0.8rem; border-collapse:collapse; color:var(--text-secondary);">
+              <tr>
+                <td style="padding:4px 0; font-weight:600; width:220px;">Discovery Document (OIDC):</td>
+                <td style="padding:4px 0;"><code id="oidc-discovery-url">https://cloud.mso-hef.de/.well-known/openid-configuration</code></td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; font-weight:600;">Authorization Endpoint:</td>
+                <td style="padding:4px 0;"><code id="moodle-oauth-auth-url">https://cloud.mso-hef.de/api/oauth/authorize</code></td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; font-weight:600;">Token Endpoint:</td>
+                <td style="padding:4px 0;"><code id="moodle-oauth-token-url">https://cloud.mso-hef.de/api/oauth/token</code></td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; font-weight:600;">Userinfo Endpoint:</td>
+                <td style="padding:4px 0;"><code id="moodle-oauth-user-url">https://cloud.mso-hef.de/api/oauth/userinfo</code></td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; font-weight:600;">JWKS Endpoint (Public Keys):</td>
+                <td style="padding:4px 0;"><code id="oidc-jwks-url">https://cloud.mso-hef.de/jwks</code></td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; font-weight:600;">Scopes:</td>
+                <td style="padding:4px 0;"><code>openid profile email</code></td>
+              </tr>
+            </table>
+          </div>
         </div>
 
         <!-- TAB: MAPPINGS -->
@@ -1310,6 +1309,52 @@
       <div style="display:flex; justify-content:flex-end; margin-top:25px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal('log-details-modal')">Schließen</button>
       </div>
+    </div>
+  </div>
+
+  <!-- OAUTH CLIENT EDIT MODAL -->
+  <div class="modal" id="oauth-client-modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <span class="close-btn" onclick="closeModal('oauth-client-modal')">&times;</span>
+      <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px;" id="oauth-client-modal-title">Neuer SSO-Client</h3>
+      
+      <form id="oauth-client-form" onsubmit="saveOauthClientForm(event)">
+        <input type="hidden" id="oauth_db_id">
+        
+        <div class="form-group">
+          <label for="oauth_client_name">Client-Name *</label>
+          <input type="text" id="oauth_client_name" class="form-control" required placeholder="z. B. WebUntis oder Moodle">
+        </div>
+
+        <div class="form-group">
+          <label for="oauth_client_id" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <span>OAuth 2.0 Client-ID *</span>
+            <button type="button" class="btn btn-secondary" onclick="generateOauthClientId()" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Generieren</button>
+          </label>
+          <input type="text" id="oauth_client_id" class="form-control" required placeholder="z. B. webuntis_client">
+        </div>
+
+        <div class="form-group">
+          <label for="oauth_client_secret" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <span>OAuth 2.0 Client-Secret (Geheimnis) *</span>
+            <button type="button" class="btn btn-secondary" onclick="generateOauthClientSecret()" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px;"><i class="fa-solid fa-key"></i> Generieren</button>
+          </label>
+          <input type="text" id="oauth_client_secret" class="form-control" required placeholder="Sicheres Client-Geheimnis">
+        </div>
+
+        <div class="form-group">
+          <label for="oauth_redirect_uri">Erlaubte Redirect-URI (Callback-URL) *</label>
+          <input type="url" id="oauth_redirect_uri" class="form-control" required placeholder="https://webuntis.com/oauth2callback">
+          <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
+            Kopieren Sie die Redirect-URI / Callback-URL aus den Einstellungen der Partneranwendung hier hinein.
+          </p>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:30px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('oauth-client-modal')">Abbrechen</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
+        </div>
+      </form>
     </div>
   </div>
 
