@@ -38,14 +38,13 @@ function getOrCreateOidcKeys() {
  * Bei deployment unter cloud.mso-hef.de wird der Pfad /novus vorangestellt.
  */
 function getOidcBaseUrl(req) {
-  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
   const host = req.get('host') || '';
   
   // Wenn der Host cloud.mso-hef.de ist, sind wir unter Option A (/novus)
   const isSubdir = host.toLowerCase() === 'cloud.mso-hef.de';
   const prefix = isSubdir ? '/novus' : '';
   
-  return `${protocol}://${host}${prefix}`;
+  return `https://${host}${prefix}`;
 }
 
 /**
@@ -54,13 +53,13 @@ function getOidcBaseUrl(req) {
 function openidConfigurationHandler(req, res) {
   try {
     const base = getOidcBaseUrl(req);
-    const issuer = `${base}/api/oauth`;
+    const issuer = base; // OIDC-Standard: Issuer muss exakt dem Base-Path der Discovery-URL entsprechen
 
     res.json({
       issuer: issuer,
-      authorization_endpoint: `${issuer}/authorize`,
-      token_endpoint: `${issuer}/token`,
-      userinfo_endpoint: `${issuer}/userinfo`,
+      authorization_endpoint: `${base}/api/oauth/authorize`,
+      token_endpoint: `${base}/api/oauth/token`,
+      userinfo_endpoint: `${base}/api/oauth/userinfo`,
       jwks_uri: `${base}/jwks`,
       response_types_supported: ['code'],
       subject_types_supported: ['public'],

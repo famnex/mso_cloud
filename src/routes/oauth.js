@@ -202,7 +202,7 @@ router.post('/token', (req, res) => {
         lastname = 'Administrator';
       }
 
-      const issuer = `${getOidcBaseUrl(req)}/api/oauth`;
+      const issuer = getOidcBaseUrl(req);
 
       const { privateKeyPem } = getOrCreateOidcKeys();
 
