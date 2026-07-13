@@ -24,7 +24,7 @@
   <style>
     :root {
       --bg-dark: #f1f5f9; /* Helles Hellgrau */
-      --card-bg: rgba(255, 255, 255, 0.9); /* Helles Weiß mit minimaler Transparenz */
+      --card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 40%, #f1f5f9 100%);
       --card-border: rgba(0, 0, 0, 0.08); /* Dunkle, dezente Ränder */
       --accent: #3b82f6; /* Wird dynamisch überschrieben */
       --accent-glow: rgba(59, 130, 246, 0.12);
@@ -168,6 +168,38 @@
       transform: translateX(100%);
     }
 
+    /* Kopierschutz-Wasserzeichen: Guillochen & feine Sicherheitslinien über dem gesamten Ausweis */
+    .security-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 45; /* Liegt über allen Bildelementen zum Schutz vor Screenshots & Kopieren */
+      pointer-events: none;
+      opacity: 0.06;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 40 Q 30 10, 60 40 T 120 40' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 80 Q 30 50, 60 80 T 120 80' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 100 Q 30 70, 60 100 T 120 100' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3C/svg%3E");
+    }
+
+    /* Logo-Wasserzeichen im Kartenhintergrund */
+    .logo-watermark {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 190px;
+      height: 190px;
+      opacity: 0.035;
+      z-index: 2;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-watermark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: grayscale(100%);
+    }
+
     /* Card Header */
     .card-header {
       display: flex;
@@ -175,6 +207,7 @@
       gap: 10px;
       border-bottom: 1px solid rgba(0,0,0,0.05);
       padding-bottom: 10px;
+      z-index: 10;
     }
 
     .school-logo-img {
@@ -233,6 +266,8 @@
       display: flex;
       gap: 12px;
       margin: 10px 0;
+      z-index: 10;
+      position: relative;
     }
 
     .photo-wrapper {
@@ -302,6 +337,7 @@
       align-items: flex-end;
       margin: 5px 0;
       position: relative;
+      z-index: 10;
     }
 
     .principal-container {
@@ -331,15 +367,20 @@
       opacity: 0.5;
     }
 
-    /* Siegel Container */
+    /* Vorgerendertes Siegel: Überlappt die untere rechte Ecke des Passbilds */
     .seal-container {
-      width: 60px;
-      height: 60px;
-      position: relative;
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      left: 78px; /* So positioniert, dass das linke obere 1/4 auf dem Passbild liegt */
+      top: -38px; /* Ragt hoch ins Passbild hinein */
+      z-index: 30; /* Liegt über dem Foto */
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
+      user-select: none;
+      transition: transform 0.1s ease;
+      transform-style: preserve-3d;
     }
 
     .seal-img {
@@ -349,20 +390,21 @@
       pointer-events: none;
       -webkit-user-drag: none;
       user-select: none;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.08));
     }
 
     /* Fallback Siegel */
     .hologram-siegel-fallback {
-      width: 54px;
-      height: 54px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.01) 100%);
+      background: radial-gradient(circle, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.01) 100%);
       border: 1.5px dashed rgba(0,0,0,0.15);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.3rem;
-      color: rgba(0,0,0,0.45);
+      font-size: 1.4rem;
+      color: rgba(0,0,0,0.4);
       box-shadow: 0 0 10px rgba(0,0,0,0.02);
       pointer-events: none;
     }
@@ -383,6 +425,7 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      z-index: 10;
     }
 
     .qr-container-wrapper {
@@ -751,6 +794,12 @@
     <!-- Student Card -->
     <div class="student-card" id="student-card">
       
+      <!-- Kopierschutz-Overlays (Guillochen über allen Bildern) -->
+      <div class="security-overlay"></div>
+      
+      <!-- Logo-Wasserzeichen im Hintergrund -->
+      <div class="logo-watermark" id="logo-watermark-container"></div>
+      
       <!-- Revocation / Error Overlays -->
       <div class="revoked-overlay" id="revoked-overlay">
         <i class="fa-solid fa-circle-xmark revoked-icon" id="overlay-icon"></i>
@@ -773,9 +822,16 @@
       <!-- Card Body - Photo & Info -->
       <div class="card-body">
         <!-- Photo -->
-        <div class="photo-wrapper">
+        <div class="photo-wrapper" style="position: relative; user-select: none;">
           <div id="card-photo-container">
             <div class="placeholder-avatar"><i class="fa-solid fa-user"></i></div>
+          </div>
+          
+          <!-- Vorgerendertes Siegel: Überlappt die untere rechte Ecke des Fotos -->
+          <div class="seal-container" id="seal-container">
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
+            <!-- Fallback-Siegel, falls kein Bild hinterlegt ist -->
+            <div class="hologram-siegel-fallback" id="hologram-fallback"><i class="fa-solid fa-graduation-cap"></i></div>
           </div>
         </div>
 
@@ -796,7 +852,7 @@
         </div>
       </div>
 
-      <!-- Schulleiter-Unterschrift, Siegel & Name -->
+      <!-- Schulleiter-Unterschrift & Name -->
       <div class="signature-seal-area">
         <div class="principal-container">
           <div class="signature-wrapper" id="signature-container" style="position: relative; user-select: none;">
@@ -806,13 +862,6 @@
           <span class="detail-label" data-i18n="labelPrincipal">Schulleiter/in</span>
           <span class="detail-value" style="font-size: 0.7rem;" id="principal-name-display">OStD Karsten Backhaus</span>
         </div>
-
-        <!-- Siegel Container -->
-        <div class="seal-container" id="seal-container" style="position: relative; user-select: none;">
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-          <!-- Fallback-Siegel, falls kein Bild hinterlegt ist -->
-          <div class="hologram-siegel-fallback" id="hologram-fallback"><i class="fa-solid fa-graduation-cap"></i></div>
-        </div>
       </div>
 
       <!-- Card Footer - QR & Live Validation -->
@@ -820,7 +869,7 @@
         <div class="qr-container-wrapper">
           
           <!-- QR Code Container (mit Mediotheksnummer darunter) -->
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; z-index: 10; position: relative;">
             <div class="qr-code-box" id="qrcode-box" title="Scan Mediotheksnummer"></div>
             <span style="font-family: monospace; font-size: 0.7rem; font-weight: 700; color: var(--text);" id="card-mediothek-number-display">-</span>
           </div>
@@ -928,7 +977,7 @@
         statusOnline: "Vérifié en ligne",
         statusOffline: "Vérifié hors ligne",
         revokedTitle: "Carte bloquée",
-        revokedDesc: "Cette carte d'étudiant numérique a été désactivée ou bloquée par l'administration. Veuillez contacter le bureau.",
+        revokedDesc: "Cette carte d'étudiant numérique a été désactivée ou bloquée by l'administration. Veuillez contacter le bureau.",
         expiredTitle: "Carte expirée",
         expiredDesc: "Cette carte d'étudiant numérique a expiré. Veuillez vous connecter à Internet pour la renouveler.",
         noPhotoTitle: "Aucune photo",
@@ -1060,10 +1109,10 @@
       card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
       const seal = document.getElementById('seal-element');
       if (seal) {
-        seal.style.transform = `translateZ(18px) rotate(${tiltY * 1.5}deg)`;
+        seal.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
       } else {
         const fallback = document.getElementById('hologram-fallback');
-        if (fallback) fallback.style.transform = `translateZ(18px) rotate(${tiltY * 1.5}deg)`;
+        if (fallback) fallback.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
       }
     });
 
@@ -1088,10 +1137,10 @@
           card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
           const seal = document.getElementById('seal-element');
           if (seal) {
-            seal.style.transform = `translateZ(18px) rotate(${tiltY * 1.5}deg)`;
+            seal.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
           } else {
             const fallback = document.getElementById('hologram-fallback');
-            if (fallback) fallback.style.transform = `translateZ(18px) rotate(${tiltY * 1.5}deg)`;
+            if (fallback) fallback.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
           }
         }
       });
@@ -1163,8 +1212,11 @@
       // 2. Schultitel & Logo (Ausblenden des Schulnamens bei breitem Logo)
       document.getElementById('school-title-display').innerText = data.card_school_name || 'Modellschule Obersberg';
       const logoContainer = document.getElementById('school-logo-container');
+      const watermarkContainer = document.getElementById('logo-watermark-container');
+      
       if (data.card_logo) {
         logoContainer.innerHTML = `<img src="${data.card_logo}" id="card-logo-element" class="school-logo-img" alt="Logo">`;
+        watermarkContainer.innerHTML = `<img src="${data.card_logo}" alt="Watermark">`;
         
         // Dynamische Prüfung des Breiten-Verhältnisses (Aspekt-Ratio)
         const tempImg = new Image();
@@ -1179,6 +1231,7 @@
         tempImg.src = data.card_logo;
       } else {
         logoContainer.innerHTML = `<div class="school-logo-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>`;
+        watermarkContainer.innerHTML = '';
         document.getElementById('school-title-display').style.display = 'block';
       }
 
@@ -1207,12 +1260,12 @@
       // 4. Passbild befüllen
       const imgContainer = document.getElementById('card-photo-container');
       if (data.card_image) {
-        imgContainer.innerHTML = `<img src="${data.card_image}" alt="Portrait">`;
+        imgContainer.innerHTML = `<img src="${data.card_image}" style="width: 100%; height: 100%; object-fit: cover;" alt="Portrait">`;
       } else {
         imgContainer.innerHTML = `<div class="placeholder-avatar"><i class="fa-solid fa-user"></i></div>`;
       }
 
-      // 5. Schulleiter-Unterschrift & Name
+      // 5. Schulleiter-Unterschrift & Name (Kopiergeschützt)
       document.getElementById('principal-name-display').innerText = data.card_principal_name || 'Schulleiter/in';
       const sigContainer = document.getElementById('signature-container');
       if (data.card_signature) {
@@ -1227,7 +1280,7 @@
         `;
       }
 
-      // 6. Siegel befüllen (Kopiergeschützt)
+      // 6. Vorgerendertes Siegel befüllen (Kopiergeschützt und überlappt das Passbild unten rechts)
       const sealContainer = document.getElementById('seal-container');
       if (data.card_seal) {
         sealContainer.innerHTML = `
