@@ -90,12 +90,31 @@ router.get('/card', async (req, res) => {
       card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),
       card_logo: getConfig('card_logo', ''),
       card_signature: getConfig('card_signature', ''),
-      card_pwa_logging: getConfig('card_pwa_logging', '0')
+      card_pwa_logging: getConfig('card_pwa_logging', '0'),
+      card_pwa_icon: getConfig('card_pwa_icon', '')
     });
   } catch (err) {
     console.error('Fehler beim Laden des Schülerausweises:', err);
     res.status(500).json({ error: 'Fehler beim Laden des Profils: ' + err.message });
   }
+});
+
+/**
+ * Liefert das konfigurierte PWA App-Icon (oder ein Standardbild als Fallback) aus.
+ */
+router.get('/pwa-icon', (req, res) => {
+  const icon = getConfig('card_pwa_icon', '');
+  if (!icon) {
+    return res.redirect('/media/icon-512.png');
+  }
+  const matches = icon.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+  if (!matches || matches.length !== 3) {
+    return res.redirect('/media/icon-512.png');
+  }
+  const contentType = matches[1];
+  const buffer = Buffer.from(matches[2], 'base64');
+  res.setHeader('Content-Type', contentType);
+  res.send(buffer);
 });
 
 module.exports = router;

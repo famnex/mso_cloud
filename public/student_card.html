@@ -313,6 +313,9 @@
       max-height: 100%;
       max-width: 100%;
       object-fit: contain;
+      pointer-events: none;
+      -webkit-user-drag: none;
+      user-select: none;
     }
 
     .signature-placeholder {
@@ -772,7 +775,8 @@
       <!-- Schulleiter-Unterschrift & Siegel -->
       <div class="signature-seal-area">
         <div class="principal-container">
-          <div class="signature-wrapper" id="signature-container">
+          <div class="signature-wrapper" id="signature-container" style="position: relative; user-select: none;">
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
             <span class="signature-placeholder">Unterschrift</span>
           </div>
           <span class="detail-label" data-i18n="labelPrincipal">Schulleiter/in</span>
@@ -1154,9 +1158,15 @@
       document.getElementById('principal-name-display').innerText = data.card_principal_name || 'Schulleiter/in';
       const sigContainer = document.getElementById('signature-container');
       if (data.card_signature) {
-        sigContainer.innerHTML = `<img src="${data.card_signature}" class="signature-img" alt="Unterschrift">`;
+        sigContainer.innerHTML = `
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
+          <img src="${data.card_signature}" class="signature-img" style="pointer-events: none; -webkit-user-drag: none; user-select: none;" alt="Unterschrift">
+        `;
       } else {
-        sigContainer.innerHTML = `<span class="signature-placeholder">Unterschrift</span>`;
+        sigContainer.innerHTML = `
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
+          <span class="signature-placeholder">Unterschrift</span>
+        `;
       }
 
       // 6. QR-Code für Mediotheksnummer generieren (falls Library geladen)

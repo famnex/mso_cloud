@@ -575,13 +575,22 @@
                 <label for="card_pwa_logging" style="margin: 0; font-weight: normal; cursor: pointer; font-size: 0.9rem;">PWA-Logging in der Browser-Konsole aktivieren (für Debugging)</label>
               </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div class="form-group">
                   <label for="card_logo_input">Schullogo (Bilddatei)</label>
                   <input type="file" id="card_logo_input" class="form-control" accept="image/*" onchange="previewImageFile(this, 'card-logo-preview')">
                   <div style="margin-top: 10px; text-align: center; border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; min-height: 80px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25);">
                     <img id="card-logo-preview" style="max-height: 70px; max-width: 100%; object-fit: contain; display: none;" alt="Logo Vorschau">
                     <span id="card-logo-placeholder" style="color: var(--text-secondary); font-size: 0.8rem;">Kein Logo hochgeladen</span>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="card_pwa_icon_input">PWA App-Icon (Bilddatei)</label>
+                  <input type="file" id="card_pwa_icon_input" class="form-control" accept="image/*" onchange="previewImageFile(this, 'card-pwa-icon-preview')">
+                  <div style="margin-top: 10px; text-align: center; border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; min-height: 80px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25);">
+                    <img id="card-pwa-icon-preview" style="max-height: 70px; max-width: 100%; object-fit: contain; display: none;" alt="App-Icon Vorschau">
+                    <span id="card-pwa-icon-placeholder" style="color: var(--text-secondary); font-size: 0.8rem;">Kein App-Icon hochgeladen</span>
                   </div>
                 </div>
 

@@ -1073,6 +1073,21 @@ async function loadAdminConfig() {
       }
     }
 
+    // PWA Icon Vorschau befüllen
+    const pwaIconImg = document.getElementById('card-pwa-icon-preview');
+    const pwaIconPlaceholder = document.getElementById('card-pwa-icon-placeholder');
+    if (pwaIconImg && pwaIconPlaceholder) {
+      if (cfg.card_pwa_icon) {
+        pwaIconImg.src = cfg.card_pwa_icon;
+        pwaIconImg.style.display = 'block';
+        pwaIconPlaceholder.style.display = 'none';
+      } else {
+        pwaIconImg.src = '';
+        pwaIconImg.style.display = 'none';
+        pwaIconPlaceholder.style.display = 'block';
+      }
+    }
+
     // Unterschrift Vorschau befüllen
     const sigImg = document.getElementById('card-signature-preview');
     const sigPlaceholder = document.getElementById('card-signature-placeholder');
@@ -3361,6 +3376,7 @@ async function saveCardConfig(e) {
   e.preventDefault();
   
   const logoImg = document.getElementById('card-logo-preview');
+  const pwaIconImg = document.getElementById('card-pwa-icon-preview');
   const sigImg = document.getElementById('card-signature-preview');
   
   const body = {
@@ -3368,6 +3384,7 @@ async function saveCardConfig(e) {
     card_principal_name: document.getElementById('card_principal_name').value.trim(),
     card_primary_color: document.getElementById('card_primary_color').value,
     card_logo: logoImg.src && logoImg.src.startsWith('data:') ? logoImg.src : '',
+    card_pwa_icon: pwaIconImg.src && pwaIconImg.src.startsWith('data:') ? pwaIconImg.src : '',
     card_signature: sigImg.src && sigImg.src.startsWith('data:') ? sigImg.src : '',
     card_pwa_logging: document.getElementById('card_pwa_logging').checked ? '1' : '0'
   };

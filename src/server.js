@@ -61,6 +61,27 @@ app.use((req, res, next) => {
   next();
 });
 
+// Dynamisch generiertes Manifest für konfigurierbare PWA-Icons
+app.get(['/manifest.json', '/novus/manifest.json'], (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json({
+    name: "MSO Digitaler Schülerausweis",
+    short_name: "MSO Ausweis",
+    start_url: "student_card.html",
+    display: "standalone",
+    background_color: "#ffffff",
+    theme_color: getConfig('card_primary_color', '#3b82f6'),
+    icons: [
+      {
+        src: "api/student/pwa-icon",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any maskable"
+      }
+    ]
+  });
+});
+
 // Statische Dateien aus /public ausliefern
 app.use(express.static(path.join(__dirname, '../public')));
 
