@@ -882,6 +882,7 @@ function toggleTileSsoFields() {
       Geben Sie in der Ziel-App (z. B. Buchungssystem) folgende Einstellungen an:
       <ul style="margin: 6px 0 0 15px; padding:0; display:flex; flex-direction:column; gap:4px;">
         <li><strong>SSO Identity Provider Login-URL:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem; word-break:break-all;">${base}/api/tiles/sso/${tileId}</code></li>
+        <li><strong>URL Query Parameter Name:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">sso_token</code></li>
         <li><strong>Username Claim Name:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">username</code></li>
         <li><strong>E-Mail Claim Name:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">email</code></li>
         <li><strong>Signierschlüssel (Secret):</strong> Nutzen Sie den oben angezeigten/generierten Schlüssel.</li>
