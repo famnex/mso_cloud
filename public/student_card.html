@@ -1031,7 +1031,7 @@
       if (beta !== null && gamma !== null) {
         // Berechne Neigung relativ zur Neutralhaltung (ca. 45 Grad geneigtes Halten)
         targetTiltX = Math.min(Math.max((beta - 45) * 0.6, -15), 15);
-        targetTiltY = Math.min(Math.max(gamma * 0.6, -15), 15);
+        targetTiltY = Math.min(Math.max(-gamma * 0.6, -15), 15); // Links/Rechts invertiert für intuitives Mitneigen
       }
     }
 
