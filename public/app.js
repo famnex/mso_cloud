@@ -1053,6 +1053,10 @@ async function loadAdminConfig() {
     if (cardColorInput) {
       cardColorInput.value = cfg.card_primary_color || '#3b82f6';
     }
+    const cardPwaLoggingInput = document.getElementById('card_pwa_logging');
+    if (cardPwaLoggingInput) {
+      cardPwaLoggingInput.checked = cfg.card_pwa_logging === '1';
+    }
 
     // Logo Vorschau befüllen
     const logoImg = document.getElementById('card-logo-preview');
@@ -3364,7 +3368,8 @@ async function saveCardConfig(e) {
     card_principal_name: document.getElementById('card_principal_name').value.trim(),
     card_primary_color: document.getElementById('card_primary_color').value,
     card_logo: logoImg.src && logoImg.src.startsWith('data:') ? logoImg.src : '',
-    card_signature: sigImg.src && sigImg.src.startsWith('data:') ? sigImg.src : ''
+    card_signature: sigImg.src && sigImg.src.startsWith('data:') ? sigImg.src : '',
+    card_pwa_logging: document.getElementById('card_pwa_logging').checked ? '1' : '0'
   };
 
   try {

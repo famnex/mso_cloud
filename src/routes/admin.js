@@ -62,7 +62,8 @@ router.get('/config', (req, res) => {
        card_school_name: getConfig('card_school_name', 'Modellschule Obersberg'),
        card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),
        card_logo: getConfig('card_logo', ''),
-       card_signature: getConfig('card_signature', '')
+       card_signature: getConfig('card_signature', ''),
+       card_pwa_logging: getConfig('card_pwa_logging', '0')
      };
      res.json(config);
   } catch (error) {
@@ -83,7 +84,7 @@ router.post('/config', async (req, res) => {
       'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from',
       'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database',
       'impressum_url', 'disable_student_check',
-      'card_primary_color', 'card_school_name', 'card_principal_name', 'card_logo', 'card_signature'
+      'card_primary_color', 'card_school_name', 'card_principal_name', 'card_logo', 'card_signature', 'card_pwa_logging'
     ];
 
     // Standard-Keys sichern

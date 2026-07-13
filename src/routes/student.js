@@ -89,7 +89,8 @@ router.get('/card', async (req, res) => {
       card_school_name: getConfig('card_school_name', 'Modellschule Obersberg'),
       card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),
       card_logo: getConfig('card_logo', ''),
-      card_signature: getConfig('card_signature', '')
+      card_signature: getConfig('card_signature', ''),
+      card_pwa_logging: getConfig('card_pwa_logging', '0')
     });
   } catch (err) {
     console.error('Fehler beim Laden des Schülerausweises:', err);

@@ -496,6 +496,166 @@
       margin-top: 15px;
       z-index: 10;
     }
+
+    /* PWA Prompt Overlay CSS */
+    .pwa-prompt-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .pwa-prompt-card {
+      background: #ffffff;
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 24px;
+      padding: 25px;
+      width: 100%;
+      max-width: 350px;
+      position: relative;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      color: #0f172a;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .pwa-close-btn {
+      position: absolute;
+      top: 15px; right: 15px;
+      background: rgba(0,0,0,0.05);
+      border: none;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+    .pwa-close-btn:hover {
+      background: rgba(0,0,0,0.1);
+    }
+
+    .pwa-icon-logo {
+      width: 60px; height: 60px;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 2.2rem;
+      margin: 0 auto 15px auto;
+    }
+
+    .pwa-desc {
+      font-size: 0.85rem;
+      color: #475569;
+      line-height: 1.4;
+      margin-bottom: 15px;
+    }
+
+    .pwa-benefits {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      text-align: left;
+      margin-bottom: 15px;
+      background: rgba(0,0,0,0.02);
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(0,0,0,0.03);
+    }
+
+    .benefit-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .benefit-icon {
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-top: 2px;
+    }
+
+    .benefit-item h4 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .benefit-item p {
+      font-size: 0.75rem;
+      color: #475569;
+    }
+
+    .pwa-instructions {
+      text-align: left;
+      margin-bottom: 15px;
+    }
+
+    .pwa-instructions h4 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+    }
+
+    .instruct-step {
+      font-size: 0.8rem;
+      color: #334155;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-num {
+      width: 18px; height: 18px;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 800;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .pwa-action-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      padding: 12px;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--accent-glow);
+      transition: all 0.2s;
+    }
+    .pwa-action-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
   </style>
 </head>
 <body>
@@ -513,6 +673,49 @@
   <!-- PWA Offline Banner -->
   <div id="offline-banner" class="offline-banner">
     <i class="fa-solid fa-cloud-sun"></i> <span data-i18n="offlineMode">Offline-Modus active</span>
+  </div>
+
+  <!-- PWA Install Prompt Overlay -->
+  <div class="pwa-prompt-overlay" id="pwa-prompt">
+    <div class="pwa-prompt-card">
+      <button class="pwa-close-btn" onclick="dismissPwaPrompt()"><i class="fa-solid fa-xmark"></i></button>
+      <div class="pwa-icon-logo"><i class="fa-solid fa-address-card"></i></div>
+      <h3 id="pwa-prompt-title">Ausweis installieren</h3>
+      <p class="pwa-desc" id="pwa-prompt-desc">Installiere diesen digitalen Schülerausweis als App auf deinem Homescreen, um ihn offline vorzuzeigen und jederzeit griffbereit zu haben.</p>
+      
+      <div class="pwa-benefits">
+        <div class="benefit-item">
+          <i class="fa-solid fa-bolt benefit-icon"></i>
+          <div>
+            <h4 id="pwa-benefit-1-title">Schnell & Direkt</h4>
+            <p id="pwa-benefit-1-desc">Direktzugriff über dein App-Icon auf dem Homescreen.</p>
+          </div>
+        </div>
+        <div class="benefit-item">
+          <i class="fa-solid fa-cloud-sun benefit-icon"></i>
+          <div>
+            <h4 id="pwa-benefit-2-title">Offline verfügbar</h4>
+            <p id="pwa-benefit-2-desc">Funktioniert in der Schule auch komplett ohne Internet.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pwa-instructions">
+        <h4 id="pwa-instruct-title">Installationsanleitung:</h4>
+        <!-- iOS Anleitung -->
+        <div id="pwa-ios-instructions" style="display: none;">
+          <p class="instruct-step"><span class="step-num">1</span> Tippe im Browser unten auf das Teilen-Symbol <i class="fa-solid fa-share-from-square" style="color:var(--accent);"></i>.</p>
+          <p class="instruct-step"><span class="step-num">2</span> Wähle **„Zum Home-Bildschirm“** <i class="fa-solid fa-square-plus" style="color:var(--accent);"></i> aus.</p>
+        </div>
+        <!-- Android Anleitung -->
+        <div id="pwa-android-instructions" style="display: none;">
+          <p class="instruct-step"><span class="step-num">1</span> Tippe oben rechts auf die Menüpunkte <i class="fa-solid fa-ellipsis-vertical" style="color:var(--accent);"></i>.</p>
+          <p class="instruct-step"><span class="step-num">2</span> Wähle **„App installieren“** oder **„Zum Startbildschirm“**.</p>
+        </div>
+      </div>
+
+      <button class="pwa-action-btn" id="pwa-install-btn" style="display: none;">Jetzt installieren</button>
+    </div>
   </div>
 
   <!-- Card Frame container -->
@@ -637,7 +840,17 @@
         noPhotoTitle: "Kein Foto hinterlegt",
         noPhotoDesc: "Für Ihren Schülerausweis wurde noch kein Passbild hochgeladen. Bitte laden Sie ein Foto im MSO Cloud Profil hoch, um den Ausweis zu aktivieren.",
         photoPendingTitle: "Foto ungeprüft",
-        photoPendingDesc: "Ihr hochgeladenes Passbild wird derzeit von der Verwaltung geprüft. Sobald das Foto verifiziert ist, wird Ihr Ausweis freigeschaltet."
+        photoPendingDesc: "Ihr hochgeladenes Passbild wird derzeit von der Verwaltung geprüft. Sobald das Foto verifiziert ist, wird Ihr Ausweis freigeschaltet.",
+        
+        // PWA Translation strings
+        pwaTitle: "Ausweis installieren",
+        pwaDesc: "Installiere diesen digitalen Schülerausweis als App auf deinem Homescreen, um ihn offline vorzuzeigen und jederzeit griffbereit zu haben.",
+        pwaB1Title: "Schnell & Direkt",
+        pwaB1Desc: "Direktzugriff über dein App-Icon auf dem Homescreen.",
+        pwaB2Title: "Offline verfügbar",
+        pwaB2Desc: "Funktioniert in der Schule auch komplett ohne Internet.",
+        pwaInstruct: "Installationsanleitung:",
+        pwaInstallBtn: "Jetzt installieren"
       },
       en: {
         offlineMode: "Offline Mode Active (Cached Card)",
@@ -657,7 +870,17 @@
         noPhotoTitle: "No Photo Uploaded",
         noPhotoDesc: "No portrait photo has been uploaded yet. Please upload a photo in your MSO Cloud profile to activate the ID card.",
         photoPendingTitle: "Photo Pending",
-        photoPendingDesc: "Your uploaded photo is currently under review by the administration. Your card will be unlocked once approved."
+        photoPendingDesc: "Your uploaded photo is currently under review by the administration. Your card will be unlocked once approved.",
+        
+        // PWA Translation strings
+        pwaTitle: "Install ID Card",
+        pwaDesc: "Install this digital student ID card as an app on your homescreen for offline access and quick launcher access.",
+        pwaB1Title: "Fast & Direct",
+        pwaB1Desc: "Access the card directly via an app icon on your homescreen.",
+        pwaB2Title: "Offline support",
+        pwaB2Desc: "Works completely offline inside the school buildings.",
+        pwaInstruct: "Installation Guide:",
+        pwaInstallBtn: "Install Now"
       },
       fr: {
         offlineMode: "Mode hors ligne actif (carte mise en cache)",
@@ -677,13 +900,79 @@
         noPhotoTitle: "Aucune photo",
         noPhotoDesc: "Aucune photo d'identité n'a encore été téléchargée. Veuillez télécharger une photo dans votre profil pour l'activer.",
         photoPendingTitle: "Photo en cours d'examen",
-        photoPendingDesc: "Votre photo téléchargée est en cours d'examen par l'administration. La carte sera activée une fois approuvée."
+        photoPendingDesc: "Votre photo téléchargée est en cours d'examen par l'administration. La carte sera activée une fois approuvée.",
+        
+        // PWA Translation strings
+        pwaTitle: "Installer la carte",
+        pwaDesc: "Installez cette carte d'étudiant numérique sur votre écran d'accueil pour la présenter hors ligne et y accéder rapidement.",
+        pwaB1Title: "Rapide & Direct",
+        pwaB1Desc: "Accédez à la carte directement depuis l'écran d'accueil.",
+        pwaB2Title: "Disponible hors ligne",
+        pwaB2Desc: "Fonctionne hors ligne dans l'école, même sans réseau.",
+        pwaInstruct: "Guide d'installation:",
+        pwaInstallBtn: "Installer maintenant"
       }
     };
 
     let currentLang = localStorage.getItem('mso_card_lang') || 'de';
     let cardData = null;
     let qrGenerator = null;
+    let deferredPrompt;
+
+    // Capture Android PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      
+      const installBtn = document.getElementById('pwa-install-btn');
+      if (installBtn) installBtn.style.display = 'block';
+      
+      const androidInstruct = document.getElementById('pwa-android-instructions');
+      if (androidInstruct) androidInstruct.style.display = 'none';
+      
+      checkPwaInstallPrompt();
+    });
+
+    // PWA overlay popup logic
+    function checkPwaInstallPrompt() {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isDismissed = sessionStorage.getItem('pwa_prompt_dismissed') === 'true';
+
+      if (isMobile && !isStandalone && !isDismissed) {
+        document.getElementById('pwa-prompt').style.display = 'flex';
+        
+        // Match specific instructions
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) {
+          document.getElementById('pwa-ios-instructions').style.display = 'block';
+          document.getElementById('pwa-android-instructions').style.display = 'none';
+        } else {
+          if (!deferredPrompt) {
+            document.getElementById('pwa-android-instructions').style.display = 'block';
+          }
+        }
+      }
+    }
+
+    function dismissPwaPrompt() {
+      document.getElementById('pwa-prompt').style.display = 'none';
+      sessionStorage.setItem('pwa_prompt_dismissed', 'true');
+    }
+
+    // Trigger installation
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`User installation choice: ${outcome}`);
+          deferredPrompt = null;
+          dismissPwaPrompt();
+        }
+      });
+    }
 
     // Switch Language Handler
     function switchLanguage(lang) {
@@ -703,6 +992,17 @@
           el.innerText = translations[lang][key];
         }
       });
+
+      // Translate PWA prompt texts
+      const dict = translations[lang];
+      document.getElementById('pwa-prompt-title').innerText = dict.pwaTitle;
+      document.getElementById('pwa-prompt-desc').innerText = dict.pwaDesc;
+      document.getElementById('pwa-benefit-1-title').innerText = dict.pwaB1Title;
+      document.getElementById('pwa-benefit-1-desc').innerText = dict.pwaB1Desc;
+      document.getElementById('pwa-benefit-2-title').innerText = dict.pwaB2Title;
+      document.getElementById('pwa-benefit-2-desc').innerText = dict.pwaB2Desc;
+      document.getElementById('pwa-instruct-title').innerText = dict.pwaInstruct;
+      document.getElementById('pwa-install-btn').innerText = dict.pwaInstallBtn;
 
       // Re-trigger layout checks for error messages if data is loaded
       if (cardData) {
@@ -776,8 +1076,16 @@
         
         localStorage.setItem('mso_cached_card', JSON.stringify(data));
         renderCard(data, false);
+
+        // Send Logging Config to Service Worker
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_LOGGING',
+            enabled: data.card_pwa_logging === '1'
+          });
+        }
       } catch (err) {
-        console.warn('Online-Abruf fehlgeschlagen, lade cached data:', err);
+        console.warn('Online-Abruf des Ausweises fehlgeschlagen, lade cached data:', err);
         const cached = localStorage.getItem('mso_cached_card');
         if (cached) {
           cardData = JSON.parse(cached);
@@ -787,6 +1095,14 @@
         }
       }
     }
+
+    // Proactive background refreshing
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        loadCardData();
+      }
+    });
+    setInterval(loadCardData, 15 * 60 * 1000); // Proaktiv alle 15 Minuten refreshen
 
     function renderCard(data, isOffline) {
       // 1. Theme Farbe anwenden
@@ -925,7 +1241,9 @@
 
     // Start
     switchLanguage(currentLang);
-    loadCardData();
+    loadCardData().then(() => {
+      checkPwaInstallPrompt();
+    });
   </script>
 </body>
 </html>
