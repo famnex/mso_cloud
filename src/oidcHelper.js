@@ -60,6 +60,7 @@ function openidConfigurationHandler(req, res) {
       authorization_endpoint: `${base}/api/oauth/authorize`,
       token_endpoint: `${base}/api/oauth/token`,
       userinfo_endpoint: `${base}/api/oauth/userinfo`,
+      end_session_endpoint: `${base}/api/oauth/logout`,
       jwks_uri: `${base}/jwks`,
       response_types_supported: ['code'],
       subject_types_supported: ['public'],
