@@ -317,9 +317,9 @@
     .signature-seal-area {
       position: absolute;
       left: 16px;
-      bottom: 110px; /* Direkt über dem Footer positioniert */
+      bottom: 80px; /* Direkt über dem Footer positioniert */
       width: 200px;
-      height: 80px;
+      height: 110px;
       z-index: 20;
     }
 
@@ -1314,7 +1314,7 @@
       const sigCanvas = document.createElement('canvas');
       const sigCtx = sigCanvas.getContext('2d');
       sigCanvas.width = 200;
-      sigCanvas.height = 80;
+      sigCanvas.height = 110;
 
       // 1. Unterschriften-Grafik laden & zeichnen
       const sigImg = new Image();
@@ -1328,8 +1328,8 @@
             const w = sigImg.width * ratio;
             const h = sigImg.height * ratio;
             
-            // Unterschrift bei Y=2 zeichnen, damit sie den Text leicht überlappt
-            sigCtx.drawImage(sigImg, 0, 2, w, h);
+            // Unterschrift um 40px nach unten verschoben (Y=2+40=42)
+            sigCtx.drawImage(sigImg, 0, 42, w, h);
             resolve();
           };
           sigImg.onerror = () => {
@@ -1362,7 +1362,7 @@
       const sigContainer = document.getElementById('signature-container');
       sigContainer.innerHTML = '';
       sigCanvas.style.width = '200px';
-      sigCanvas.style.height = '80px';
+      sigCanvas.style.height = '110px';
       sigCanvas.style.pointerEvents = 'none';
       sigCanvas.style.userSelect = 'none';
       sigContainer.appendChild(sigCanvas);
