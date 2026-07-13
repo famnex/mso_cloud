@@ -1088,6 +1088,21 @@ async function loadAdminConfig() {
       }
     }
 
+    // Siegel Vorschau befüllen
+    const sealImg = document.getElementById('card-seal-preview');
+    const sealPlaceholder = document.getElementById('card-seal-placeholder');
+    if (sealImg && sealPlaceholder) {
+      if (cfg.card_seal) {
+        sealImg.src = cfg.card_seal;
+        sealImg.style.display = 'block';
+        sealPlaceholder.style.display = 'none';
+      } else {
+        sealImg.src = '';
+        sealImg.style.display = 'none';
+        sealPlaceholder.style.display = 'block';
+      }
+    }
+
     // Unterschrift Vorschau befüllen
     const sigImg = document.getElementById('card-signature-preview');
     const sigPlaceholder = document.getElementById('card-signature-placeholder');
@@ -3377,6 +3392,7 @@ async function saveCardConfig(e) {
   
   const logoImg = document.getElementById('card-logo-preview');
   const pwaIconImg = document.getElementById('card-pwa-icon-preview');
+  const sealImg = document.getElementById('card-seal-preview');
   const sigImg = document.getElementById('card-signature-preview');
   
   const body = {
@@ -3385,6 +3401,7 @@ async function saveCardConfig(e) {
     card_primary_color: document.getElementById('card_primary_color').value,
     card_logo: logoImg.src && logoImg.src.startsWith('data:') ? logoImg.src : '',
     card_pwa_icon: pwaIconImg.src && pwaIconImg.src.startsWith('data:') ? pwaIconImg.src : '',
+    card_seal: sealImg.src && sealImg.src.startsWith('data:') ? sealImg.src : '',
     card_signature: sigImg.src && sigImg.src.startsWith('data:') ? sigImg.src : '',
     card_pwa_logging: document.getElementById('card_pwa_logging').checked ? '1' : '0'
   };
