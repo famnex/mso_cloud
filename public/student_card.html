@@ -317,9 +317,9 @@
     .signature-seal-area {
       position: absolute;
       left: 16px;
-      bottom: 80px; /* Direkt über dem Footer positioniert */
+      bottom: 110px; /* Direkt über dem Footer positioniert */
       width: 200px;
-      height: 110px;
+      height: 80px;
       z-index: 20;
     }
 
@@ -1315,7 +1315,7 @@
       const sigCanvas = document.createElement('canvas');
       const sigCtx = sigCanvas.getContext('2d');
       sigCanvas.width = 200;
-      sigCanvas.height = 110;
+      sigCanvas.height = 80;
 
       // 1. Unterschriften-Grafik laden & zeichnen
       const sigImg = new Image();
@@ -1324,13 +1324,13 @@
       const sigLoaded = new Promise((resolve) => {
         if (data.card_signature) {
           sigImg.onload = () => {
-            // Seitenverhältnis wahren (Unterschrift max 180px breit und 45px hoch)
-            const ratio = Math.min(180 / sigImg.width, 45 / sigImg.height);
+            // Seitenverhältnis wahren (Unterschrift max 190px breit und 65px hoch - 1,5x größer!)
+            const ratio = Math.min(190 / sigImg.width, 65 / sigImg.height);
             const w = sigImg.width * ratio;
             const h = sigImg.height * ratio;
             
-            // Unterschrift um 40px nach unten verschoben (Y=2+40=42)
-            sigCtx.drawImage(sigImg, 0, 42, w, h);
+            // Unterschrift bei Y=2 zeichnen (wieder 40px nach oben gezogen)
+            sigCtx.drawImage(sigImg, 0, 2, w, h);
             resolve();
           };
           sigImg.onerror = () => {
@@ -1363,7 +1363,7 @@
       const sigContainer = document.getElementById('signature-container');
       sigContainer.innerHTML = '';
       sigCanvas.style.width = '200px';
-      sigCanvas.style.height = '110px';
+      sigCanvas.style.height = '80px';
       sigCanvas.style.pointerEvents = 'none';
       sigCanvas.style.userSelect = 'none';
       sigContainer.appendChild(sigCanvas);
