@@ -598,7 +598,7 @@ function loadAdminTabContent(tabId) {
 
   if (tabId === 'tab-tiles') {
     loadAdminTiles();
-  } else if (tabId === 'tab-ldap' || tabId === 'tab-smtp' || tabId === 'tab-mysql' || tabId === 'tab-system') {
+  } else if (tabId === 'tab-ldap' || tabId === 'tab-smtp' || tabId === 'tab-mysql' || tabId === 'tab-system' || tabId === 'tab-card-config') {
     loadAdminConfig();
     if (tabId === 'tab-system') {
       loadSystemInfo();
@@ -1038,6 +1038,50 @@ async function loadAdminConfig() {
     const disableStudentCheckInput = document.getElementById('disable_student_check');
     if (disableStudentCheckInput) {
       disableStudentCheckInput.checked = cfg.disable_student_check === '1';
+    }
+
+    // Schülerausweis Felder befüllen
+    const cardSchoolInput = document.getElementById('card_school_name');
+    if (cardSchoolInput) {
+      cardSchoolInput.value = cfg.card_school_name || 'Modellschule Obersberg';
+    }
+    const cardPrincipalInput = document.getElementById('card_principal_name');
+    if (cardPrincipalInput) {
+      cardPrincipalInput.value = cfg.card_principal_name || 'OStD Karsten Backhaus';
+    }
+    const cardColorInput = document.getElementById('card_primary_color');
+    if (cardColorInput) {
+      cardColorInput.value = cfg.card_primary_color || '#3b82f6';
+    }
+
+    // Logo Vorschau befüllen
+    const logoImg = document.getElementById('card-logo-preview');
+    const logoPlaceholder = document.getElementById('card-logo-placeholder');
+    if (logoImg && logoPlaceholder) {
+      if (cfg.card_logo) {
+        logoImg.src = cfg.card_logo;
+        logoImg.style.display = 'block';
+        logoPlaceholder.style.display = 'none';
+      } else {
+        logoImg.src = '';
+        logoImg.style.display = 'none';
+        logoPlaceholder.style.display = 'block';
+      }
+    }
+
+    // Unterschrift Vorschau befüllen
+    const sigImg = document.getElementById('card-signature-preview');
+    const sigPlaceholder = document.getElementById('card-signature-placeholder');
+    if (sigImg && sigPlaceholder) {
+      if (cfg.card_signature) {
+        sigImg.src = cfg.card_signature;
+        sigImg.style.display = 'block';
+        sigPlaceholder.style.display = 'none';
+      } else {
+        sigImg.src = '';
+        sigImg.style.display = 'none';
+        sigPlaceholder.style.display = 'block';
+      }
     }
 
   } catch (err) {
@@ -3290,6 +3334,54 @@ function closeAllViews() {
   if (mainView) mainView.style.display = 'block';
 
   loadTiles();
+}
+
+function previewImageFile(input, imgId) {
+  const file = input.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = document.getElementById(imgId);
+      img.src = e.target.result;
+      img.style.display = 'block';
+      
+      const placeholderId = imgId.replace('preview', 'placeholder');
+      const placeholder = document.getElementById(placeholderId);
+      if (placeholder) placeholder.style.display = 'none';
+    }
+    reader.readAsDataURL(file);
+  }
+}
+
+async function saveCardConfig(e) {
+  e.preventDefault();
+  
+  const logoImg = document.getElementById('card-logo-preview');
+  const sigImg = document.getElementById('card-signature-preview');
+  
+  const body = {
+    card_school_name: document.getElementById('card_school_name').value.trim(),
+    card_principal_name: document.getElementById('card_principal_name').value.trim(),
+    card_primary_color: document.getElementById('card_primary_color').value,
+    card_logo: logoImg.src && logoImg.src.startsWith('data:') ? logoImg.src : '',
+    card_signature: sigImg.src && sigImg.src.startsWith('data:') ? sigImg.src : ''
+  };
+
+  try {
+    const res = await fetch('api/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      showAdminAlert('Schülerausweis-Einstellungen erfolgreich gespeichert.');
+    } else {
+      const err = await res.json();
+      throw new Error(err.error || 'Fehler beim Speichern.');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
 }
 
 

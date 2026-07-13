@@ -64,14 +64,16 @@ router.get('/card', async (req, res) => {
       );
     }
 
-    // Ablaufdatum bestimmen (31. Juli des laufenden Schuljahres)
+    // Ablaufdatum bestimmen (Stichtag: 1. September)
     const now = new Date();
     const currentYear = now.getFullYear();
+    const sepFirstCurrentYear = new Date(currentYear, 8, 1); // 8 = September (0-indexed)
+    
     let expirationYear = currentYear;
-    if (now.getMonth() >= 7) { // Ab August gilt es bis zum nächsten Jahr
+    if (now >= sepFirstCurrentYear) {
       expirationYear = currentYear + 1;
     }
-    const expiresAt = `${expirationYear}-07-31`;
+    const expiresAt = `${expirationYear}-09-01`;
 
     res.json({
       first_name: profile.first_name,
@@ -82,7 +84,12 @@ router.get('/card', async (req, res) => {
       card_image: profile.card_image,
       card_status: profile.card_status,
       expires_at: expiresAt,
-      server_time: new Date().toISOString()
+      server_time: new Date().toISOString(),
+      card_primary_color: getConfig('card_primary_color', '#3b82f6'),
+      card_school_name: getConfig('card_school_name', 'Modellschule Obersberg'),
+      card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),
+      card_logo: getConfig('card_logo', ''),
+      card_signature: getConfig('card_signature', '')
     });
   } catch (err) {
     console.error('Fehler beim Laden des Schülerausweises:', err);

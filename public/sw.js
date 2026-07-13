@@ -2,7 +2,8 @@ const CACHE_NAME = 'mso-student-card-v3';
 const ASSETS = [
   'student_card.html',
   'style.css',
-  'favicon.ico'
+  'favicon.ico',
+  'assets/qrcode.min.js'
 ];
 
 self.addEventListener('install', (e) => {
