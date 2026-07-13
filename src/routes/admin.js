@@ -76,7 +76,7 @@ router.post('/config', async (req, res) => {
       'ldap_name_attribute', 'ldap_upn_suffix',
       'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from',
       'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database',
-      'impressum_url'
+      'impressum_url', 'disable_student_check'
     ];
 
     // Standard-Keys sichern
