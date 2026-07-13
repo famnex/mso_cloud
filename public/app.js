@@ -3415,8 +3415,14 @@ async function saveCardConfig(e) {
     if (res.ok) {
       showAdminAlert('Schülerausweis-Einstellungen erfolgreich gespeichert.');
     } else {
-      const err = await res.json();
-      throw new Error(err.error || 'Fehler beim Speichern.');
+      let errMsg = 'Fehler beim Speichern.';
+      try {
+        const err = await res.json();
+        errMsg = err.error || errMsg;
+      } catch (jsonErr) {
+        errMsg = `Serverfehler (${res.status}): ${res.statusText || 'Interner Fehler'}`;
+      }
+      throw new Error(errMsg);
     }
   } catch (err) {
     showAdminAlert(err.message, 'danger');
