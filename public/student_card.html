@@ -314,23 +314,19 @@
       line-height: 1.2;
     }
 
-    /* Schulleiter-Unterschrift & Name (40px nach unten geschoben) */
+    /* Schulleiter-Unterschrift & Name (Absolut positioniert, um den Dokumentenfluss nicht zu stören) */
     .signature-seal-area {
-      display: flex;
-      justify-content: flex-start;
-      align-items: flex-end;
-      margin: 5px 0;
-      position: relative;
-      z-index: 10;
-      /* 40px nach unten geschoben */
-      top: 40px; 
+      position: absolute;
+      left: 16px;
+      bottom: 110px; /* Direkt über dem Footer positioniert */
+      width: 200px;
+      height: 80px;
+      z-index: 20;
     }
 
     .principal-container {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      width: 200px;
+      width: 100%;
+      height: 100%;
     }
 
     /* QR-Code & Validity Zone */
@@ -1319,7 +1315,7 @@
       const sigCanvas = document.createElement('canvas');
       const sigCtx = sigCanvas.getContext('2d');
       sigCanvas.width = 200;
-      sigCanvas.height = 110;
+      sigCanvas.height = 80;
 
       // 1. Unterschriften-Grafik laden & zeichnen
       const sigImg = new Image();
@@ -1328,8 +1324,13 @@
       const sigLoaded = new Promise((resolve) => {
         if (data.card_signature) {
           sigImg.onload = () => {
-            // Größere Unterschrift (Breite 180, Höhe 65), die den Text leicht überlappt
-            sigCtx.drawImage(sigImg, 0, 5, 180, 65);
+            // Seitenverhältnis wahren (Unterschrift max 180px breit und 45px hoch)
+            const ratio = Math.min(180 / sigImg.width, 45 / sigImg.height);
+            const w = sigImg.width * ratio;
+            const h = sigImg.height * ratio;
+            
+            // Unterschrift bei Y=2 zeichnen, damit sie den Text leicht überlappt
+            sigCtx.drawImage(sigImg, 0, 2, w, h);
             resolve();
           };
           sigImg.onerror = () => {
@@ -1350,19 +1351,19 @@
       sigCtx.font = '700 10px "Outfit", sans-serif';
       sigCtx.textAlign = 'left';
       sigCtx.textBaseline = 'top';
-      sigCtx.fillText(labelText.toUpperCase(), 2, 70);
+      sigCtx.fillText(labelText.toUpperCase(), 2, 45);
 
       // Name des Schulleiters
       const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
       sigCtx.fillStyle = '#0f172a'; // var(--text)
       sigCtx.font = '600 13px "Outfit", sans-serif';
-      sigCtx.fillText(principalName, 2, 84);
+      sigCtx.fillText(principalName, 2, 59);
 
       // Unterschriften-Container befüllen
       const sigContainer = document.getElementById('signature-container');
       sigContainer.innerHTML = '';
       sigCanvas.style.width = '200px';
-      sigCanvas.style.height = '110px';
+      sigCanvas.style.height = '80px';
       sigCanvas.style.pointerEvents = 'none';
       sigCanvas.style.userSelect = 'none';
       sigContainer.appendChild(sigCanvas);
