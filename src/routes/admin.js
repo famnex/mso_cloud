@@ -56,9 +56,10 @@ router.get('/config', (req, res) => {
       mysql_password: getConfig('mysql_password') ? '********' : '',
       mysql_database: getConfig('mysql_database', 'digitale_anmeldung'),
 
-      impressum_url: getConfig('impressum_url', 'https://www.mso-hef.de/impressum')
-    };
-    res.json(config);
+       impressum_url: getConfig('impressum_url', 'https://www.mso-hef.de/impressum'),
+       disable_student_check: getConfig('disable_student_check', '0')
+     };
+     res.json(config);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

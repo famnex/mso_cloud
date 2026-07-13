@@ -154,9 +154,15 @@ html[data-theme="light"] .user-dropdown,
   color: var(--accent-color);
   font-size: 0.95rem;
   text-align: left;
-  background: rgba(46, 139, 250, 0.05);
+  background: #111b30; /* Solider dunkler Hintergrund */
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
+}
+
+/* Light Theme */
+html[data-theme="light"] .dropdown-user-name,
+[data-theme="light"] .dropdown-user-name {
+  background: #f1f5f9;
 }
 
 /* Dropdown Divider */
