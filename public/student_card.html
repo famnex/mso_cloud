@@ -598,9 +598,32 @@
         statusLabel.style.color = 'var(--success)';
       }
 
-      // Sperrung (Revoke) prüfen
+      // Sperrung, fehlendes Bild oder unbestätigten Status prüfen
       const overlay = document.getElementById('revoked-overlay');
-      if (data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig') {
+      const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
+      const hasNoImage = !data.card_image;
+      const isNotVerified = data.card_status !== 'Bild verifiziert';
+
+      if (isRevoked) {
+        overlay.innerHTML = `
+          <i class="fa-solid fa-circle-xmark revoked-icon"></i>
+          <div class="revoked-title">Ausweis gesperrt</div>
+          <div class="revoked-desc">Dieser digitale Schülerausweis wurde serverseitig ungültig geschaltet oder gesperrt. Wenden Sie sich bei Fragen an das Sekretariat.</div>
+        `;
+        overlay.style.display = 'flex';
+      } else if (hasNoImage) {
+        overlay.innerHTML = `
+          <i class="fa-solid fa-image-portrait revoked-icon" style="color: var(--accent);"></i>
+          <div class="revoked-title">Kein Foto hinterlegt</div>
+          <div class="revoked-desc">Für Ihren Schülerausweis wurde noch kein Passbild hochgeladen. Bitte laden Sie ein Foto im MSO Cloud Profil hoch, um den Ausweis zu aktivieren.</div>
+        `;
+        overlay.style.display = 'flex';
+      } else if (isNotVerified) {
+        overlay.innerHTML = `
+          <i class="fa-solid fa-user-clock revoked-icon" style="color: #f59e0b;"></i>
+          <div class="revoked-title">Foto ungeprüft</div>
+          <div class="revoked-desc">Ihr hochgeladenes Passbild wird derzeit von der Verwaltung geprüft. Sobald das Foto verifiziert ist, wird Ihr Ausweis freigeschaltet. (Status: <strong>${data.card_status || 'Unbekannt'}</strong>)</div>
+        `;
         overlay.style.display = 'flex';
       } else {
         overlay.style.display = 'none';
