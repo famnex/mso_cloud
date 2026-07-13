@@ -348,16 +348,23 @@
     }
 
     .signature-wrapper {
-      height: 38px;
+      height: 52px;
       display: flex;
       align-items: center;
-      margin-bottom: 2px;
+      margin-bottom: -10px;
+      position: relative;
+      z-index: 15;
     }
 
     .signature-img {
       max-height: 100%;
       max-width: 100%;
       object-fit: contain;
+      transform: scale(1.15);
+      transform-origin: left center;
+      pointer-events: none;
+      -webkit-user-drag: none;
+      user-select: none;
     }
 
     .signature-placeholder {
@@ -372,8 +379,8 @@
       position: absolute;
       width: 72px;
       height: 72px;
-      left: 78px; /* So positioniert, dass das linke obere 1/4 auf dem Passbild liegt */
-      top: -38px; /* Ragt hoch ins Passbild hinein */
+      left: 59px; /* Überlappt das untere rechte Viertel des Passbilds */
+      top: 89px; /* Liegt exakt am unteren Rand des Passbilds an */
       z-index: 30; /* Liegt über dem Foto */
       display: flex;
       align-items: center;
@@ -822,17 +829,17 @@
       <!-- Card Body - Photo & Info -->
       <div class="card-body">
         <!-- Photo -->
-        <div class="photo-wrapper" style="position: relative; user-select: none;">
+        <div class="photo-wrapper" style="user-select: none;">
           <div id="card-photo-container">
             <div class="placeholder-avatar"><i class="fa-solid fa-user"></i></div>
           </div>
-          
-          <!-- Vorgerendertes Siegel: Überlappt die untere rechte Ecke des Fotos -->
-          <div class="seal-container" id="seal-container">
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-            <!-- Fallback-Siegel, falls kein Bild hinterlegt ist -->
-            <div class="hologram-siegel-fallback" id="hologram-fallback"><i class="fa-solid fa-graduation-cap"></i></div>
-          </div>
+        </div>
+
+        <!-- Vorgerendertes Siegel: Überlappt die untere rechte Ecke des Fotos -->
+        <div class="seal-container" id="seal-container">
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
+          <!-- Fallback-Siegel, falls kein Bild hinterlegt ist -->
+          <div class="hologram-siegel-fallback" id="hologram-fallback"><i class="fa-solid fa-graduation-cap"></i></div>
         </div>
 
         <!-- Details -->
