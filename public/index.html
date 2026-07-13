@@ -78,7 +78,7 @@
             <!-- Name header inside dropdown -->
             <div class="dropdown-user-name" id="header-full-name">Name Laden...</div>
             <a href="#" onclick="navigateTo('profile', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-user-gear" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Benutzerprofil & Zugänge</a>
-            <a href="#" onclick="navigateTo('card', event)" style="display: block; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis</a>
+            <a href="#" id="header-card-link" onclick="navigateTo('card', event)" style="display: none; padding: 10px 20px; color: var(--text-primary); text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis</a>
             <div class="dropdown-divider"></div>
             <a href="#" onclick="handleLogout()" style="display: block; padding: 10px 20px; color: #f43f5e; text-decoration: none; font-size: 0.9rem; transition: all 0.2s ease; text-align: left;"><i class="fa-solid fa-right-from-bracket" style="margin-right: 10px; width: 16px;"></i> Abmelden</a>
           </div>
@@ -816,7 +816,7 @@
   <!-- MODAL: LOGIN -->
   <div class="modal" id="login-modal">
     <div class="modal-content glass-panel" style="max-width: 500px;">
-      <span class="close-btn" onclick="closeModal('login-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('login-modal')"><i class="fa-solid fa-xmark"></i></span>
       
       <!-- Login Tabs (Umschaltbar zwischen Normal- & Erstlogin) -->
       <div class="login-tabs" style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 25px;">
@@ -875,7 +875,7 @@
   <!-- MODAL: PASSWORD RESET REQUEST -->
   <div class="modal" id="reset-request-modal">
     <div class="modal-content glass-panel">
-      <span class="close-btn" onclick="closeModal('reset-request-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('reset-request-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:15px; text-align:center;">Passwort vergessen</h3>
       <p style="color:var(--text-secondary); font-size:0.85rem; line-height:1.5; margin-bottom:20px; text-align:center;">
         Geben Sie die E-Mail-Adresse Ihres lokalen Accounts ein. Wir senden Ihnen einen sicheren Link zum Festlegen eines neuen Passworts.
@@ -922,7 +922,7 @@
   <!-- MODAL: CREATE / EDIT TILE (KACHEL) -->
   <div class="modal" id="tile-modal">
     <div class="modal-content glass-panel modal-content-large">
-      <span class="close-btn" onclick="closeModal('tile-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('tile-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:25px;" id="tile-modal-title">Neuer Dienst</h3>
       
       <form id="tile-form" onsubmit="saveTileForm(event)">
@@ -1064,7 +1064,7 @@
   <!-- MODAL: LDAP MAPPING FORM -->
   <div class="modal" id="mapping-modal">
     <div class="modal-content glass-panel">
-      <span class="close-btn" onclick="closeModal('mapping-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('mapping-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px;" id="mapping-modal-title">Neues LDAP-Mapping</h3>
       
       <form id="mapping-form" onsubmit="saveMappingForm(event)">
@@ -1092,7 +1092,7 @@
   <!-- MODAL: USER FORM -->
   <div class="modal" id="user-modal">
     <div class="modal-content glass-panel">
-      <span class="close-btn" onclick="closeModal('user-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('user-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px;" id="user-modal-title">Neuer Benutzer</h3>
       
       <form id="user-form" onsubmit="saveUserForm(event)">
@@ -1136,7 +1136,7 @@
   <!-- MODAL: NACHRICHTEN (NEWS) -->
   <div class="modal" id="message-modal">
     <div class="modal-content glass-panel" style="max-width: 650px;">
-      <span class="close-btn" onclick="closeModal('message-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('message-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px; display:flex; align-items:center; gap:8px;" id="message-modal-title">
         <i class="fa-solid fa-bullhorn" style="color: var(--accent-color);"></i> Nachricht erstellen
       </h3>
@@ -1200,7 +1200,7 @@
   <!-- MODAL: NEWS ANZEIGE (POPUP) -->
   <div class="modal" id="news-view-modal">
     <div class="modal-content glass-panel" style="max-width: 600px; padding: 24px;">
-      <span class="close-btn" onclick="closeModal('news-view-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('news-view-modal')"><i class="fa-solid fa-xmark"></i></span>
       
       <!-- Karussell-Bereich im Modal -->
       <div id="modal-news-carousel-container" style="position: relative; overflow: hidden; width: 100%;">
@@ -1212,7 +1212,7 @@
   <!-- MODAL: SPH INFO POPUP -->
   <div class="modal" id="sph-info-modal">
     <div class="modal-content glass-panel" style="max-width: 550px;">
-      <span class="close-btn" onclick="closeModal('sph-info-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('sph-info-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:20px; display:flex; align-items:center; gap:10px; color: var(--accent-color);">
         <i class="fa-solid fa-circle-info"></i> Weiterleitung zum Schulportal
       </h3>
@@ -1248,7 +1248,7 @@
   <!-- MODAL: SPH CREDENTIALS -->
   <div class="modal" id="sph-credentials-modal">
     <div class="modal-content glass-panel">
-      <span class="close-btn" onclick="closeModal('sph-credentials-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('sph-credentials-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-link" style="color: var(--warn-color);"></i> Schulportal Zugangsdaten</h3>
       
       <div id="sph-credentials-status-loading" style="text-align: center; padding: 20px;">
@@ -1299,7 +1299,7 @@
   <!-- MODAL: LOG DETAILS -->
   <div class="modal" id="log-details-modal">
     <div class="modal-content glass-panel" style="max-width:650px; padding:24px;">
-      <span class="close-btn" onclick="closeModal('log-details-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('log-details-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px; display:flex; align-items:center; gap:8px; color:var(--accent-color);">
         <i class="fa-solid fa-circle-info"></i> Protokoll-Details
       </h3>
@@ -1341,7 +1341,7 @@
   <!-- OAUTH CLIENT EDIT MODAL -->
   <div class="modal" id="oauth-client-modal">
     <div class="modal-content" style="max-width: 600px;">
-      <span class="close-btn" onclick="closeModal('oauth-client-modal')">&times;</span>
+      <span class="close-btn" onclick="closeModal('oauth-client-modal')"><i class="fa-solid fa-xmark"></i></span>
       <h3 style="font-weight:700; font-size:1.5rem; margin-bottom:20px;" id="oauth-client-modal-title">Neuer SSO-Client</h3>
       
       <form id="oauth-client-form" onsubmit="saveOauthClientForm(event)">

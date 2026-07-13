@@ -136,6 +136,12 @@ function renderAuthenticatedHeader() {
   // Render Admin Button right container if admin
   renderAdminButton();
 
+  // Toggle student card visibility in dropdown
+  const cardLink = document.getElementById('header-card-link');
+  if (cardLink) {
+    cardLink.style.display = isStudent ? 'block' : 'none';
+  }
+
   // Load student profile details
   if (isStudent) {
     loadStudentProfile();
@@ -3239,7 +3245,7 @@ function navigateTo(page, event) {
   if (page === 'profile') {
     openStudentView();
   } else if (page === 'card') {
-    openCardView();
+    window.location.href = 'student_card.html';
   }
 }
 

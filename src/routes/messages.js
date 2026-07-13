@@ -9,6 +9,9 @@ const { db } = require('../db');
 router.get('/', (req, res) => {
   try {
     const user = req.session.user;
+    if (!user) {
+      return res.json([]);
+    }
     
     // Alle Nachrichten aus der Datenbank holen
     const allMessages = db.prepare('SELECT * FROM news_messages ORDER BY created_at DESC').all();

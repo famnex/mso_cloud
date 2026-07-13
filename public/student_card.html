@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MSO Digitaler Schülerausweis</title>
+  
+  <!-- PWA Manifest & Icons -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MSO Ausweis">
+  
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(17, 25, 40, 0.65);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.35);
+      --text: #f8fafc;
+      --text-secondary: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      padding: 20px;
+      position: relative;
+    }
+
+    /* Background Animation */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+      animation: rotateBg 20s linear infinite;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    @keyframes rotateBg {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* PWA Back Button */
+    .back-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      transition: all 0.2s ease;
+    }
+    .back-btn:hover {
+      background: rgba(255,255,255,0.1);
+      transform: translateY(-2px);
+    }
+
+    /* Card Frame container */
+    .card-container {
+      perspective: 1000px;
+      width: 100%;
+      max-width: 380px;
+      z-index: 10;
+      margin-top: 40px;
+    }
+
+    /* Holographic Student Card */
+    .student-card {
+      width: 100%;
+      background: var(--card-bg);
+      backdrop-filter: blur(25px) saturate(180%);
+      -webkit-backdrop-filter: blur(25px) saturate(180%);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                  0 0 40px var(--accent-glow);
+      transform-style: preserve-3d;
+      transition: transform 0.1s ease;
+    }
+
+    /* Shimmer effect overlay */
+    .student-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0) 100%
+      );
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      z-index: 5;
+      transform: translateX(-100%);
+      transition: transform 0.5s ease;
+    }
+
+    .student-card:hover::after {
+      transform: translateX(100%);
+    }
+
+    /* Card Header */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1.5px solid rgba(255,255,255,0.06);
+      padding-bottom: 15px;
+    }
+
+    .school-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: linear-gradient(to right, #fff, var(--text-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .card-badge {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Card Content Layout */
+    .card-body {
+      display: flex;
+      gap: 20px;
+    }
+
+    /* Photo Container */
+    .photo-wrapper {
+      width: 110px;
+      height: 145px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.1);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+      position: relative;
+      background: #1e293b;
+      flex-shrink: 0;
+    }
+
+    .photo-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-wrapper .placeholder-avatar {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 3rem;
+    }
+
+    /* Details styling */
+    .details-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-grow: 1;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail-label {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .detail-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .detail-value.name {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    /* Hologram Siegel */
+    .hologram-siegel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(59,130,246,0.3) 100%);
+      border: 1px dashed rgba(255,255,255,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      color: rgba(255,255,255,0.7);
+      box-shadow: 0 0 15px rgba(255,255,255,0.1);
+      transition: transform 0.1s ease;
+      transform-style: preserve-3d;
+      pointer-events: none;
+    }
+
+    .hologram-siegel i {
+      animation: spinSiegel 10s linear infinite;
+    }
+
+    @keyframes spinSiegel {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Footer Live validation */
+    .card-footer {
+      margin-top: 24px;
+      border-top: 1.5px solid rgba(255,255,255,0.06);
+      padding-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Live Ticker Clock */
+    .live-ticker {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0,0,0,0.25);
+      border-radius: 12px;
+      padding: 8px 12px;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .ticker-label {
+      font-size: 0.75rem;
+      color: var(--success);
+      font-weight: 700;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .ticker-label::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px var(--success);
+      animation: pulseGreen 1.5s infinite;
+    }
+
+    @keyframes pulseGreen {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .ticker-time {
+      font-family: monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* Expiry & Validity info */
+    .validity-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    /* Revocation / Overlay Screen */
+    .revoked-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.95);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      text-align: center;
+      border-radius: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .revoked-icon {
+      font-size: 4rem;
+      color: var(--danger);
+      margin-bottom: 20px;
+      animation: shake 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes shake {
+      0% { transform: rotate(-5deg); }
+      100% { transform: rotate(5deg); }
+    }
+
+    .revoked-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .revoked-desc {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Offline Banner */
+    .offline-banner {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid #f59e0b;
+      color: #fbbf24;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Back button -->
+  <a href="index.html" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Zum Portal</a>
+
+  <!-- PWA Offline Banner -->
+  <div id="offline-banner" class="offline-banner">
+    <i class="fa-solid fa-cloud-sun"></i> Offline-Modus aktiv (Lokaler Ausweis)
+  </div>
+
+  <!-- Card Frame container -->
+  <div class="card-container" id="card-frame">
+    
+    <!-- Student Card -->
+    <div class="student-card" id="student-card">
+      
+      <!-- Revocation Overlay -->
+      <div class="revoked-overlay" id="revoked-overlay">
+        <i class="fa-solid fa-circle-xmark revoked-icon"></i>
+        <div class="revoked-title">Ungültiger Ausweis</div>
+        <div class="revoked-desc">Dieser digitale Schülerausweis wurde serverseitig ungültig geschaltet oder gesperrt. Wenden Sie sich bei Fragen an das Sekretariat.</div>
+      </div>
+      
+      <!-- Card Header -->
+      <div class="card-header">
+        <div class="school-title">Modellschule Obersberg</div>
+        <div class="card-badge">Schüler</div>
+      </div>
+
+      <!-- Card Body -->
+      <div class="card-body">
+        <!-- Photo -->
+        <div class="photo-wrapper">
+          <div id="card-photo-container">
+            <div class="placeholder-avatar"><i class="fa-solid fa-user"></i></div>
+          </div>
+        </div>
+
+        <!-- Details -->
+        <div class="details-wrapper">
+          <div class="detail-item">
+            <span class="detail-label">Name, Vorname</span>
+            <span class="detail-value name" id="card-name">-</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Geburtsdatum</span>
+            <span class="detail-value" id="card-birth">-</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Bibliotheksnr.</span>
+            <span class="detail-value" id="card-bib">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hologram -->
+      <div class="hologram-siegel" id="hologram">
+        <i class="fa-solid fa-graduation-cap"></i>
+      </div>
+
+      <!-- Card Footer -->
+      <div class="card-footer">
+        <!-- Live validation Clock -->
+        <div class="live-ticker">
+          <div class="ticker-label">Gültig</div>
+          <div class="ticker-time" id="ticker-time">00:00:00.000</div>
+        </div>
+
+        <!-- Validity Expiry Dates -->
+        <div class="validity-info">
+          <span>Gültig bis: <strong id="card-expiry">-</strong></span>
+          <span>Status: <strong style="color:var(--success);" id="card-status-label">Online verifiziert</strong></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('Service Worker registriert!'))
+          .catch(err => console.error('Service Worker Fehler:', err));
+      });
+    }
+
+    // Interactive 3D Card Hover & Tilting
+    const cardFrame = document.getElementById('card-frame');
+    const card = document.getElementById('student-card');
+    const hologram = document.getElementById('hologram');
+
+    // Mouse / Touch Tilt Effect
+    cardFrame.addEventListener('mousemove', (e) => {
+      const rect = cardFrame.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width/2;
+      const y = e.clientY - rect.top - rect.height/2;
+      
+      const tiltX = (y / (rect.height/2)) * 12;
+      const tiltY = -(x / (rect.width/2)) * 12;
+
+      card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+      hologram.style.transform = `translateZ(20px) rotate(${tiltY * 2}deg)`;
+    });
+
+    cardFrame.addEventListener('mouseleave', () => {
+      card.style.transform = 'rotateX(0deg) rotateY(0deg)';
+      hologram.style.transform = 'translateZ(0px) rotate(0deg)';
+    });
+
+    // Gyroscope tilt effect (DeviceOrientation)
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', (e) => {
+        const beta = e.beta;  // Front-back Tilt
+        const gamma = e.gamma; // Left-right Tilt
+        
+        if (beta && gamma) {
+          // Begrenze Neigung
+          const tiltX = Math.min(Math.max(beta - 45, -15), 15);
+          const tiltY = Math.min(Math.max(gamma, -15), 15);
+
+          card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+          hologram.style.transform = `translateZ(20px) rotate(${tiltY * 2}deg)`;
+        }
+      });
+    }
+
+    // Live-Clock Ticker
+    function updateClock() {
+      const now = new Date();
+      const hrs = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const secs = String(now.getSeconds()).padStart(2, '0');
+      const ms = String(now.getMilliseconds()).padStart(3, '0');
+      
+      document.getElementById('ticker-time').innerText = `${hrs}:${mins}:${secs}.${ms}`;
+      requestAnimationFrame(updateClock);
+    }
+    requestAnimationFrame(updateClock);
+
+    // Fetch Card Data
+    async function loadCardData() {
+      try {
+        const res = await fetch('api/student/card');
+        if (!res.ok) throw new Error('Nicht autorisiert oder offline.');
+        
+        const data = await res.json();
+        
+        // Cachen in localStorage für Offline-Zugriff
+        localStorage.setItem('mso_cached_card', JSON.stringify(data));
+        renderCard(data, false);
+      } catch (err) {
+        console.warn('Online-Abruf fehlgeschlagen, lade Offline-Ausweis:', err);
+        const cached = localStorage.getItem('mso_cached_card');
+        if (cached) {
+          renderCard(JSON.parse(cached), true);
+        } else {
+          document.getElementById('card-name').innerText = 'Kein Offline-Cache';
+        }
+      }
+    }
+
+    function renderCard(data, isOffline) {
+      document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
+      
+      // Geburtsdatum formatieren
+      let birthStr = '-';
+      if (data.birth_date) {
+        const parts = data.birth_date.split('-');
+        if (parts.length === 3) {
+          birthStr = `${parts[2]}.${parts[1]}.${parts[0]}`;
+        } else {
+          birthStr = data.birth_date;
+        }
+      }
+      document.getElementById('card-birth').innerText = birthStr;
+      document.getElementById('card-bib').innerText = data.mediothek_number || '-';
+      
+      // Ablaufdatum formatieren
+      if (data.expires_at) {
+        const parts = data.expires_at.split('-');
+        document.getElementById('card-expiry').innerText = `${parts[2]}.${parts[1]}.${parts[0]}`;
+      }
+      
+      // Foto rendern
+      const imgContainer = document.getElementById('card-photo-container');
+      if (data.card_image) {
+        imgContainer.innerHTML = `<img src="${data.card_image}" alt="Passbild">`;
+      } else {
+        imgContainer.innerHTML = `<div class="placeholder-avatar"><i class="fa-solid fa-user"></i></div>`;
+      }
+
+      // Offline Banner & Status anpassen
+      const offlineBanner = document.getElementById('offline-banner');
+      const statusLabel = document.getElementById('card-status-label');
+      
+      if (isOffline) {
+        offlineBanner.style.display = 'flex';
+        statusLabel.innerText = 'Offline verifiziert';
+        statusLabel.style.color = 'var(--text-secondary)';
+      } else {
+        offlineBanner.style.display = 'none';
+        statusLabel.innerText = 'Online verifiziert';
+        statusLabel.style.color = 'var(--success)';
+      }
+
+      // Sperrung (Revoke) prüfen
+      const overlay = document.getElementById('revoked-overlay');
+      if (data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig') {
+        overlay.style.display = 'flex';
+      } else {
+        overlay.style.display = 'none';
+      }
+
+      // Offline-Check gegen das Ablaufdatum
+      const now = new Date();
+      const expiry = new Date(data.expires_at);
+      if (now > expiry) {
+        overlay.innerHTML = `
+          <i class="fa-solid fa-calendar-times revoked-icon"></i>
+          <div class="revoked-title">Ausweis abgelaufen</div>
+          <div class="revoked-desc">Dieser digitale Schülerausweis ist am ${document.getElementById('card-expiry').innerText} abgelaufen. Bitte verbinden Sie sich mit dem Internet, um ihn zu erneuern.</div>
+        `;
+        overlay.style.display = 'flex';
+      }
+    }
+
+    // Start
+    loadCardData();
+  </script>
+</body>
+</html>

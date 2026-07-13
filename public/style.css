@@ -529,18 +529,19 @@ main {
 
 .close-btn {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
+  top: 15px;
+  right: 15px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   cursor: pointer;
   color: var(--text-secondary);
   border-radius: 50%;
-  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  transition: all 0.2s ease;
+  z-index: 15;
   line-height: 1;
 }
 .close-btn:hover {

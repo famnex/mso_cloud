@@ -72,6 +72,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tiles', require('./routes/tiles'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/student', require('./routes/student'));
 // OIDC standardisierte Pfade auf Root-Ebene (Direkte JSON-Antworten ohne Redirect für Auto-Discovery)
 const { openidConfigurationHandler, jwksHandler } = require('./oidcHelper');
 app.get('/.well-known/openid-configuration', openidConfigurationHandler);
