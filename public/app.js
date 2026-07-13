@@ -1034,6 +1034,10 @@ async function loadAdminConfig() {
     if (impressumInput) {
       impressumInput.value = cfg.impressum_url || 'https://www.mso-hef.de/impressum';
     }
+    const disableStudentCheckInput = document.getElementById('disable_student_check');
+    if (disableStudentCheckInput) {
+      disableStudentCheckInput.checked = cfg.disable_student_check === '1';
+    }
 
   } catch (err) {
     showAdminAlert('Konfiguration konnte nicht geladen werden.', 'danger');
@@ -1182,7 +1186,8 @@ async function saveMysqlConfig(e) {
 async function saveGeneralConfig(e) {
   e.preventDefault();
   const body = {
-    impressum_url: document.getElementById('impressum_url').value.trim()
+    impressum_url: document.getElementById('impressum_url').value.trim(),
+    disable_student_check: document.getElementById('disable_student_check').checked ? '1' : '0'
   };
 
   try {

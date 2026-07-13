@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../db');
+const { db, getConfig } = require('../db');
 
 /**
  * Holt die Ausweis-Daten des aktuell eingeloggten Schülers.
@@ -12,9 +12,25 @@ router.get('/card', (req, res) => {
   }
 
   try {
-    const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(user.id);
+    let profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(user.id);
+    const disableCheck = getConfig('disable_student_check') === '1';
+
     if (!profile) {
-      return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
+      if (disableCheck) {
+        // Dummy-Profil für Testzwecke erzeugen
+        const nameParts = (user.display_name || user.username).split(' ');
+        profile = {
+          first_name: nameParts[0] || user.username,
+          last_name: nameParts.slice(1).join(' ') || 'Test-Account',
+          birth_date: '1980-01-01',
+          birth_place: 'Musterstadt',
+          mediothek_number: '999999',
+          card_image: null,
+          card_status: 'Bild verifiziert'
+        };
+      } else {
+        return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
+      }
     }
 
     // Ablaufdatum bestimmen (31. Juli des laufenden Schuljahres)
