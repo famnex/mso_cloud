@@ -14,7 +14,14 @@ router.get('/me', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const impressumUrl = getConfig('impressum_url', 'https://www.mso-hef.de/impressum');
   if (req.session.user) {
-    res.json({ logged_in: true, user: req.session.user, impressum_url: impressumUrl });
+    const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
+    const isStudent = !!isStudentRow || req.session.user.role === 'schueler';
+    
+    const userPayload = {
+      ...req.session.user,
+      isStudent: isStudent
+    };
+    res.json({ logged_in: true, user: userPayload, impressum_url: impressumUrl });
   } else {
     res.json({ logged_in: false, impressum_url: impressumUrl });
   }
