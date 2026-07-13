@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mso-student-card-v2';
+const CACHE_NAME = 'mso-student-card-v3';
 const ASSETS = [
   'student_card.html',
   'style.css',
@@ -28,24 +28,29 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Network First strategy for all requests to ensure updates are instant while online
 self.addEventListener('fetch', (e) => {
-  if (e.request.url.includes('/api/student/card')) {
-    e.respondWith(
-      fetch(e.request)
-        .then((res) => {
+  // Nur GET-Anfragen cachen (APIs und statische Assets)
+  if (e.request.method !== 'GET') {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => {
+        // Nur erfolgreiche Anfragen in den Cache schreiben
+        if (res.status === 200) {
           const resClone = res.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(e.request, resClone);
           });
-          return res;
-        })
-        .catch(() => caches.match(e.request))
-    );
-  } else {
-    e.respondWith(
-      caches.match(e.request).then((cachedRes) => {
-        return cachedRes || fetch(e.request);
+        }
+        return res;
       })
-    );
-  }
+      .catch(() => {
+        // Offline-Fallback aus dem Cache
+        return caches.match(e.request);
+      })
+  );
 });
