@@ -867,7 +867,40 @@ function toggleTileGroupsSelect() {
 function toggleTileSsoFields() {
   const sso = document.getElementById('tile_sso_type').value;
   const wrapper = document.getElementById('tile-sso-key-wrapper');
+  const helpText = document.getElementById('tile-sso-help-text');
+  
   wrapper.style.display = sso !== 'none' ? 'block' : 'none';
+  
+  if (sso === 'jwt') {
+    const host = window.location.host;
+    const isSubdir = host.toLowerCase() === 'cloud.mso-hef.de';
+    const base = `https://${host}${isSubdir ? '/novus' : ''}`;
+    const tileId = document.getElementById('tile-id-field').value || '<KACHEL_ID>';
+    
+    helpText.innerHTML = `
+      <div style="font-weight:600; margin-bottom:6px; color:#3b82f6;"><i class="fa-solid fa-circle-info"></i> JWT SSO Integration</div>
+      Geben Sie in der Ziel-App (z. B. Buchungssystem) folgende Einstellungen an:
+      <ul style="margin: 6px 0 0 15px; padding:0; display:flex; flex-direction:column; gap:4px;">
+        <li><strong>SSO Identity Provider Login-URL:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem; word-break:break-all;">${base}/api/tiles/sso/${tileId}</code></li>
+        <li><strong>Username Claim Name:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">username</code></li>
+        <li><strong>E-Mail Claim Name:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">email</code></li>
+        <li><strong>Signierschlüssel (Secret):</strong> Nutzen Sie den oben angezeigten/generierten Schlüssel.</li>
+      </ul>
+    `;
+    helpText.style.display = 'block';
+  } else if (sso === 'query') {
+    helpText.innerHTML = `
+      <div style="font-weight:600; margin-bottom:6px; color:#3b82f6;"><i class="fa-solid fa-circle-info"></i> Query SSO Integration</div>
+      Dem Ziel-Link werden Parameter angehängt. Geben Sie in der App folgendes an:
+      <ul style="margin: 6px 0 0 15px; padding:0; display:flex; flex-direction:column; gap:4px;">
+        <li><strong>Übergebene Parameter:</strong> <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">username</code>, <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">email</code>, <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">timestamp</code>, <code style="background:rgba(0,0,0,0.2); padding:2px 4px; border-radius:4px; font-size:0.75rem;">hash</code></li>
+        <li><strong>Signaturschlüssel:</strong> Der oben hinterlegte Schlüssel dient zur HMAC-Validierung des Hashes.</li>
+      </ul>
+    `;
+    helpText.style.display = 'block';
+  } else {
+    helpText.style.display = 'none';
+  }
 }
 
 function toggleTileTimeFields() {
