@@ -1,19 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const { db, getConfig } = require('../db');
+const studentDb = require('../student_db');
 
 /**
  * Holt die Ausweis-Daten des aktuell eingeloggten Schülers.
  */
-router.get('/card', (req, res) => {
+router.get('/card', async (req, res) => {
   const user = req.session.user;
   if (!user) {
     return res.status(401).json({ error: 'Nicht angemeldet.' });
   }
 
   try {
-    let profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(user.id);
-    const disableCheck = getConfig('disable_student_check') === '1';
+    let profile = await studentDb.getStudentProfile(user);
+    const disableCheck = getConfig('disable_student_check', '0') === '1';
 
     if (!profile) {
       if (disableCheck) {
@@ -31,6 +32,36 @@ router.get('/card', (req, res) => {
       } else {
         return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
       }
+    } else {
+      // Profil in lokaler SQLite synchronisieren, damit es offline geladen werden kann
+      db.prepare(`
+        INSERT INTO student_profiles (
+          user_id, first_name, last_name, birth_date, birth_place, 
+          mediothek_number, start_password, account_status, card_status, card_image
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          first_name = excluded.first_name,
+          last_name = excluded.last_name,
+          birth_date = excluded.birth_date,
+          birth_place = excluded.birth_place,
+          mediothek_number = excluded.mediothek_number,
+          start_password = excluded.start_password,
+          account_status = excluded.account_status,
+          card_status = excluded.card_status,
+          card_image = COALESCE(excluded.card_image, card_image)
+      `).run(
+        user.id,
+        profile.first_name || '',
+        profile.last_name || '',
+        profile.birth_date || null,
+        profile.birth_place || '',
+        profile.mediothek_number || '',
+        profile.start_password || '',
+        profile.account_status || 'false',
+        profile.card_status || 'Bild ungeprüft / Kein Bild',
+        profile.card_image || null
+      );
     }
 
     // Ablaufdatum bestimmen (31. Juli des laufenden Schuljahres)
