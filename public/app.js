@@ -598,8 +598,11 @@ function loadAdminTabContent(tabId) {
 
   if (tabId === 'tab-tiles') {
     loadAdminTiles();
-  } else if (tabId === 'tab-ldap' || tabId === 'tab-smtp' || tabId === 'tab-mysql') {
+  } else if (tabId === 'tab-ldap' || tabId === 'tab-smtp' || tabId === 'tab-mysql' || tabId === 'tab-system') {
     loadAdminConfig();
+    if (tabId === 'tab-system') {
+      loadSystemInfo();
+    }
   } else if (tabId === 'tab-oauth') {
     loadOauthClientConfig();
   } else if (tabId === 'tab-mapping') {
@@ -608,8 +611,6 @@ function loadAdminTabContent(tabId) {
     loadAdminUsers();
   } else if (tabId === 'tab-messages') {
     loadAdminMessages();
-  } else if (tabId === 'tab-system') {
-    loadSystemInfo();
   } else if (tabId === 'tab-logs') {
     loadAdminLogs();
   }
