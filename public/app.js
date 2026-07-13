@@ -142,6 +142,12 @@ function renderAuthenticatedHeader() {
     cardLink.style.display = isStudent ? 'block' : 'none';
   }
 
+  // Toggle user profile link visibility based on student status
+  const profileLink = document.getElementById('header-profile-link');
+  if (profileLink) {
+    profileLink.style.display = isStudent ? 'block' : 'none';
+  }
+
   // Load student profile details
   if (isStudent) {
     loadStudentProfile();
