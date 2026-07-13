@@ -464,30 +464,11 @@ router.get('/.well-known/openid-configuration', openidConfigurationHandler);
  */
 router.get('/jwks', jwksHandler);
 
-/**
- * OIDC End Session (Logout) Endpoint (GET /api/oauth/logout)
- */
 router.get('/logout', (req, res) => {
   try {
-    // 1. Lokale Session in MSO Cloud zerstören (Benutzer ausloggen)
-    if (req.session) {
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('Session-Zerstörung fehlgeschlagen beim OIDC-Logout:', err);
-        }
-      });
-    }
-
-    // 2. OIDC RP-Initiated Logout Parameter ermitteln
-    const { post_logout_redirect_uri } = req.query;
-    
-    // 3. Weiterleitung durchführen
-    if (post_logout_redirect_uri) {
-      // Zurückleiten an den RP (z.B. WebUntis)
-      return res.redirect(post_logout_redirect_uri);
-    }
-
-    // Fallback: Zurück auf das Cloud Portal
+    // Der Benutzer soll in der MSO Cloud angemeldet bleiben, wenn er sich bei WebUntis abmeldet.
+    // Daher zerstören wir die Session NICHT und ignorieren den post_logout_redirect_uri.
+    // Stattdessen leiten wir ihn direkt zurück auf die MSO Cloud Startseite um.
     const host = req.get('host') || '';
     const isSubdir = host.toLowerCase() === 'cloud.mso-hef.de';
     const redirectUrl = isSubdir ? '/novus/' : '/';
