@@ -1025,35 +1025,39 @@
       targetTiltY = 0;
     });
 
+    function handleOrientation(e) {
+      const beta = e.beta;  
+      const gamma = e.gamma; 
+      if (beta !== null && gamma !== null) {
+        // Berechne Neigung relativ zur Neutralhaltung (ca. 45 Grad geneigtes Halten)
+        targetTiltX = Math.min(Math.max((beta - 45) * 0.6, -15), 15);
+        targetTiltY = Math.min(Math.max(gamma * 0.6, -15), 15);
+      }
+    }
+
     // Gyroscope tilt effect (DeviceOrientation) mit iOS-Permission-Handling
     if (window.DeviceOrientationEvent) {
-      // iOS 13+ Berechtigung einholen bei erster Benutzerinteraktion
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ erfordert expliziten Permission-Request im Klick/Touch-Kontext
         const requestGyroPermission = () => {
           DeviceOrientationEvent.requestPermission()
             .then(state => {
               if (state === 'granted') {
-                console.log('Gyroskop-Berechtigung erteilt.');
+                console.log('Gyroskop-Berechtigung erteilt. Registriere Listener.');
+                window.addEventListener('deviceorientation', handleOrientation);
               }
             })
-            .catch(console.error);
-          document.removeEventListener('click', requestGyroPermission);
-          document.removeEventListener('touchstart', requestGyroPermission);
+            .catch(err => {
+              console.error('Fehler bei Gyro-Berechtigungsanfrage:', err);
+            });
         };
-        document.addEventListener('click', requestGyroPermission);
-        document.addEventListener('touchstart', requestGyroPermission);
+        // Wir lauschen auf dem gesamten Dokument auf den ersten Klick/Touch
+        document.addEventListener('click', requestGyroPermission, { once: true });
+        document.addEventListener('touchstart', requestGyroPermission, { once: true });
+      } else {
+        // Android / Desktop: Direkt registrieren
+        window.addEventListener('deviceorientation', handleOrientation);
       }
-
-      window.addEventListener('deviceorientation', (e) => {
-        const beta = e.beta;  
-        const gamma = e.gamma; 
-        
-        if (beta !== null && gamma !== null) {
-          // Normalisierung der Neigung im typischen Halte-Winkel (45 Grad Neigung)
-          targetTiltX = Math.min(Math.max(beta - 45, -15), 15);
-          targetTiltY = Math.min(Math.max(gamma, -15), 15);
-        }
-      });
     }
 
     // Live-Clock Ticker with Date and time with MS
@@ -1201,6 +1205,7 @@
       } else {
         document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
         document.getElementById('card-birthplace').innerText = data.birth_place || '-';
+        document.getElementById('card-mediothek-number-display').innerText = data.mediothek_number || '-';
         
         // Geburtsdatum
         let birthStr = '-';
