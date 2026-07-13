@@ -1203,6 +1203,8 @@ async function saveGeneralConfig(e) {
       if (footerLink) {
         footerLink.href = body.impressum_url;
       }
+      // Aktualisiere den Auth-Status und die Header-Ansichten sofort im Frontend
+      await checkAuthStatus();
     }
   } catch (err) {
     showAdminAlert(err.message, 'danger');
