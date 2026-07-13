@@ -210,7 +210,10 @@ async function getStudentProfile(user) {
       }
       
       if (!applicationId) {
-        return getLocalProfile(user.id);
+        // Der Benutzer ist online, aber es existiert kein passender Schülerdatensatz in MySQL.
+        // Das lokale Profil wird sofort gelöscht, um den Ausweis unbrauchbar zu machen.
+        db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+        return null;
       }
 
       const [fieldRows] = await pool.query(`
