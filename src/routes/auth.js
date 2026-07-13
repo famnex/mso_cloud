@@ -15,7 +15,8 @@ router.get('/me', (req, res) => {
   const impressumUrl = getConfig('impressum_url', 'https://www.mso-hef.de/impressum');
   if (req.session.user) {
     const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
-    const isStudent = !!isStudentRow || req.session.user.role === 'schueler';
+    const disableCheck = getConfig('disable_student_check', '0') === '1';
+    const isStudent = disableCheck || !!isStudentRow || req.session.user.role === 'schueler';
     
     const userPayload = {
       ...req.session.user,
