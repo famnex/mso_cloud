@@ -7,9 +7,9 @@
   
   <!-- PWA Manifest & Icons -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#3b82f6">
+  <meta name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="MSO Ausweis">
   
   <!-- Google Fonts & FontAwesome -->
@@ -23,13 +23,13 @@
 
   <style>
     :root {
-      --bg-dark: #090d16;
-      --card-bg: rgba(17, 25, 40, 0.7);
-      --card-border: rgba(255, 255, 255, 0.08);
+      --bg-dark: #f1f5f9; /* Helles Hellgrau */
+      --card-bg: rgba(255, 255, 255, 0.9); /* Helles Weiß mit minimaler Transparenz */
+      --card-border: rgba(0, 0, 0, 0.08); /* Dunkle, dezente Ränder */
       --accent: #3b82f6; /* Wird dynamisch überschrieben */
-      --accent-glow: rgba(59, 130, 246, 0.35);
-      --text: #f8fafc;
-      --text-secondary: #94a3b8;
+      --accent-glow: rgba(59, 130, 246, 0.12);
+      --text: #0f172a; /* Dunkler Text für super Lesbarkeit */
+      --text-secondary: #475569; /* Dezenterer dunklerer Text */
       --success: #10b981;
       --danger: #ef4444;
     }
@@ -74,39 +74,18 @@
     .top-controls {
       position: absolute;
       top: 20px;
-      left: 20px;
       right: 20px;
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       align-items: center;
       z-index: 100;
-    }
-
-    .back-btn {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--card-border);
-      color: var(--text);
-      padding: 8px 14px;
-      border-radius: 30px;
-      text-decoration: none;
-      font-size: 0.85rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      backdrop-filter: blur(10px);
-      transition: all 0.2s ease;
-    }
-    .back-btn:hover {
-      background: rgba(255,255,255,0.1);
-      transform: translateY(-2px);
     }
 
     /* Language Switcher */
     .lang-switcher {
       display: flex;
       gap: 5px;
-      background: rgba(255,255,255,0.05);
+      background: rgba(0,0,0,0.05);
       border: 1px solid var(--card-border);
       padding: 4px;
       border-radius: 30px;
@@ -137,7 +116,7 @@
       width: 100%;
       max-width: 340px;
       z-index: 10;
-      margin-top: 60px;
+      margin-top: 40px;
       margin-bottom: 20px;
     }
 
@@ -153,7 +132,7 @@
       padding: 20px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6),
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15),
                   0 0 35px var(--accent-glow);
       transform-style: preserve-3d;
       transition: transform 0.08s ease;
@@ -170,7 +149,7 @@
       background: linear-gradient(
         135deg,
         rgba(255, 255, 255, 0) 0%,
-        rgba(255, 255, 255, 0.06) 50%,
+        rgba(255, 255, 255, 0.12) 50%,
         rgba(255, 255, 255, 0) 100%
       );
       mix-blend-mode: overlay;
@@ -189,7 +168,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
       padding-bottom: 12px;
     }
 
@@ -202,7 +181,7 @@
     .school-logo-placeholder {
       width: 36px;
       height: 36px;
-      background: rgba(255,255,255,0.05);
+      background: rgba(0,0,0,0.03);
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -223,13 +202,13 @@
       font-weight: 800;
       letter-spacing: 0.3px;
       text-transform: uppercase;
-      color: #ffffff;
+      color: var(--text);
       line-height: 1.2;
     }
 
     .card-badge {
       align-self: center;
-      background: rgba(59, 130, 246, 0.15);
+      background: rgba(59, 130, 246, 0.1);
       border: 1px solid var(--accent);
       color: var(--accent);
       font-size: 0.65rem;
@@ -252,8 +231,8 @@
       height: 140px;
       border-radius: 12px;
       overflow: hidden;
-      border: 2px solid rgba(255,255,255,0.1);
-      background: #151f32;
+      border: 2px solid rgba(0,0,0,0.08);
+      background: #e2e8f0;
       flex-shrink: 0;
       position: relative;
     }
@@ -334,14 +313,13 @@
       max-height: 100%;
       max-width: 100%;
       object-fit: contain;
-      filter: drop-shadow(0 0 2px rgba(255,255,255,0.4));
     }
 
     .signature-placeholder {
       font-family: 'Brush Script MT', cursive, sans-serif;
       font-size: 1.3rem;
       color: var(--text-secondary);
-      opacity: 0.7;
+      opacity: 0.5;
     }
 
     /* Hologram Siegel */
@@ -349,14 +327,14 @@
       width: 58px;
       height: 58px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.02) 100%);
-      border: 1px dashed rgba(255,255,255,0.25);
+      background: radial-gradient(circle, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.01) 100%);
+      border: 1.5px dashed rgba(0,0,0,0.15);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.4rem;
-      color: rgba(255,255,255,0.65);
-      box-shadow: 0 0 12px rgba(255,255,255,0.08);
+      color: rgba(0,0,0,0.45);
+      box-shadow: 0 0 12px rgba(0,0,0,0.03);
       transition: transform 0.1s ease;
       transform-style: preserve-3d;
       pointer-events: none;
@@ -373,7 +351,7 @@
 
     /* QR-Code & Validity Zone */
     .card-footer {
-      border-top: 1px solid rgba(255,255,255,0.06);
+      border-top: 1px solid rgba(0,0,0,0.06);
       padding-top: 12px;
       display: flex;
       flex-direction: column;
@@ -396,7 +374,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
       flex-shrink: 0;
     }
 
@@ -411,10 +389,10 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(0,0,0,0.35);
+      background: rgba(0,0,0,0.05);
       border-radius: 8px;
       padding: 5px 8px;
-      border: 1px solid rgba(255,255,255,0.03);
+      border: 1px solid rgba(0,0,0,0.03);
     }
 
     .ticker-label {
@@ -445,7 +423,7 @@
 
     .ticker-time {
       font-family: monospace;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
       color: var(--text);
     }
@@ -466,7 +444,7 @@
     .revoked-overlay {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(10, 15, 30, 0.96);
+      background: rgba(255, 255, 255, 0.98);
       z-index: 100;
       display: none;
       flex-direction: column;
@@ -505,9 +483,9 @@
 
     /* Offline banner */
     .offline-banner {
-      background: rgba(245, 158, 11, 0.15);
+      background: rgba(245, 158, 11, 0.1);
       border: 1px solid #f59e0b;
-      color: #fbbf24;
+      color: #d97706;
       padding: 6px 12px;
       border-radius: 20px;
       font-size: 0.8rem;
@@ -524,8 +502,6 @@
 
   <!-- Top Bar Controls -->
   <div class="top-controls">
-    <a href="index.html" class="back-btn"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="backBtn">Portal</span></a>
-    
     <!-- Language Toggle -->
     <div class="lang-switcher">
       <button class="lang-btn active" onclick="switchLanguage('de')">DE</button>
@@ -561,7 +537,7 @@
         <div class="school-info">
           <div class="school-title" id="school-title-display">Modellschule Obersberg</div>
         </div>
-        <div class="card-badge" data-i18n="studentBadge">Schüler</div>
+        <div class="card-badge" id="card-badge-display" data-i18n="studentBadge">Schülerausweis</div>
       </div>
 
       <!-- Card Body - Photo & Info -->
@@ -596,7 +572,7 @@
           <div class="signature-wrapper" id="signature-container">
             <span class="signature-placeholder">Unterschrift</span>
           </div>
-          <span class="detail-label" data-i18n="labelPrincipal">Schulleiter</span>
+          <span class="detail-label" data-i18n="labelPrincipal">Schulleiter/in</span>
           <span class="detail-value" style="font-size: 0.75rem;" id="principal-name-display">OStD Karsten Backhaus</span>
         </div>
 
@@ -616,7 +592,7 @@
             <!-- Live Clock -->
             <div class="live-ticker">
               <div class="ticker-label" data-i18n="labelValid">Gültig</div>
-              <div class="ticker-time" id="ticker-time">00:00:00.000</div>
+              <div class="ticker-time" id="ticker-time">00.00.0000 00:00:00.000</div>
             </div>
 
             <!-- Expiry & Status info -->
@@ -644,9 +620,8 @@
     // Translations Dictionary
     const translations = {
       de: {
-        backBtn: "Portal",
         offlineMode: "Offline-Modus aktiv (Lokaler Ausweis)",
-        studentBadge: "Schüler",
+        studentBadge: "Schülerausweis",
         labelName: "Name, Vorname",
         labelBirth: "Geburtsdatum",
         labelBirthplace: "Geburtsort",
@@ -665,9 +640,8 @@
         photoPendingDesc: "Ihr hochgeladenes Passbild wird derzeit von der Verwaltung geprüft. Sobald das Foto verifiziert ist, wird Ihr Ausweis freigeschaltet."
       },
       en: {
-        backBtn: "Lobby",
         offlineMode: "Offline Mode Active (Cached Card)",
-        studentBadge: "Student",
+        studentBadge: "Student ID Card",
         labelName: "Name, Surname",
         labelBirth: "Date of Birth",
         labelBirthplace: "Place of Birth",
@@ -686,9 +660,8 @@
         photoPendingDesc: "Your uploaded photo is currently under review by the administration. Your card will be unlocked once approved."
       },
       fr: {
-        backBtn: "Portail",
         offlineMode: "Mode hors ligne actif (carte mise en cache)",
-        studentBadge: "Élève",
+        studentBadge: "Carte d'étudiant",
         labelName: "Nom, Prénom",
         labelBirth: "Date de naissance",
         labelBirthplace: "Lieu de naissance",
@@ -775,15 +748,19 @@
       });
     }
 
-    // Live-Clock Ticker
+    // Live-Clock Ticker with Date and time with MS
     function updateClock() {
       const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+
       const hrs = String(now.getHours()).padStart(2, '0');
       const mins = String(now.getMinutes()).padStart(2, '0');
       const secs = String(now.getSeconds()).padStart(2, '0');
       const ms = String(now.getMilliseconds()).padStart(3, '0');
       
-      document.getElementById('ticker-time').innerText = `${hrs}:${mins}:${secs}.${ms}`;
+      document.getElementById('ticker-time').innerText = `${day}.${month}.${year} ${hrs}:${mins}:${secs}.${ms}`;
       requestAnimationFrame(updateClock);
     }
     requestAnimationFrame(updateClock);
@@ -815,7 +792,7 @@
       // 1. Theme Farbe anwenden
       if (data.card_primary_color) {
         document.documentElement.style.setProperty('--accent', data.card_primary_color);
-        document.documentElement.style.setProperty('--accent-glow', data.card_primary_color + '40');
+        document.documentElement.style.setProperty('--accent-glow', data.card_primary_color + '1F');
       }
 
       // 2. Schultitel & Logo
