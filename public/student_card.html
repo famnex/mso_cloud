@@ -1221,9 +1221,12 @@
       const logoContainer = document.getElementById('school-logo-container');
       const watermarkContainer = document.getElementById('logo-watermark-container');
       
+      // Wasserzeichen im Hintergrund befüllen (PWA App-Icon)
+      const pwaIconSrc = data.card_pwa_icon || 'api/student/pwa-icon';
+      watermarkContainer.innerHTML = `<img src="${pwaIconSrc}" alt="Watermark">`;
+      
       if (data.card_logo) {
         logoContainer.innerHTML = `<img src="${data.card_logo}" id="card-logo-element" class="school-logo-img" alt="Logo">`;
-        watermarkContainer.innerHTML = `<img src="${data.card_logo}" alt="Watermark">`;
         
         // Dynamische Prüfung des Breiten-Verhältnisses (Aspekt-Ratio)
         const tempImg = new Image();
@@ -1238,7 +1241,6 @@
         tempImg.src = data.card_logo;
       } else {
         logoContainer.innerHTML = `<div class="school-logo-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>`;
-        watermarkContainer.innerHTML = '';
         document.getElementById('school-title-display').style.display = 'block';
       }
 
