@@ -137,9 +137,13 @@ header {
   border: 1px solid var(--panel-border);
   box-shadow: var(--shadow-main);
   z-index: 1000;
-  background: var(--panel-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #0f172a; /* Solider Hintergrund im Dark Mode */
+}
+
+/* Deckender Hintergrund im Light Mode */
+html[data-theme="light"] .user-dropdown,
+[data-theme="light"] .user-dropdown {
+  background: #ffffff;
 }
 
 /* Dropdown Name Header */
