@@ -68,6 +68,8 @@ Enthält alle Dienste-Kacheln, die auf dem Dashboard angezeigt werden.
 | `time_limit_enabled` | INTEGER | Flag für Zeitsperre (`0` = Inaktiv, `1` = Aktiv) |
 | `time_limit_start` | TEXT | Startzeitpunkt der Kachel-Aktivität (`HH:MM`) |
 | `time_limit_end` | TEXT | Endzeitpunkt der Kachel-Aktivität (`HH:MM`) |
+| `open_in_new_tab` | INTEGER | Flag, ob die Kachel in einem neuen Tab geöffnet werden soll (`0` = nein, `1` = ja) |
+| `disable_status_check` | INTEGER | Flag, ob die Erreichbarkeits-Statusprüfung deaktiviert werden soll (`0` = nein/Prüfung aktiv, `1` = ja/immer online) |
 
 ---
 

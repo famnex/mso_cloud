@@ -303,7 +303,7 @@ router.post('/tiles/reorder', (req, res) => {
 
 router.post('/tiles', (req, res) => {
   try {
-    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end } = req.body;
+    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end, open_in_new_tab, disable_status_check } = req.body;
     
     if (!title || !icon || !link) {
       return res.status(400).json({ error: 'Titel, Icon und Link sind Pflichtfelder.' });
@@ -318,8 +318,8 @@ router.post('/tiles', (req, res) => {
     }
 
     db.prepare(`
-      INSERT INTO tiles (title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tiles (title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end, open_in_new_tab, disable_status_check)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title,
       description || '',
@@ -332,7 +332,9 @@ router.post('/tiles', (req, res) => {
       finalSortOrder,
       parseInt(time_limit_enabled || 0, 10),
       time_limit_start || '08:00',
-      time_limit_end || '16:00'
+      time_limit_end || '16:00',
+      parseInt(open_in_new_tab || 0, 10),
+      parseInt(disable_status_check || 0, 10)
     );
 
     res.json({ success: true, message: 'Dienst erfolgreich hinzugefügt.' });
@@ -344,7 +346,7 @@ router.post('/tiles', (req, res) => {
 router.put('/tiles/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end } = req.body;
+    const { title, description, icon, link, visibility, allowed_groups, sso_type, sso_key, sort_order, time_limit_enabled, time_limit_start, time_limit_end, open_in_new_tab, disable_status_check } = req.body;
 
     if (!title || !icon || !link) {
       return res.status(400).json({ error: 'Titel, Icon und Link sind Pflichtfelder.' });
@@ -352,7 +354,7 @@ router.put('/tiles/:id', (req, res) => {
 
     db.prepare(`
       UPDATE tiles
-      SET title = ?, description = ?, icon = ?, link = ?, visibility = ?, allowed_groups = ?, sso_type = ?, sso_key = ?, sort_order = ?, time_limit_enabled = ?, time_limit_start = ?, time_limit_end = ?
+      SET title = ?, description = ?, icon = ?, link = ?, visibility = ?, allowed_groups = ?, sso_type = ?, sso_key = ?, sort_order = ?, time_limit_enabled = ?, time_limit_start = ?, time_limit_end = ?, open_in_new_tab = ?, disable_status_check = ?
       WHERE id = ?
     `).run(
       title,
@@ -367,6 +369,8 @@ router.put('/tiles/:id', (req, res) => {
       parseInt(time_limit_enabled || 0, 10),
       time_limit_start || '08:00',
       time_limit_end || '16:00',
+      parseInt(open_in_new_tab || 0, 10),
+      parseInt(disable_status_check || 0, 10),
       id
     );
 

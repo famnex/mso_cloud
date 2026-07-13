@@ -264,10 +264,13 @@ async function loadTiles() {
         tileCard.className = 'tile-card glass-panel';
         // SSO-Gateway Link als Href nutzen
         tileCard.href = `api/tiles/sso/${tile.id}`;
+        if (tile.open_in_new_tab === 1) {
+          tileCard.target = '_blank';
+        }
         
         if (isSph) {
           tileCard.onclick = function(e) {
-            handleSphClick(e, tile.id);
+            handleSphClick(e, tile.id, tile.open_in_new_tab === 1);
           };
         }
       }
@@ -275,7 +278,7 @@ async function loadTiles() {
       let keyBtnHtml = '';
       if (currentUser) {
         if (isSph) {
-          keyBtnHtml = `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
+          keyBtnHtml = `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id}, ${tile.open_in_new_tab === 1})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
         }
       }
       
@@ -310,7 +313,15 @@ async function loadTiles() {
           dot.setAttribute('title', 'Dienst aktuell im gesperrten Zeitraum');
         }
       } else {
-        checkTileStatus(tile.id, tile.link);
+        if (tile.disable_status_check === 1) {
+          const dot = document.getElementById(`status-dot-${tile.id}`);
+          if (dot) {
+            dot.className = 'status-dot online';
+            dot.setAttribute('title', 'Statusprüfung deaktiviert (Standardmäßig erreichbar)');
+          }
+        } else {
+          checkTileStatus(tile.id, tile.link);
+        }
       }
     });
 
@@ -703,6 +714,14 @@ async function loadAdminTiles() {
         ? ` <span class="user-badge" style="font-size:0.7rem; background:rgba(245,158,11,0.1); color:var(--warn-color); display:inline-flex; align-items:center; gap:3px;" title="Zeitsperre aktiv: ${tile.time_limit_start} - ${tile.time_limit_end} Uhr"><i class="fa-solid fa-lock"></i> ${tile.time_limit_start}-${tile.time_limit_end}</span>`
         : '';
 
+      const newTabBadge = tile.open_in_new_tab === 1
+        ? ` <span class="user-badge" style="font-size:0.7rem; background:rgba(59,130,246,0.1); color:#3b82f6; display:inline-flex; align-items:center; gap:3px;" title="Öffnet in neuem Tab"><i class="fa-solid fa-up-right-from-square"></i> Tab</span>`
+        : '';
+
+      const noCheckBadge = tile.disable_status_check === 1
+        ? ` <span class="user-badge" style="font-size:0.7rem; background:rgba(107,114,128,0.1); color:#9ca3af; display:inline-flex; align-items:center; gap:3px;" title="Statusprüfung deaktiviert"><i class="fa-solid fa-eye-slash"></i> Kein Check</span>`
+        : '';
+
       const tr = document.createElement('tr');
       tr.setAttribute('draggable', 'true');
       tr.dataset.id = tile.id;
@@ -710,7 +729,7 @@ async function loadAdminTiles() {
       
       tr.innerHTML = `
         <td style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
-        <td><strong>${tile.title}</strong>${timeLockBadge}</td>
+        <td><strong>${tile.title}</strong>${timeLockBadge}${newTabBadge}${noCheckBadge}</td>
         <td style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
         <td style="font-size: 1.25rem;">${renderIcon(tile.icon)}</td>
         <td><span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></td>
@@ -819,10 +838,14 @@ function openTileForm(tile = null) {
     document.getElementById('tile_time_limit_enabled').checked = tile.time_limit_enabled === 1;
     document.getElementById('tile_time_limit_start').value = tile.time_limit_start || '08:00';
     document.getElementById('tile_time_limit_end').value = tile.time_limit_end || '16:00';
+    document.getElementById('tile_open_in_new_tab').checked = tile.open_in_new_tab === 1;
+    document.getElementById('tile_disable_status_check').checked = tile.disable_status_check === 1;
   } else {
     document.getElementById('tile_time_limit_enabled').checked = false;
     document.getElementById('tile_time_limit_start').value = '08:00';
     document.getElementById('tile_time_limit_end').value = '16:00';
+    document.getElementById('tile_open_in_new_tab').checked = false;
+    document.getElementById('tile_disable_status_check').checked = false;
   }
 
   // Initialisiere die premium icon & group Selectors
@@ -872,7 +895,9 @@ async function saveTileForm(e) {
     sso_key: document.getElementById('tile_sso_key').value.trim(),
     time_limit_enabled: document.getElementById('tile_time_limit_enabled').checked ? 1 : 0,
     time_limit_start: document.getElementById('tile_time_limit_start').value,
-    time_limit_end: document.getElementById('tile_time_limit_end').value
+    time_limit_end: document.getElementById('tile_time_limit_end').value,
+    open_in_new_tab: document.getElementById('tile_open_in_new_tab').checked ? 1 : 0,
+    disable_status_check: document.getElementById('tile_disable_status_check').checked ? 1 : 0
   };
 
   const url = id ? `api/admin/tiles/${id}` : 'api/admin/tiles';
@@ -1851,13 +1876,15 @@ function initTooltips() {
    8. SPH Autologin Zugangsdaten Management
    ========================================================================== */
 let activeSphTileId = null;
+let activeSphTileOpenInNewTab = false;
 
-async function openSphCredentialsModal(event, tileId) {
+async function openSphCredentialsModal(event, tileId, openInNewTab) {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
   }
   activeSphTileId = tileId;
+  activeSphTileOpenInNewTab = !!openInNewTab;
   
   // Modal anzeigen und Ladestatus setzen
   document.getElementById('sph-credentials-status-loading').style.display = 'block';
@@ -1899,7 +1926,11 @@ async function saveSphCredentials(e) {
 
     if (res.ok) {
       closeModal('sph-credentials-modal');
-      window.location.href = `api/tiles/sso/${activeSphTileId}`;
+      if (activeSphTileOpenInNewTab) {
+        window.open(`api/tiles/sso/${activeSphTileId}`, '_blank');
+      } else {
+        window.location.href = `api/tiles/sso/${activeSphTileId}`;
+      }
     } else {
       const data = await res.json();
       throw new Error(data.error);
@@ -1932,13 +1963,15 @@ async function deleteSphCredentials() {
   }
 }
 
-async function handleSphClick(e, tileId) {
+async function handleSphClick(e, tileId, openInNewTab) {
   // 1. Wenn nicht eingeloggt in der MSO Cloud, ganz normale Weiterleitung erlauben
   if (!currentUser) {
     return;
   }
 
   e.preventDefault(); // Standard-Navigation unterbrechen
+  activeSphTileId = tileId;
+  activeSphTileOpenInNewTab = !!openInNewTab;
   
   try {
     // 2. Prüfen, ob Zugangsdaten hinterlegt sind
@@ -1947,7 +1980,11 @@ async function handleSphClick(e, tileId) {
 
     if (data.exists) {
       // Zugangsdaten vorhanden -> Direkt weiterleiten (löst den Auto-POST aus!)
-      window.location.href = `api/tiles/sso/${tileId}`;
+      if (activeSphTileOpenInNewTab) {
+        window.open(`api/tiles/sso/${tileId}`, '_blank');
+      } else {
+        window.location.href = `api/tiles/sso/${tileId}`;
+      }
       return;
     }
 
@@ -1955,18 +1992,21 @@ async function handleSphClick(e, tileId) {
     const alwaysShow = localStorage.getItem('sph_always_show_info') !== 'false';
     if (!alwaysShow) {
       // Benutzer hat Opt-out gewählt -> Direkt zur normalen SPH-Loginseite weiterleiten
-      window.location.href = `api/tiles/sso/${tileId}`;
+      if (activeSphTileOpenInNewTab) {
+        window.open(`api/tiles/sso/${tileId}`, '_blank');
+      } else {
+        window.location.href = `api/tiles/sso/${tileId}`;
+      }
       return;
     }
 
     // 4. Info-Modal anzeigen!
-    activeSphTileId = tileId;
     document.getElementById('sph-info-always-show').checked = true;
     
     // Verlinkung im Modal-Text zum Öffnen des Zugangsdaten-Eingabemodals
     document.getElementById('sph-info-link-credentials').onclick = (event) => {
       closeModal('sph-info-modal');
-      openSphCredentialsModal(event, tileId);
+      openSphCredentialsModal(event, tileId, openInNewTab);
     };
 
     openModal('sph-info-modal');
@@ -1974,7 +2014,11 @@ async function handleSphClick(e, tileId) {
   } catch (err) {
     console.error('Fehler bei SPH-Weiterleitungsprüfung:', err);
     // Fallback: Direkt weiterleiten
-    window.location.href = `api/tiles/sso/${tileId}`;
+    if (activeSphTileOpenInNewTab) {
+      window.open(`api/tiles/sso/${tileId}`, '_blank');
+    } else {
+      window.location.href = `api/tiles/sso/${tileId}`;
+    }
   }
 }
 
@@ -1984,7 +2028,11 @@ function proceedToSchulportal() {
   localStorage.setItem('sph_always_show_info', alwaysShow ? 'true' : 'false');
   
   closeModal('sph-info-modal');
-  window.location.href = `api/tiles/sso/${activeSphTileId}`;
+  if (activeSphTileOpenInNewTab) {
+    window.open(`api/tiles/sso/${activeSphTileId}`, '_blank');
+  } else {
+    window.location.href = `api/tiles/sso/${activeSphTileId}`;
+  }
 }
 
 /* --- Booking Autologin (Obsolete - JWT is used now) --- */
