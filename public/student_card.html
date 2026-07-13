@@ -128,7 +128,7 @@
     /* Hochkant Plastikkarte */
     .student-card {
       width: 100%;
-      height: 485px; /* Leicht verringerte Höhe gegen Scrollbalken */
+      height: 485px; /* Viewport-sicher gegen Scrollbalken */
       background: var(--card-bg);
       backdrop-filter: blur(25px) saturate(180%);
       -webkit-backdrop-filter: blur(25px) saturate(180%);
@@ -178,7 +178,7 @@
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 40 Q 30 10, 60 40 T 120 40' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 80 Q 30 50, 60 80 T 120 80' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 100 Q 30 70, 60 100 T 120 100' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3C/svg%3E");
     }
 
-    /* Logo-Wasserzeichen im Kartenhintergrund */
+    /* Logo-Wasserzeichen im Kartenhintergrund (PWA App-Icon) */
     .logo-watermark {
       position: absolute;
       top: 50%; left: 50%;
@@ -261,48 +261,32 @@
       box-shadow: 0 0 10px var(--accent-glow);
     }
 
-    /* Card Body - Profile Data & Portrait */
+    /* Card Body - Photo & Info */
     .card-body {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       margin: 10px 0;
       z-index: 10;
       position: relative;
     }
 
-    .photo-wrapper {
-      width: 95px;
-      height: 125px;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 2px solid rgba(0,0,0,0.06);
-      background: #e2e8f0;
+    /* Photo Container: Breiter gemacht auf 170px für vergrößertes Bild (125px) + herausragendes Siegel (45px) */
+    .photo-container-wrapper {
+      width: 170px;
+      height: 210px;
       flex-shrink: 0;
       position: relative;
+      user-select: none;
     }
 
-    .photo-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .placeholder-avatar {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-secondary);
-      font-size: 2.5rem;
-    }
-
+    /* Rechtsbündiger Details Wrapper */
     .details-wrapper {
       display: flex;
       flex-direction: column;
       gap: 8px;
       flex-grow: 1;
       justify-content: center;
+      text-align: right; /* Alle Angaben rechtsbündig */
     }
 
     .detail-item {
@@ -330,99 +314,23 @@
       line-height: 1.2;
     }
 
-    /* Schulleiter-Unterschrift & Siegel-Zone */
+    /* Schulleiter-Unterschrift & Name (40px nach unten geschoben) */
     .signature-seal-area {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-start;
       align-items: flex-end;
       margin: 5px 0;
       position: relative;
       z-index: 10;
+      /* 40px nach unten geschoben */
+      top: 40px; 
     }
 
     .principal-container {
       display: flex;
       flex-direction: column;
       gap: 2px;
-      max-width: 160px;
-    }
-
-    .signature-wrapper {
-      height: 52px;
-      display: flex;
-      align-items: center;
-      margin-bottom: -10px;
-      position: relative;
-      z-index: 15;
-    }
-
-    .signature-img {
-      max-height: 100%;
-      max-width: 100%;
-      object-fit: contain;
-      transform: scale(1.15);
-      transform-origin: left center;
-      pointer-events: none;
-      -webkit-user-drag: none;
-      user-select: none;
-    }
-
-    .signature-placeholder {
-      font-family: 'Brush Script MT', cursive, sans-serif;
-      font-size: 1.2rem;
-      color: var(--text-secondary);
-      opacity: 0.5;
-    }
-
-    /* Vorgerendertes Siegel: Überlappt die untere rechte Ecke des Passbilds */
-    .seal-container {
-      position: absolute;
-      width: 72px;
-      height: 72px;
-      left: 59px; /* Überlappt das untere rechte Viertel des Passbilds */
-      top: 89px; /* Liegt exakt am unteren Rand des Passbilds an */
-      z-index: 30; /* Liegt über dem Foto */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-      transition: transform 0.1s ease;
-      transform-style: preserve-3d;
-    }
-
-    .seal-img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      pointer-events: none;
-      -webkit-user-drag: none;
-      user-select: none;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.08));
-    }
-
-    /* Fallback Siegel */
-    .hologram-siegel-fallback {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.01) 100%);
-      border: 1.5px dashed rgba(0,0,0,0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.4rem;
-      color: rgba(0,0,0,0.4);
-      box-shadow: 0 0 10px rgba(0,0,0,0.02);
-      pointer-events: none;
-    }
-
-    .hologram-siegel-fallback i {
-      animation: spinSiegel 12s linear infinite;
-    }
-
-    @keyframes spinSiegel {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      width: 200px;
     }
 
     /* QR-Code & Validity Zone */
@@ -435,6 +343,7 @@
       z-index: 10;
     }
 
+    /* Footer-Spalten getauscht, damit QR-Code rechts und Gültigkeit links ist */
     .qr-container-wrapper {
       display: flex;
       justify-content: space-between;
@@ -442,24 +351,12 @@
       gap: 12px;
     }
 
-    .qr-code-box {
-      width: 66px;
-      height: 66px;
-      background: #ffffff;
-      padding: 4px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-      flex-shrink: 0;
-    }
-
     .validity-block {
       display: flex;
       flex-direction: column;
       gap: 4px;
       flex-grow: 1;
+      text-align: left;
     }
 
     .live-ticker {
@@ -515,6 +412,19 @@
 
     .expiry-text strong {
       color: var(--text);
+    }
+
+    .qr-code-box {
+      width: 66px;
+      height: 66px;
+      background: #ffffff;
+      padding: 4px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      flex-shrink: 0;
     }
 
     /* Revoked / Error overlay screen */
@@ -828,21 +738,12 @@
 
       <!-- Card Body - Photo & Info -->
       <div class="card-body">
-        <!-- Photo -->
-        <div class="photo-wrapper" style="user-select: none;">
-          <div id="card-photo-container">
-            <div class="placeholder-avatar"><i class="fa-solid fa-user"></i></div>
-          </div>
+        <!-- Kombinierter Prerendered Container (Foto + Siegel) -->
+        <div class="photo-container-wrapper" id="card-photo-container">
+          <div class="placeholder-avatar" style="width: 125px; height: 165px; background: #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-user"></i></div>
         </div>
 
-        <!-- Vorgerendertes Siegel: Überlappt die untere rechte Ecke des Fotos -->
-        <div class="seal-container" id="seal-container">
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-          <!-- Fallback-Siegel, falls kein Bild hinterlegt ist -->
-          <div class="hologram-siegel-fallback" id="hologram-fallback"><i class="fa-solid fa-graduation-cap"></i></div>
-        </div>
-
-        <!-- Details -->
+        <!-- Details (Rechtsbündig) -->
         <div class="details-wrapper">
           <div class="detail-item">
             <span class="detail-label" data-i18n="labelName">Name, Vorname</span>
@@ -859,15 +760,10 @@
         </div>
       </div>
 
-      <!-- Schulleiter-Unterschrift & Name -->
+      <!-- Schulleiter-Unterschrift & Name (Prerendered auf Canvas, 40px nach unten geschoben) -->
       <div class="signature-seal-area">
-        <div class="principal-container">
-          <div class="signature-wrapper" id="signature-container" style="position: relative; user-select: none;">
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-            <span class="signature-placeholder">Unterschrift</span>
-          </div>
-          <span class="detail-label" data-i18n="labelPrincipal">Schulleiter/in</span>
-          <span class="detail-value" style="font-size: 0.7rem;" id="principal-name-display">OStD Karsten Backhaus</span>
+        <div class="principal-container" id="signature-container">
+          <span class="signature-placeholder">Unterschrift</span>
         </div>
       </div>
 
@@ -875,12 +771,6 @@
       <div class="card-footer">
         <div class="qr-container-wrapper">
           
-          <!-- QR Code Container (mit Mediotheksnummer darunter) -->
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; z-index: 10; position: relative;">
-            <div class="qr-code-box" id="qrcode-box" title="Scan Mediotheksnummer"></div>
-            <span style="font-family: monospace; font-size: 0.7rem; font-weight: 700; color: var(--text);" id="card-mediothek-number-display">-</span>
-          </div>
-
           <div class="validity-block">
             <!-- Live Clock -->
             <div class="live-ticker">
@@ -894,6 +784,13 @@
               <span>Status: <strong style="color:var(--success); font-weight:700;" id="card-status-label">Online</strong></span>
             </div>
           </div>
+
+          <!-- QR Code Container (mit Mediotheksnummer darunter) -->
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; z-index: 10; position: relative;">
+            <div class="qr-code-box" id="qrcode-box" title="Scan Mediotheksnummer"></div>
+            <span style="font-family: monospace; font-size: 0.7rem; font-weight: 700; color: var(--text);" id="card-mediothek-number-display">-</span>
+          </div>
+
         </div>
       </div>
 
@@ -1103,7 +1000,6 @@
     // Interactive 3D Card Hover & Tilting
     const cardFrame = document.getElementById('card-frame');
     const card = document.getElementById('student-card');
-    const hologram = document.getElementById('hologram');
 
     cardFrame.addEventListener('mousemove', (e) => {
       const rect = cardFrame.getBoundingClientRect();
@@ -1114,21 +1010,10 @@
       const tiltY = -(x / (rect.width/2)) * 12;
 
       card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
-      const seal = document.getElementById('seal-element');
-      if (seal) {
-        seal.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
-      } else {
-        const fallback = document.getElementById('hologram-fallback');
-        if (fallback) fallback.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
-      }
     });
 
     cardFrame.addEventListener('mouseleave', () => {
       card.style.transform = 'rotateX(0deg) rotateY(0deg)';
-      const seal = document.getElementById('seal-element');
-      if (seal) seal.style.transform = 'translateZ(0px) rotate(0deg)';
-      const fallback = document.getElementById('hologram-fallback');
-      if (fallback) fallback.style.transform = 'translateZ(0px) rotate(0deg)';
     });
 
     // Gyroscope tilt effect (DeviceOrientation)
@@ -1142,13 +1027,6 @@
           const tiltY = Math.min(Math.max(gamma, -15), 15);
 
           card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
-          const seal = document.getElementById('seal-element');
-          if (seal) {
-            seal.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
-          } else {
-            const fallback = document.getElementById('hologram-fallback');
-            if (fallback) fallback.style.transform = `translateZ(25px) rotate(${tiltY * 1.5}deg)`;
-          }
         }
       });
     }
@@ -1209,7 +1087,7 @@
     });
     setInterval(loadCardData, 15 * 60 * 1000); // Proaktiv alle 15 Minuten refreshen
 
-    function renderCard(data, isOffline) {
+    async function renderCard(data, isOffline) {
       // 1. Theme Farbe anwenden
       if (data.card_primary_color) {
         document.documentElement.style.setProperty('--accent', data.card_primary_color);
@@ -1221,7 +1099,6 @@
       const logoContainer = document.getElementById('school-logo-container');
       const watermarkContainer = document.getElementById('logo-watermark-container');
       
-      // Wasserzeichen im Hintergrund befüllen (PWA App-Icon)
       const pwaIconSrc = data.card_pwa_icon || 'api/student/pwa-icon';
       watermarkContainer.innerHTML = `<img src="${pwaIconSrc}" alt="Watermark">`;
       
@@ -1265,45 +1142,11 @@
         const parts = data.expires_at.split('-');
         document.getElementById('card-expiry').innerText = `${parts[2]}.${parts[1]}.${parts[0]}`;
       }
+
+      // 4. Prerendering der kopiergeschützten Canvas-Bilder (Foto+Siegel & Unterschrift+Text)
+      await prerenderElementsOnCanvas(data);
       
-      // 4. Passbild befüllen
-      const imgContainer = document.getElementById('card-photo-container');
-      if (data.card_image) {
-        imgContainer.innerHTML = `<img src="${data.card_image}" style="width: 100%; height: 100%; object-fit: cover;" alt="Portrait">`;
-      } else {
-        imgContainer.innerHTML = `<div class="placeholder-avatar"><i class="fa-solid fa-user"></i></div>`;
-      }
-
-      // 5. Schulleiter-Unterschrift & Name (Kopiergeschützt)
-      document.getElementById('principal-name-display').innerText = data.card_principal_name || 'Schulleiter/in';
-      const sigContainer = document.getElementById('signature-container');
-      if (data.card_signature) {
-        sigContainer.innerHTML = `
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-          <img src="${data.card_signature}" class="signature-img" style="pointer-events: none; -webkit-user-drag: none; user-select: none;" alt="Unterschrift">
-        `;
-      } else {
-        sigContainer.innerHTML = `
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-          <span class="signature-placeholder">Unterschrift</span>
-        `;
-      }
-
-      // 6. Vorgerendertes Siegel befüllen (Kopiergeschützt und überlappt das Passbild unten rechts)
-      const sealContainer = document.getElementById('seal-container');
-      if (data.card_seal) {
-        sealContainer.innerHTML = `
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-          <img src="${data.card_seal}" id="seal-element" class="seal-img" style="pointer-events: none; -webkit-user-drag: none; user-select: none;" alt="Siegel">
-        `;
-      } else {
-        sealContainer.innerHTML = `
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent;" oncontextmenu="return false;" onmousedown="return false;" ondragstart="return false;"></div>
-          <div class="hologram-siegel-fallback" id="hologram-fallback"><i class="fa-solid fa-graduation-cap"></i></div>
-        `;
-      }
-
-      // 7. QR-Code für Mediotheksnummer generieren & Nummer anzeigen
+      // 5. QR-Code für Mediotheksnummer generieren & Nummer anzeigen
       document.getElementById('card-mediothek-number-display').innerText = data.mediothek_number || '-';
       const qrBox = document.getElementById('qrcode-box');
       if (typeof QRCode !== 'undefined' && data.mediothek_number) {
@@ -1320,7 +1163,7 @@
         qrBox.innerHTML = `<i class="fa-solid fa-qrcode" style="color:var(--bg-dark); font-size:2rem;"></i>`;
       }
 
-      // 8. Status & Offline Banner
+      // 6. Status & Offline Banner
       const offlineBanner = document.getElementById('offline-banner');
       const statusLabel = document.getElementById('card-status-label');
       
@@ -1334,7 +1177,7 @@
         statusLabel.style.color = 'var(--success)';
       }
 
-      // 9. Sperrung, Bildfehler & Ablaufprüfung (Overlay Management)
+      // 7. Sperrung, Bildfehler & Ablaufprüfung (Overlay Management)
       const overlay = document.getElementById('revoked-overlay');
       const overlayIcon = document.getElementById('overlay-icon');
       const overlayTitle = document.getElementById('overlay-title');
@@ -1382,6 +1225,198 @@
       } else {
         overlay.style.display = 'none';
       }
+    }
+
+    /**
+     * Zeichnet das Passbild + Siegel sowie Unterschrift + Name untrennbar auf HTML5 Canvas Elemente.
+     * Dies verhindert das Auslesen/Extrahieren von Unterschrift oder Siegel aus dem Quellcode/Netzwerk.
+     */
+    async function prerenderElementsOnCanvas(data) {
+      // --- CANVAS 1: Foto (125x165) + Dienstsiegel (90x90, unten rechts überlappend) ---
+      // Da das Siegel um 45px rechts und unten überragt: Gesamtgröße = 170x210
+      const photoCanvas = document.createElement('canvas');
+      const photoCtx = photoCanvas.getContext('2d');
+      photoCanvas.width = 170;
+      photoCanvas.height = 210;
+
+      // 1. Passbild laden und auf Canvas zeichnen
+      const photoImg = new Image();
+      photoImg.crossOrigin = "anonymous";
+      
+      const photoLoaded = new Promise((resolve) => {
+        if (data.card_image) {
+          photoImg.onload = () => {
+            // Zentrierter Zuschnitt (Cover-Effekt) im 125x165-Pixel-Feld
+            const hRatio = 125 / photoImg.width;
+            const vRatio = 165 / photoImg.height;
+            const ratio = Math.max(hRatio, vRatio);
+            const shiftX = (125 - photoImg.width * ratio) / 2;
+            const shiftY = (165 - photoImg.height * ratio) / 2;
+
+            // Foto-Hintergrund abrunden simulieren (Canvas clipping)
+            photoCtx.save();
+            roundRect(photoCtx, 0, 0, 125, 165, 12);
+            photoCtx.clip();
+            photoCtx.drawImage(photoImg, 0, 0, photoImg.width, photoImg.height, 
+                               shiftX, shiftY, photoImg.width * ratio, photoImg.height * ratio);
+            photoCtx.restore();
+            
+            // Fester dezenter Rahmen um das Foto zeichnen
+            photoCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+            photoCtx.lineWidth = 2;
+            photoCtx.stroke();
+            resolve();
+          };
+          photoImg.onerror = () => {
+            drawFallbackAvatar(photoCtx);
+            resolve();
+          };
+          photoImg.src = data.card_image;
+        } else {
+          drawFallbackAvatar(photoCtx);
+          resolve();
+        }
+      });
+
+      await photoLoaded;
+
+      // 2. Siegel laden und über dem Foto unten rechts platzieren (Stempel-Effekt)
+      // Das Siegel hat die Größe 90x90 und liegt bei x=80, y=120
+      const sealImg = new Image();
+      sealImg.crossOrigin = "anonymous";
+      
+      const sealLoaded = new Promise((resolve) => {
+        if (data.card_seal) {
+          sealImg.onload = () => {
+            // Siegel zeichnen
+            photoCtx.drawImage(sealImg, 80, 120, 90, 90);
+            resolve();
+          };
+          sealImg.onerror = () => {
+            drawFallbackSeal(photoCtx, 80, 120, 90);
+            resolve();
+          };
+          sealImg.src = data.card_seal;
+        } else {
+          drawFallbackSeal(photoCtx, 80, 120, 90);
+          resolve();
+        }
+      });
+
+      await sealLoaded;
+
+      // Rendered Image Container befüllen
+      const photoContainer = document.getElementById('card-photo-container');
+      photoContainer.innerHTML = '';
+      photoCanvas.style.width = '170px';
+      photoCanvas.style.height = '210px';
+      photoCanvas.style.pointerEvents = 'none';
+      photoCanvas.style.userSelect = 'none';
+      photoContainer.appendChild(photoCanvas);
+
+
+      // --- CANVAS 2: Unterschrift + Text (Schulleiter/in & Name) ---
+      const sigCanvas = document.createElement('canvas');
+      const sigCtx = sigCanvas.getContext('2d');
+      sigCanvas.width = 200;
+      sigCanvas.height = 110;
+
+      // 1. Unterschriften-Grafik laden & zeichnen
+      const sigImg = new Image();
+      sigImg.crossOrigin = "anonymous";
+      
+      const sigLoaded = new Promise((resolve) => {
+        if (data.card_signature) {
+          sigImg.onload = () => {
+            // Größere Unterschrift (Breite 180, Höhe 65), die den Text leicht überlappt
+            sigCtx.drawImage(sigImg, 0, 5, 180, 65);
+            resolve();
+          };
+          sigImg.onerror = () => {
+            resolve();
+          };
+          sigImg.src = data.card_signature;
+        } else {
+          resolve();
+        }
+      });
+
+      await sigLoaded;
+
+      // 2. Bezeichnungen auf Canvas zeichnen (untrennbar mit Unterschrift verschmolzen!)
+      // Bezeichnung "Schulleiter/in"
+      const labelText = translations[currentLang].labelPrincipal || 'Schulleiter/in';
+      sigCtx.fillStyle = '#475569'; // var(--text-secondary)
+      sigCtx.font = '700 10px "Outfit", sans-serif';
+      sigCtx.textAlign = 'left';
+      sigCtx.textBaseline = 'top';
+      sigCtx.fillText(labelText.toUpperCase(), 2, 70);
+
+      // Name des Schulleiters
+      const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
+      sigCtx.fillStyle = '#0f172a'; // var(--text)
+      sigCtx.font = '600 13px "Outfit", sans-serif';
+      sigCtx.fillText(principalName, 2, 84);
+
+      // Unterschriften-Container befüllen
+      const sigContainer = document.getElementById('signature-container');
+      sigContainer.innerHTML = '';
+      sigCanvas.style.width = '200px';
+      sigCanvas.style.height = '110px';
+      sigCanvas.style.pointerEvents = 'none';
+      sigCanvas.style.userSelect = 'none';
+      sigContainer.appendChild(sigCanvas);
+    }
+
+    // Hilfsfunktion: Abgerundete Canvas-Pfade zeichnen
+    function roundRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function drawFallbackAvatar(ctx) {
+      ctx.fillStyle = '#e2e8f0';
+      roundRect(ctx, 0, 0, 125, 165, 12);
+      ctx.fill();
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('👤', 62.5, 82.5);
+    }
+
+    function drawFallbackSeal(ctx, x, y, size) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + size/2, y + size/2, size/2 - 4, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+      ctx.stroke();
+      
+      // Doppelte Kreis-Innenlinie
+      ctx.beginPath();
+      ctx.arc(x + size/2, y + size/2, size/2 - 8, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+      ctx.stroke();
+
+      // Symbol in der Mitte
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.font = '24px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🎓', x + size/2, y + size/2);
+      ctx.restore();
     }
 
     // Start
