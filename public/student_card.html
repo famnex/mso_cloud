@@ -756,7 +756,7 @@
         </div>
       </div>
 
-      <!-- Schulleiter-Unterschrift & Name (Prerendered auf Canvas, 40px nach unten geschoben) -->
+      <!-- Schulleiter-Unterschrift & Name (Prerendered auf Canvas) -->
       <div class="signature-seal-area">
         <div class="principal-container" id="signature-container">
           <span class="signature-placeholder">Unterschrift</span>
@@ -997,32 +997,61 @@
     const cardFrame = document.getElementById('card-frame');
     const card = document.getElementById('student-card');
 
+    let targetTiltX = 0;
+    let targetTiltY = 0;
+    let currentTiltX = 0;
+    let currentTiltY = 0;
+
+    // Smooth-Dämpfungs-Loop für absolut flüssige 3D-Reaktionen
+    function updateCard3D() {
+      currentTiltX += (targetTiltX - currentTiltX) * 0.12;
+      currentTiltY += (targetTiltY - currentTiltY) * 0.12;
+      card.style.transform = `rotateX(${currentTiltX}deg) rotateY(${currentTiltY}deg)`;
+      requestAnimationFrame(updateCard3D);
+    }
+    requestAnimationFrame(updateCard3D);
+
     cardFrame.addEventListener('mousemove', (e) => {
       const rect = cardFrame.getBoundingClientRect();
       const x = e.clientX - rect.left - rect.width/2;
       const y = e.clientY - rect.top - rect.height/2;
       
-      const tiltX = (y / (rect.height/2)) * 12;
-      const tiltY = -(x / (rect.width/2)) * 12;
-
-      card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+      targetTiltX = (y / (rect.height/2)) * 12;
+      targetTiltY = -(x / (rect.width/2)) * 12;
     });
 
     cardFrame.addEventListener('mouseleave', () => {
-      card.style.transform = 'rotateX(0deg) rotateY(0deg)';
+      targetTiltX = 0;
+      targetTiltY = 0;
     });
 
-    // Gyroscope tilt effect (DeviceOrientation)
+    // Gyroscope tilt effect (DeviceOrientation) mit iOS-Permission-Handling
     if (window.DeviceOrientationEvent) {
+      // iOS 13+ Berechtigung einholen bei erster Benutzerinteraktion
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const requestGyroPermission = () => {
+          DeviceOrientationEvent.requestPermission()
+            .then(state => {
+              if (state === 'granted') {
+                console.log('Gyroskop-Berechtigung erteilt.');
+              }
+            })
+            .catch(console.error);
+          document.removeEventListener('click', requestGyroPermission);
+          document.removeEventListener('touchstart', requestGyroPermission);
+        };
+        document.addEventListener('click', requestGyroPermission);
+        document.addEventListener('touchstart', requestGyroPermission);
+      }
+
       window.addEventListener('deviceorientation', (e) => {
         const beta = e.beta;  
         const gamma = e.gamma; 
         
-        if (beta && gamma) {
-          const tiltX = Math.min(Math.max(beta - 45, -15), 15);
-          const tiltY = Math.min(Math.max(gamma, -15), 15);
-
-          card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+        if (beta !== null && gamma !== null) {
+          // Normalisierung der Neigung im typischen Halte-Winkel (45 Grad Neigung)
+          targetTiltX = Math.min(Math.max(beta - 45, -15), 15);
+          targetTiltY = Math.min(Math.max(gamma, -15), 15);
         }
       });
     }
@@ -1053,6 +1082,19 @@
         const data = await res.json();
         cardData = data;
         
+        // Prüfen, ob der Server den Ausweis gesperrt hat
+        const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
+        const now = new Date();
+        const expiry = new Date(data.expires_at);
+        const isExpired = now > expiry;
+
+        if (isRevoked || isExpired) {
+          // Permanentes Sperr-Flag offline setzen
+          localStorage.setItem('mso_card_offline_blocked', 'true');
+        } else {
+          localStorage.setItem('mso_card_offline_blocked', 'false');
+        }
+
         localStorage.setItem('mso_cached_card', JSON.stringify(data));
         renderCard(data, false);
 
@@ -1066,8 +1108,14 @@
       } catch (err) {
         console.warn('Online-Abruf des Ausweises fehlgeschlagen, lade cached data:', err);
         const cached = localStorage.getItem('mso_cached_card');
+        const isOfflineBlocked = localStorage.getItem('mso_card_offline_blocked') === 'true';
+
         if (cached) {
           cardData = JSON.parse(cached);
+          if (isOfflineBlocked) {
+            // Im Cache als permanent gesperrt eintragen
+            cardData.card_status = 'Ausweis gesperrt';
+          }
           renderCard(cardData, true);
         } else {
           document.getElementById('card-name').innerText = 'Kein Cache vorhanden';
@@ -1090,95 +1138,7 @@
         document.documentElement.style.setProperty('--accent-glow', data.card_primary_color + '1F');
       }
 
-      // 2. Schultitel & Logo (Ausblenden des Schulnamens bei breitem Logo)
-      document.getElementById('school-title-display').innerText = data.card_school_name || 'Modellschule Obersberg';
-      const logoContainer = document.getElementById('school-logo-container');
-      const watermarkContainer = document.getElementById('logo-watermark-container');
-      
-      const pwaIconSrc = data.card_pwa_icon || 'api/student/pwa-icon';
-      watermarkContainer.innerHTML = `<img src="${pwaIconSrc}" alt="Watermark">`;
-      
-      if (data.card_logo) {
-        logoContainer.innerHTML = `<img src="${data.card_logo}" id="card-logo-element" class="school-logo-img" alt="Logo">`;
-        
-        // Dynamische Prüfung des Breiten-Verhältnisses (Aspekt-Ratio)
-        const tempImg = new Image();
-        tempImg.onload = function() {
-          const ratio = this.width / this.height;
-          if (ratio > 1.6) {
-            document.getElementById('school-title-display').style.display = 'none';
-          } else {
-            document.getElementById('school-title-display').style.display = 'block';
-          }
-        };
-        tempImg.src = data.card_logo;
-      } else {
-        logoContainer.innerHTML = `<div class="school-logo-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>`;
-        document.getElementById('school-title-display').style.display = 'block';
-      }
-
-      // 3. Personendaten befüllen
-      document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
-      document.getElementById('card-birthplace').innerText = data.birth_place || '-';
-      
-      // Geburtsdatum
-      let birthStr = '-';
-      if (data.birth_date) {
-        const parts = data.birth_date.split('-');
-        if (parts.length === 3) {
-          birthStr = `${parts[2]}.${parts[1]}.${parts[0]}`;
-        } else {
-          birthStr = data.birth_date;
-        }
-      }
-      document.getElementById('card-birth').innerText = birthStr;
-      
-      // Ablaufdatum
-      if (data.expires_at) {
-        const parts = data.expires_at.split('-');
-        document.getElementById('card-expiry').innerText = `${parts[2]}.${parts[1]}.${parts[0]}`;
-      }
-
-      // 4. Prerendering der kopiergeschützten Canvas-Bilder (Foto+Siegel & Unterschrift+Text)
-      await prerenderElementsOnCanvas(data);
-      
-      // 5. QR-Code für Mediotheksnummer generieren & Nummer anzeigen
-      document.getElementById('card-mediothek-number-display').innerText = data.mediothek_number || '-';
-      const qrBox = document.getElementById('qrcode-box');
-      if (typeof QRCode !== 'undefined' && data.mediothek_number) {
-        qrBox.innerHTML = '';
-        qrGenerator = new QRCode(qrBox, {
-          text: data.mediothek_number,
-          width: 64,
-          height: 64,
-          colorDark : "#000000",
-          colorLight : "#ffffff",
-          correctLevel : QRCode.CorrectLevel.M
-        });
-      } else {
-        qrBox.innerHTML = `<i class="fa-solid fa-qrcode" style="color:var(--bg-dark); font-size:2rem;"></i>`;
-      }
-
-      // 6. Status & Offline Banner
-      const offlineBanner = document.getElementById('offline-banner');
-      const statusLabel = document.getElementById('card-status-label');
-      
-      if (isOffline) {
-        offlineBanner.style.display = 'flex';
-        statusLabel.innerText = translations[currentLang].statusOffline;
-        statusLabel.style.color = 'var(--text-secondary)';
-      } else {
-        offlineBanner.style.display = 'none';
-        statusLabel.innerText = translations[currentLang].statusOnline;
-        statusLabel.style.color = 'var(--success)';
-      }
-
-      // 7. Sperrung, Bildfehler & Ablaufprüfung (Overlay Management)
-      const overlay = document.getElementById('revoked-overlay');
-      const overlayIcon = document.getElementById('overlay-icon');
-      const overlayTitle = document.getElementById('overlay-title');
-      const overlayDesc = document.getElementById('overlay-desc');
-
+      // 2. Sperr- & Statusprüfung vornehmen
       const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
       const hasNoImage = !data.card_image;
       const isVerified = data.card_status === 'Bild genehmigt' || 
@@ -1193,6 +1153,112 @@
       const now = new Date();
       const expiry = new Date(data.expires_at);
       const isExpired = now > expiry;
+
+      const shouldBlockContent = isRevoked || isExpired || hasNoImage || isNotVerified;
+
+      // 3. Schultitel & Logo (Wasserzeichen im Hintergrund)
+      const watermarkContainer = document.getElementById('logo-watermark-container');
+      const logoContainer = document.getElementById('school-logo-container');
+      
+      if (shouldBlockContent) {
+        // Bei Sperrung kein Wasserzeichen und kein Logo anzeigen!
+        watermarkContainer.innerHTML = '';
+        logoContainer.innerHTML = `<div class="school-logo-placeholder" style="border-color: var(--danger); color: var(--danger);"><i class="fa-solid fa-circle-exmark"></i></div>`;
+        document.getElementById('school-title-display').innerText = 'UNGÜLTIGER AUSWEIS';
+        document.getElementById('school-title-display').style.display = 'block';
+      } else {
+        const pwaIconSrc = data.card_pwa_icon || 'api/student/pwa-icon';
+        watermarkContainer.innerHTML = `<img src="${pwaIconSrc}" alt="Watermark">`;
+        
+        document.getElementById('school-title-display').innerText = data.card_school_name || 'Modellschule Obersberg';
+        if (data.card_logo) {
+          logoContainer.innerHTML = `<img src="${data.card_logo}" id="card-logo-element" class="school-logo-img" alt="Logo">`;
+          
+          // Dynamische Prüfung des Breiten-Verhältnisses (Aspekt-Ratio)
+          const tempImg = new Image();
+          tempImg.onload = function() {
+            const ratio = this.width / this.height;
+            if (ratio > 1.6) {
+              document.getElementById('school-title-display').style.display = 'none';
+            } else {
+              document.getElementById('school-title-display').style.display = 'block';
+            }
+          };
+          tempImg.src = data.card_logo;
+        } else {
+          logoContainer.innerHTML = `<div class="school-logo-placeholder"><i class="fa-solid fa-graduation-cap"></i></div>`;
+          document.getElementById('school-title-display').style.display = 'block';
+        }
+      }
+
+      // 4. Personendaten befüllen (Bei Sperrung anonymisieren/leeren)
+      if (shouldBlockContent) {
+        document.getElementById('card-name').innerText = '—';
+        document.getElementById('card-birth').innerText = '—';
+        document.getElementById('card-birthplace').innerText = '—';
+        document.getElementById('card-expiry').innerText = '—';
+        document.getElementById('card-mediothek-number-display').innerText = '—';
+      } else {
+        document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
+        document.getElementById('card-birthplace').innerText = data.birth_place || '-';
+        
+        // Geburtsdatum
+        let birthStr = '-';
+        if (data.birth_date) {
+          const parts = data.birth_date.split('-');
+          if (parts.length === 3) {
+            birthStr = `${parts[2]}.${parts[1]}.${parts[0]}`;
+          } else {
+            birthStr = data.birth_date;
+          }
+        }
+        document.getElementById('card-birth').innerText = birthStr;
+        
+        // Ablaufdatum
+        if (data.expires_at) {
+          const parts = data.expires_at.split('-');
+          document.getElementById('card-expiry').innerText = `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+      }
+
+      // 5. Prerendering der kopiergeschützten Canvas-Bilder mit DPR-Verdreifachung (Retina-Qualität)
+      await prerenderElementsOnCanvas(data, shouldBlockContent);
+      
+      // 6. QR-Code für Mediotheksnummer generieren (Bei Sperrung leeren)
+      const qrBox = document.getElementById('qrcode-box');
+      if (!shouldBlockContent && typeof QRCode !== 'undefined' && data.mediothek_number) {
+        qrBox.innerHTML = '';
+        qrGenerator = new QRCode(qrBox, {
+          text: data.mediothek_number,
+          width: 64,
+          height: 64,
+          colorDark : "#000000",
+          colorLight : "#ffffff",
+          correctLevel : QRCode.CorrectLevel.M
+        });
+      } else {
+        qrBox.innerHTML = `<i class="fa-solid fa-ban" style="color:var(--danger); font-size:2rem;"></i>`;
+      }
+
+      // 7. Status & Offline Banner
+      const offlineBanner = document.getElementById('offline-banner');
+      const statusLabel = document.getElementById('card-status-label');
+      
+      if (isOffline) {
+        offlineBanner.style.display = 'flex';
+        statusLabel.innerText = translations[currentLang].statusOffline;
+        statusLabel.style.color = 'var(--text-secondary)';
+      } else {
+        offlineBanner.style.display = 'none';
+        statusLabel.innerText = translations[currentLang].statusOnline;
+        statusLabel.style.color = 'var(--success)';
+      }
+
+      // 8. Sperrung, Bildfehler & Ablaufprüfung (Overlay Management)
+      const overlay = document.getElementById('revoked-overlay');
+      const overlayIcon = document.getElementById('overlay-icon');
+      const overlayTitle = document.getElementById('overlay-title');
+      const overlayDesc = document.getElementById('overlay-desc');
 
       if (isRevoked) {
         overlayIcon.className = "fa-solid fa-circle-xmark revoked-icon";
@@ -1225,81 +1291,90 @@
 
     /**
      * Zeichnet das Passbild + Siegel sowie Unterschrift + Name untrennbar auf HTML5 Canvas Elemente.
-     * Dies verhindert das Auslesen/Extrahieren von Unterschrift oder Siegel aus dem Quellcode/Netzwerk.
+     * Nutzt High-DPI Skalierung (DPR=3) für gestochen scharfe Rendering-Ergebnisse.
      */
-    async function prerenderElementsOnCanvas(data) {
+    async function prerenderElementsOnCanvas(data, shouldBlockContent) {
+      const dpr = 3; // Skalierungsfaktor für Retina/High-DPI Schärfe
+
       // --- CANVAS 1: Foto (125x165) + Dienstsiegel (90x90, unten rechts überlappend) ---
-      // Da das Siegel um 45px rechts und unten überragt: Gesamtgröße = 170x210
       const photoCanvas = document.createElement('canvas');
       const photoCtx = photoCanvas.getContext('2d');
-      photoCanvas.width = 170;
-      photoCanvas.height = 210;
+      photoCanvas.width = 170 * dpr;
+      photoCanvas.height = 210 * dpr;
+      photoCtx.scale(dpr, dpr);
 
-      // 1. Passbild laden und auf Canvas zeichnen
-      const photoImg = new Image();
-      photoImg.crossOrigin = "anonymous";
-      
-      const photoLoaded = new Promise((resolve) => {
-        if (data.card_image) {
-          photoImg.onload = () => {
-            // Zentrierter Zuschnitt (Cover-Effekt) im 125x165-Pixel-Feld
-            const hRatio = 125 / photoImg.width;
-            const vRatio = 165 / photoImg.height;
-            const ratio = Math.max(hRatio, vRatio);
-            const shiftX = (125 - photoImg.width * ratio) / 2;
-            const shiftY = (165 - photoImg.height * ratio) / 2;
+      if (shouldBlockContent) {
+        // Bei Sperrung: Leeres Canvas mit rotem Schloss-Symbol und grauem Hintergrund zeichnen!
+        photoCtx.fillStyle = '#e2e8f0';
+        roundRect(photoCtx, 0, 0, 125, 165, 12);
+        photoCtx.fill();
+        photoCtx.fillStyle = '#ef4444';
+        photoCtx.font = '500 48px sans-serif';
+        photoCtx.textAlign = 'center';
+        photoCtx.textBaseline = 'middle';
+        photoCtx.fillText('🔒', 62.5, 82.5);
+      } else {
+        // 1. Passbild laden und auf Canvas zeichnen
+        const photoImg = new Image();
+        photoImg.crossOrigin = "anonymous";
+        
+        const photoLoaded = new Promise((resolve) => {
+          if (data.card_image) {
+            photoImg.onload = () => {
+              const hRatio = 125 / photoImg.width;
+              const vRatio = 165 / photoImg.height;
+              const ratio = Math.max(hRatio, vRatio);
+              const shiftX = (125 - photoImg.width * ratio) / 2;
+              const shiftY = (165 - photoImg.height * ratio) / 2;
 
-            // Foto-Hintergrund abrunden simulieren (Canvas clipping)
-            photoCtx.save();
-            roundRect(photoCtx, 0, 0, 125, 165, 12);
-            photoCtx.clip();
-            photoCtx.drawImage(photoImg, 0, 0, photoImg.width, photoImg.height, 
-                               shiftX, shiftY, photoImg.width * ratio, photoImg.height * ratio);
-            photoCtx.restore();
-            
-            // Fester dezenter Rahmen um das Foto zeichnen
-            photoCtx.strokeStyle = 'rgba(0,0,0,0.08)';
-            photoCtx.lineWidth = 2;
-            photoCtx.stroke();
-            resolve();
-          };
-          photoImg.onerror = () => {
+              photoCtx.save();
+              roundRect(photoCtx, 0, 0, 125, 165, 12);
+              photoCtx.clip();
+              photoCtx.drawImage(photoImg, 0, 0, photoImg.width, photoImg.height, 
+                                 shiftX, shiftY, photoImg.width * ratio, photoImg.height * ratio);
+              photoCtx.restore();
+              
+              photoCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+              photoCtx.lineWidth = 2;
+              photoCtx.stroke();
+              resolve();
+            };
+            photoImg.onerror = () => {
+              drawFallbackAvatar(photoCtx);
+              resolve();
+            };
+            photoImg.src = data.card_image;
+          } else {
             drawFallbackAvatar(photoCtx);
             resolve();
-          };
-          photoImg.src = data.card_image;
-        } else {
-          drawFallbackAvatar(photoCtx);
-          resolve();
-        }
-      });
+          }
+        });
 
-      await photoLoaded;
+        await photoLoaded;
 
-      // 2. Siegel laden und über dem Foto unten rechts platzieren (Stempel-Effekt)
-      // Das Siegel hat die Größe 90x90 und liegt bei x=80, y=120
-      const sealImg = new Image();
-      sealImg.crossOrigin = "anonymous";
-      
-      const sealLoaded = new Promise((resolve) => {
-        if (data.card_seal) {
-          sealImg.onload = () => {
-            // Siegel zeichnen
-            photoCtx.drawImage(sealImg, 80, 120, 90, 90);
-            resolve();
-          };
-          sealImg.onerror = () => {
+        // 2. Siegel laden und über dem Foto unten rechts platzieren (Stempel-Effekt)
+        const sealImg = new Image();
+        sealImg.crossOrigin = "anonymous";
+        
+        const sealLoaded = new Promise((resolve) => {
+          if (data.card_seal) {
+            sealImg.onload = () => {
+              photoCtx.drawImage(sealImg, 80, 120, 90, 90);
+              resolve();
+            };
+            sealImg.onerror = () => {
+              drawFallbackSeal(photoCtx, 80, 120, 90);
+              resolve();
+            };
+            sealImg.src = data.card_seal;
+          } else {
             drawFallbackSeal(photoCtx, 80, 120, 90);
             resolve();
-          };
-          sealImg.src = data.card_seal;
-        } else {
-          drawFallbackSeal(photoCtx, 80, 120, 90);
-          resolve();
-        }
-      });
+          }
+        });
 
-      await sealLoaded;
+        await sealLoaded;
+      }
 
       // Rendered Image Container befüllen
       const photoContainer = document.getElementById('card-photo-container');
@@ -1314,50 +1389,56 @@
       // --- CANVAS 2: Unterschrift + Text (Schulleiter/in & Name) ---
       const sigCanvas = document.createElement('canvas');
       const sigCtx = sigCanvas.getContext('2d');
-      sigCanvas.width = 200;
-      sigCanvas.height = 80;
+      sigCanvas.width = 200 * dpr;
+      sigCanvas.height = 80 * dpr;
+      sigCtx.scale(dpr, dpr);
 
-      // 1. Unterschriften-Grafik laden & zeichnen
-      const sigImg = new Image();
-      sigImg.crossOrigin = "anonymous";
-      
-      const sigLoaded = new Promise((resolve) => {
-        if (data.card_signature) {
-          sigImg.onload = () => {
-            // Seitenverhältnis wahren (Unterschrift max 190px breit und 65px hoch - 1,5x größer!)
-            const ratio = Math.min(190 / sigImg.width, 65 / sigImg.height);
-            const w = sigImg.width * ratio;
-            const h = sigImg.height * ratio;
-            
-            // Unterschrift bei Y=2 zeichnen (wieder 40px nach oben gezogen)
-            sigCtx.drawImage(sigImg, 0, 2, w, h);
+      if (!shouldBlockContent) {
+        // 1. Unterschriften-Grafik laden & zeichnen (NUR wenn aktiv!)
+        const sigImg = new Image();
+        sigImg.crossOrigin = "anonymous";
+        
+        const sigLoaded = new Promise((resolve) => {
+          if (data.card_signature) {
+            sigImg.onload = () => {
+              const ratio = Math.min(190 / sigImg.width, 65 / sigImg.height);
+              const w = sigImg.width * ratio;
+              const h = sigImg.height * ratio;
+              
+              sigCtx.drawImage(sigImg, 0, 2, w, h);
+              resolve();
+            };
+            sigImg.onerror = () => {
+              resolve();
+            };
+            sigImg.src = data.card_signature;
+          } else {
             resolve();
-          };
-          sigImg.onerror = () => {
-            resolve();
-          };
-          sigImg.src = data.card_signature;
-        } else {
-          resolve();
-        }
-      });
+          }
+        });
 
-      await sigLoaded;
+        await sigLoaded;
 
-      // 2. Bezeichnungen auf Canvas zeichnen (untrennbar mit Unterschrift verschmolzen!)
-      // Bezeichnung "Schulleiter/in"
-      const labelText = translations[currentLang].labelPrincipal || 'Schulleiter/in';
-      sigCtx.fillStyle = '#475569'; // var(--text-secondary)
-      sigCtx.font = '700 10px "Outfit", sans-serif';
-      sigCtx.textAlign = 'left';
-      sigCtx.textBaseline = 'top';
-      sigCtx.fillText(labelText.toUpperCase(), 2, 45);
+        // 2. Bezeichnungen auf Canvas zeichnen (untrennbar mit Unterschrift verschmolzen!)
+        const labelText = translations[currentLang].labelPrincipal || 'Schulleiter/in';
+        sigCtx.fillStyle = '#475569';
+        sigCtx.font = '700 10px "Outfit", sans-serif';
+        sigCtx.textAlign = 'left';
+        sigCtx.textBaseline = 'top';
+        sigCtx.fillText(labelText.toUpperCase(), 2, 45);
 
-      // Name des Schulleiters
-      const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
-      sigCtx.fillStyle = '#0f172a'; // var(--text)
-      sigCtx.font = '600 13px "Outfit", sans-serif';
-      sigCtx.fillText(principalName, 2, 59);
+        const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
+        sigCtx.fillStyle = '#0f172a';
+        sigCtx.font = '600 13px "Outfit", sans-serif';
+        sigCtx.fillText(principalName, 2, 59);
+      } else {
+        // Bei Sperrung: Leeres Canvas zeichnen (keine Unterschrift, kein Schulleitername!)
+        sigCtx.fillStyle = '#ef4444';
+        sigCtx.font = '700 10px "Outfit", sans-serif';
+        sigCtx.textAlign = 'left';
+        sigCtx.textBaseline = 'top';
+        sigCtx.fillText('AUSWEIS UNGÜLTIG', 2, 45);
+      }
 
       // Unterschriften-Container befüllen
       const sigContainer = document.getElementById('signature-container');
