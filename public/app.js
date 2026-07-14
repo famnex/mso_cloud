@@ -95,6 +95,36 @@ async function checkAuthStatus() {
     const res = await fetch('api/auth/me');
     const data = await res.json();
 
+    // 1. Plattformname & Logo auf die Oberfläche anwenden
+    const platformName = data.platform_name || 'MSO Cloud';
+    const platformLogo = data.platform_logo || '';
+
+    // HTML Titel anpassen
+    document.title = `${platformName} Portal`;
+
+    // Willkommens-Jumbo
+    const jumboTitle = document.getElementById('jumbo-title');
+    if (jumboTitle) {
+      jumboTitle.innerText = `Willkommen im ${platformName} Portal`;
+    }
+
+    // Logo Texte
+    document.querySelectorAll('.logo-text').forEach(el => {
+      el.innerText = platformName;
+    });
+
+    // Logo Bilder
+    document.querySelectorAll('.logo-img').forEach(el => {
+      if (platformLogo) {
+        el.src = platformLogo;
+        // prevent error handler overriding the custom logo
+        el.removeAttribute('onerror');
+      } else {
+        el.src = 'logo.png';
+        el.setAttribute('onerror', "this.src='https://cloud.mso-hef.de/launcher/logo.png'");
+      }
+    });
+
     if (data.impressum_url) {
       const footerLink = document.getElementById('footer-impressum-link');
       if (footerLink) {
@@ -1045,6 +1075,23 @@ async function loadAdminConfig() {
     if (disableStudentCheckInput) {
       disableStudentCheckInput.checked = cfg.disable_student_check === '1';
     }
+    const platformNameInput = document.getElementById('platform_name');
+    if (platformNameInput) {
+      platformNameInput.value = cfg.platform_name || 'MSO Cloud';
+    }
+    const platformLogoInput = document.getElementById('platform_logo');
+    if (platformLogoInput) {
+      platformLogoInput.value = cfg.platform_logo || '';
+      const preview = document.getElementById('platform_logo_preview');
+      const container = document.getElementById('platform_logo_preview_container');
+      if (cfg.platform_logo) {
+        preview.src = cfg.platform_logo;
+        container.style.display = 'flex';
+      } else {
+        preview.src = '';
+        container.style.display = 'none';
+      }
+    }
 
     // Schülerausweis Felder befüllen
     const cardSchoolInput = document.getElementById('card_school_name');
@@ -1272,7 +1319,9 @@ async function saveGeneralConfig(e) {
   e.preventDefault();
   const body = {
     impressum_url: document.getElementById('impressum_url').value.trim(),
-    disable_student_check: document.getElementById('disable_student_check').checked ? '1' : '0'
+    disable_student_check: document.getElementById('disable_student_check').checked ? '1' : '0',
+    platform_name: document.getElementById('platform_name').value.trim(),
+    platform_logo: document.getElementById('platform_logo').value
   };
 
   try {
@@ -3433,6 +3482,32 @@ async function saveCardConfig(e) {
   } catch (err) {
     showAdminAlert(err.message, 'danger');
   }
+}
+
+function convertPlatformLogoToBase64(input) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Das Logo darf maximal 2 MB groß sein.");
+      input.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('platform_logo').value = e.target.result;
+      const preview = document.getElementById('platform_logo_preview');
+      preview.src = e.target.result;
+      document.getElementById('platform_logo_preview_container').style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function removePlatformLogo() {
+  document.getElementById('platform_logo_upload').value = '';
+  document.getElementById('platform_logo').value = '';
+  document.getElementById('platform_logo_preview').src = '';
+  document.getElementById('platform_logo_preview_container').style.display = 'none';
 }
 
 

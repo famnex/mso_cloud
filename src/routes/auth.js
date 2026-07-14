@@ -13,6 +13,9 @@ const studentDb = require('../student_db');
 router.get('/me', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const impressumUrl = getConfig('impressum_url', 'https://www.mso-hef.de/impressum');
+  const platformName = getConfig('platform_name', 'MSO Cloud');
+  const platformLogo = getConfig('platform_logo', '');
+
   if (req.session.user) {
     const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
     const disableCheck = getConfig('disable_student_check', '0') === '1';
@@ -22,9 +25,9 @@ router.get('/me', (req, res) => {
       ...req.session.user,
       isStudent: isStudent
     };
-    res.json({ logged_in: true, user: userPayload, impressum_url: impressumUrl });
+    res.json({ logged_in: true, user: userPayload, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo });
   } else {
-    res.json({ logged_in: false, impressum_url: impressumUrl });
+    res.json({ logged_in: false, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo });
   }
 });
 

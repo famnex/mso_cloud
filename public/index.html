@@ -511,6 +511,19 @@
             <h4 style="font-weight:600; margin-bottom:15px;"><i class="fa-solid fa-sliders"></i> Allgemeine Einstellungen</h4>
             <form id="general-config-form" onsubmit="saveGeneralConfig(event)">
               <div class="form-group" style="margin-bottom: 20px;">
+                <label for="platform_name">Plattform-Name *</label>
+                <input type="text" id="platform_name" class="form-control" placeholder="MSO Cloud" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label for="platform_logo_upload">Plattform-Logo (Upload)</label>
+                <input type="file" id="platform_logo_upload" class="form-control" accept="image/*" onchange="convertPlatformLogoToBase64(this)">
+                <input type="hidden" id="platform_logo" value="">
+                <div id="platform_logo_preview_container" style="margin-top: 10px; display: none; align-items: center; gap: 10px;">
+                  <img id="platform_logo_preview" src="" style="max-height: 40px; object-fit: contain; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 3px; background: rgba(0,0,0,0.15);">
+                  <button type="button" class="btn btn-danger btn-sm" onclick="removePlatformLogo()" style="padding: 4px 8px; font-size: 0.75rem;"><i class="fa-solid fa-trash"></i> Logo löschen</button>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 20px;">
                 <label for="impressum_url">Impressum-URL *</label>
                 <input type="url" id="impressum_url" class="form-control" placeholder="https://www.mso-hef.de/impressum" required>
               </div>
