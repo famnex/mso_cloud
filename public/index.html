@@ -17,7 +17,7 @@
     <!-- ANONYMOUS HEADER -->
     <div id="header-anonymous" style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
       <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
-        <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
+        <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo">
         <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">MSO Cloud</span>
       </div>
       <div class="nav-controls" style="display: flex; align-items: center; gap: 15px;">
@@ -34,7 +34,7 @@
     <div id="header-authenticated" style="width: 100%; display: none; justify-content: space-between; align-items: center;">
       <!-- Left Side: Logo & Tagline -->
       <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
-        <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
+        <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo">
         <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">MSO Cloud</span>
       </div>
 
@@ -70,7 +70,7 @@
         <div style="position: relative; display: flex; align-items: center; gap: 12px;">
           <!-- Avatar Circle -->
           <div class="user-avatar-circle" onclick="toggleUserDropdown(event)">
-            <img id="header-user-avatar" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" onerror="this.src='media/user.png'">
+            <img id="header-user-avatar" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2394a3b8\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>';">
           </div>
           
           <!-- User Dropdown Menu (Right Aligned) -->
@@ -747,7 +747,7 @@
           
           <!-- Bild-Vorschau -->
           <div style="width: 147px; height: 196px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-            <img id="student-photo-preview" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild-Vorschau" onerror="this.src='media/user.png'">
+            <img id="student-photo-preview" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild-Vorschau" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2394a3b8\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>';">
             <canvas id="student-photo-canvas" width="147" height="196" style="display: none;"></canvas>
           </div>
 
@@ -794,7 +794,7 @@
           
           <!-- Card Top: School Info -->
           <div style="display: flex; gap: 12px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; position: relative; z-index: 2;">
-            <img src="logo.png" style="width: 40px; height: 40px; object-fit: contain;" alt="MSO Logo" onerror="this.src='https://cloud.mso-hef.de/launcher/logo.png'">
+            <img src="logo.png" style="width: 40px; height: 40px; object-fit: contain;" alt="MSO Logo">
             <div>
               <div style="font-weight: 700; font-size: 0.9rem; letter-spacing: 0.5px; color: #38bdf8;">MODELLSCHULE OBERSBERG</div>
               <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 1px;">Bad Hersfeld</div>
@@ -814,7 +814,7 @@
           <div style="display: grid; grid-template-columns: 120px 1fr; gap: 15px; margin-top: 15px; align-items: center; position: relative; z-index: 2;">
             <!-- Photo Frame -->
             <div style="width: 120px; height: 160px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.3); overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
-              <img id="card-photo-img" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild" onerror="this.src='media/user.png'">
+              <img id="card-photo-img" src="media/user.png" style="width: 100%; height: 100%; object-fit: cover;" alt="Passbild" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2394a3b8\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>';">
             </div>
 
             <!-- Details -->

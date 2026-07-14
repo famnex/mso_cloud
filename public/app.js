@@ -115,13 +115,11 @@ async function checkAuthStatus() {
 
     // Logo Bilder
     document.querySelectorAll('.logo-img').forEach(el => {
+      el.removeAttribute('onerror');
       if (platformLogo) {
         el.src = platformLogo;
-        // prevent error handler overriding the custom logo
-        el.removeAttribute('onerror');
       } else {
         el.src = 'logo.png';
-        el.setAttribute('onerror', "this.src='https://cloud.mso-hef.de/launcher/logo.png'");
       }
     });
 
