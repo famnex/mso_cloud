@@ -98,9 +98,20 @@ async function checkAuthStatus() {
     // 1. Plattformname & Logo auf die Oberfläche anwenden
     const platformName = data.platform_name || 'MSO Cloud';
     const platformLogo = data.platform_logo || '';
+    const cardLogo = data.card_logo || '';
 
     // HTML Titel anpassen
     document.title = `${platformName} Portal`;
+
+    // Favicon dynamisch setzen (Schullogo bevorzugt, Fallback: Plattformlogo, Fallback: default favicon.ico)
+    const faviconSrc = cardLogo || platformLogo || 'favicon.ico';
+    let faviconLink = document.querySelector("link[rel*='icon']");
+    if (!faviconLink) {
+      faviconLink = document.createElement('link');
+      faviconLink.rel = 'icon';
+      document.getElementsByTagName('head')[0].appendChild(faviconLink);
+    }
+    faviconLink.href = faviconSrc;
 
     // Willkommens-Jumbo
     const jumboTitle = document.getElementById('jumbo-title');
@@ -183,19 +194,11 @@ function renderAuthenticatedHeader() {
 }
 
 function renderAdminButton() {
-  const container = document.getElementById('admin-btn-container');
-  if (!container) return;
+  const adminLink = document.getElementById('header-admin-link');
+  if (!adminLink) return;
 
   const isAdmin = currentUser.role === 'admin';
-  if (isAdmin) {
-    container.innerHTML = `
-      <button class="btn btn-secondary" onclick="openAdminView()">
-        <i class="fa-solid fa-screwdriver-wrench"></i> Admin-Bereich
-      </button>
-    `;
-  } else {
-    container.innerHTML = '';
-  }
+  adminLink.style.display = isAdmin ? 'block' : 'none';
 }
 
 function renderAnonymousHeader() {
@@ -593,7 +596,12 @@ window.onclick = function(event) {
 /* ==========================================================================
    6. Admin Control Panel Logik
    ========================================================================== */
-function openAdminView() {
+function openAdminView(e) {
+  if (e) {
+    e.preventDefault();
+    const dropdown = document.getElementById('header-user-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+  }
   const studentView = document.getElementById('student-view');
   const cardView = document.getElementById('card-view');
 

@@ -15,6 +15,7 @@ router.get('/me', (req, res) => {
   const impressumUrl = getConfig('impressum_url', 'https://www.mso-hef.de/impressum');
   const platformName = getConfig('platform_name', 'MSO Cloud');
   const platformLogo = getConfig('platform_logo', '');
+  const cardLogo = getConfig('card_logo', '');
 
   if (req.session.user) {
     const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
@@ -25,9 +26,9 @@ router.get('/me', (req, res) => {
       ...req.session.user,
       isStudent: isStudent
     };
-    res.json({ logged_in: true, user: userPayload, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo });
+    res.json({ logged_in: true, user: userPayload, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
   } else {
-    res.json({ logged_in: false, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo });
+    res.json({ logged_in: false, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
   }
 });
 

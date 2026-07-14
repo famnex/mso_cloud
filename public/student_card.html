@@ -1142,6 +1142,16 @@
         document.documentElement.style.setProperty('--accent-glow', data.card_primary_color + '1F');
       }
 
+      // Favicon dynamisch setzen (Schullogo bevorzugt, Fallback: default favicon.ico)
+      const faviconSrc = data.card_logo || 'favicon.ico';
+      let faviconLink = document.querySelector("link[rel*='icon']");
+      if (!faviconLink) {
+        faviconLink = document.createElement('link');
+        faviconLink.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(faviconLink);
+      }
+      faviconLink.href = faviconSrc;
+
       // 2. Sperr- & Statusprüfung vornehmen
       const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
       const hasNoImage = !data.card_image;
