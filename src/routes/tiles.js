@@ -171,6 +171,28 @@ router.get('/sso/:id', (req, res) => {
           const decryptedPassword = authRouter.decrypt(sphCreds.sph_password);
           
           if (decryptedPassword) {
+            // Schulnummer (i-Parameter) aus dem Tile-Link extrahieren (Fallback: 9743)
+            let schoolNumber = '9743';
+            try {
+              if (tile.link.startsWith('http')) {
+                const urlObj = new URL(tile.link);
+                const iParam = urlObj.searchParams.get('i');
+                if (iParam) {
+                  schoolNumber = iParam.trim();
+                }
+              } else {
+                const match = tile.link.match(/[?&]i=(\d+)/);
+                if (match) {
+                  schoolNumber = match[1];
+                }
+              }
+            } catch (e) {
+              const match = tile.link.match(/[?&]i=(\d+)/);
+              if (match) {
+                schoolNumber = match[1];
+              }
+            }
+
             let sphUsername = sphCreds.sph_username.trim();
             let userVal, user2Val;
             if (sphUsername.includes('.')) {
@@ -178,7 +200,7 @@ router.get('/sso/:id', (req, res) => {
               user2Val = sphUsername.split('.').slice(1).join('.');
             } else {
               user2Val = sphUsername;
-              userVal = `9743.${sphUsername}`;
+              userVal = `${schoolNumber}.${sphUsername}`;
             }
 
             const timezoneOffset = -new Date().getTimezoneOffset() / 60;
@@ -200,7 +222,7 @@ router.get('/sso/:id', (req, res) => {
                 <div class="loader"></div>
                 <p>Melde dich automatisch beim Schulportal Hessen an...</p>
                 
-                <form id="sph-login-form" method="POST" action="https://login.schulportal.hessen.de/?url=aHR0cHM6Ly9jb25uZWN0LnNjaHVscG9ydGFsLmhlc3Nlbi5kZS8=&skin=sp&i=9743">
+                <form id="sph-login-form" method="POST" action="https://login.schulportal.hessen.de/?url=aHR0cHM6Ly9jb25uZWN0LnNjaHVscG9ydGFsLmhlc3Nlbi5kZS8=&skin=sp&i=${schoolNumber}">
                   <input type="hidden" name="url" value="aHR0cHM6Ly9jb25uZWN0LnNjaHVscG9ydGFsLmhlc3Nlbi5kZS8=">
                   <input type="hidden" name="timezone" value="${timezoneOffset}">
                   <input type="hidden" name="skin" value="sp">
