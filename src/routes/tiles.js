@@ -310,6 +310,7 @@ router.get('/sso/:id', (req, res) => {
       
       const payload = {
         username: user.username,
+        display_name: user.display_name || user.username,
         email: user.email || '',
         groups: user.groups || [],
         role: user.role,
