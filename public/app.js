@@ -103,15 +103,22 @@ async function checkAuthStatus() {
     // HTML Titel anpassen
     document.title = `${platformName} Portal`;
 
-    // Favicon dynamisch setzen (Schullogo bevorzugt, Fallback: Plattformlogo, Fallback: default favicon.ico)
-    const faviconSrc = cardLogo || platformLogo || 'favicon.ico';
-    let faviconLink = document.querySelector("link[rel*='icon']");
-    if (!faviconLink) {
-      faviconLink = document.createElement('link');
-      faviconLink.rel = 'icon';
-      document.getElementsByTagName('head')[0].appendChild(faviconLink);
+    // Favicon dynamisch setzen (Plattform-Logo aus den Einstellungen, Fallback: default favicon.ico)
+    const faviconSrc = platformLogo || 'favicon.ico';
+    
+    // Alten Link entfernen (Zwingt den Browser zur Neuprüfung)
+    const existingLinks = document.querySelectorAll("link[rel*='icon']");
+    existingLinks.forEach(link => link.parentNode.removeChild(link));
+
+    // Neuen Link erstellen (Verhindert hartnäckiges Browser-Caching)
+    const faviconLink = document.createElement('link');
+    faviconLink.rel = 'icon';
+    if (faviconSrc && !faviconSrc.startsWith('data:')) {
+      faviconLink.href = `${faviconSrc}?v=${Date.now()}`;
+    } else {
+      faviconLink.href = faviconSrc;
     }
-    faviconLink.href = faviconSrc;
+    document.getElementsByTagName('head')[0].appendChild(faviconLink);
 
     // Willkommens-Jumbo
     const jumboTitle = document.getElementById('jumbo-title');

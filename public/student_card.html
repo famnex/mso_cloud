@@ -1142,15 +1142,22 @@
         document.documentElement.style.setProperty('--accent-glow', data.card_primary_color + '1F');
       }
 
-      // Favicon dynamisch setzen (Schullogo bevorzugt, Fallback: default favicon.ico)
-      const faviconSrc = data.card_logo || 'favicon.ico';
-      let faviconLink = document.querySelector("link[rel*='icon']");
-      if (!faviconLink) {
-        faviconLink = document.createElement('link');
-        faviconLink.rel = 'icon';
-        document.getElementsByTagName('head')[0].appendChild(faviconLink);
+      // Favicon dynamisch setzen (Plattform-Logo bevorzugt, Fallback: Schullogo, Fallback: default favicon.ico)
+      const faviconSrc = data.platform_logo || data.card_logo || 'favicon.ico';
+      
+      // Alten Link entfernen (Zwingt den Browser zur Neuprüfung)
+      const existingLinks = document.querySelectorAll("link[rel*='icon']");
+      existingLinks.forEach(link => link.parentNode.removeChild(link));
+
+      // Neuen Link erstellen (Verhindert hartnäckiges Browser-Caching)
+      const faviconLink = document.createElement('link');
+      faviconLink.rel = 'icon';
+      if (faviconSrc && !faviconSrc.startsWith('data:')) {
+        faviconLink.href = `${faviconSrc}?v=${Date.now()}`;
+      } else {
+        faviconLink.href = faviconSrc;
       }
-      faviconLink.href = faviconSrc;
+      document.getElementsByTagName('head')[0].appendChild(faviconLink);
 
       // 2. Sperr- & Statusprüfung vornehmen
       const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';

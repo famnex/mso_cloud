@@ -92,7 +92,8 @@ router.get('/card', async (req, res) => {
       card_signature: getConfig('card_signature', ''),
       card_pwa_logging: getConfig('card_pwa_logging', '0'),
       card_pwa_icon: getConfig('card_pwa_icon', ''),
-      card_seal: getConfig('card_seal', '')
+      card_seal: getConfig('card_seal', ''),
+      platform_logo: getConfig('platform_logo', '')
     });
   } catch (err) {
     console.error('Fehler beim Laden des Schülerausweises:', err);
