@@ -36,7 +36,8 @@ router.get('/me', (req, res) => {
  * Login-API (Lokale Daten & LDAP)
  */
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  const password = req.body.password;
+  const username = String(req.body.username || '').trim().toLowerCase();
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich.' });
@@ -88,27 +89,29 @@ router.post('/login', async (req, res) => {
           role = localCache.role; // Bestehende Rolle beibehalten
         }
 
+        const emailLower = (ldapUser.email || '').trim().toLowerCase();
+
         if (localCache) {
           // Cache aktualisieren
           db.prepare(`
             UPDATE users 
             SET email = ?, role = ?, groups = ?, is_ldap = 1, display_name = ?, dn = ?, first_name = ?, last_name = ?
             WHERE id = ?
-          `).run(ldapUser.email, role, groupsJson, ldapUser.name, ldapUser.dn, ldapUser.givenName, ldapUser.sn, localCache.id);
+          `).run(emailLower, role, groupsJson, ldapUser.name, ldapUser.dn, ldapUser.givenName, ldapUser.sn, localCache.id);
           userId = localCache.id;
         } else {
           // Neu anlegen
           const info = db.prepare(`
             INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name, dn, first_name, last_name)
             VALUES (?, ?, NULL, ?, ?, 1, ?, ?, ?, ?)
-          `).run(username, ldapUser.email, role, groupsJson, ldapUser.name, ldapUser.dn, ldapUser.givenName, ldapUser.sn);
+          `).run(username, emailLower, role, groupsJson, ldapUser.name, ldapUser.dn, ldapUser.givenName, ldapUser.sn);
           userId = info.lastInsertRowid;
         }
 
         req.session.user = {
           id: userId,
-          username: ldapUser.username,
-          email: ldapUser.email,
+          username: username,
+          email: emailLower,
           role: role,
           groups: ldapUser.rawGroups,
           isLdap: true,
