@@ -7,6 +7,7 @@ const fs = require('fs');
 const { getConfig } = require('./db');
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 8080;
 
 // Middleware für JSON & Formular-Daten (erhöhtes Limit für Base64 Bilder)
