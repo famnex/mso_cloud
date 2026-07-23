@@ -217,7 +217,13 @@ function renderAnonymousHeader() {
 
 async function handleLogin(e) {
   e.preventDefault();
-  const user = document.getElementById('login-username').value.trim();
+  let user = document.getElementById('login-username').value.trim();
+  
+  // E-Mail-Fehlerhilfe: Alles ab dem @-Zeichen ignorieren
+  if (user.includes('@')) {
+    user = user.split('@')[0];
+  }
+  
   const pass = document.getElementById('login-password').value;
   const alertBox = document.getElementById('login-alert');
 
@@ -246,7 +252,11 @@ async function handleLogin(e) {
       await loadTiles();
       await loadActiveMessages();
     } else {
-      throw new Error(data.error || 'Fehler beim Anmelden.');
+      let errorMsg = data.error || 'Fehler beim Anmelden.';
+      if (res.status === 401) {
+        errorMsg += '\nHinweis: m.mustermann = Lehrer, mustermann.max = Schüler';
+      }
+      throw new Error(errorMsg);
     }
   } catch (err) {
     alertBox.innerText = err.message;
