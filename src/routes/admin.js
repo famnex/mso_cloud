@@ -558,6 +558,8 @@ router.post('/users', (req, res) => {
       VALUES (?, ?, ?, ?, ?, 0, ?)
     `).run(username.trim(), email.trim(), hash, role, groupsJson, displayName);
 
+    logEvent('info', 'user_created', `Benutzer ${username.trim()} wurde erfolgreich durch Admin angelegt`, { role, email: email.trim() }, req.ip);
+
     res.json({ success: true, message: 'Benutzer erfolgreich angelegt.' });
   } catch (error) {
     if (error.message.includes('UNIQUE')) {
@@ -583,6 +585,7 @@ router.put('/users/:id', (req, res) => {
         return res.status(400).json({ error: 'Rolle ist erforderlich.' });
       }
       db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+      logEvent('info', 'user_updated_ldap', `LDAP-Benutzer ${user.username} Rolle wurde auf ${role} geändert`, { userId: id }, req.ip);
       return res.json({ success: true, message: 'Rolle des LDAP-Benutzers erfolgreich aktualisiert.' });
     }
 
@@ -602,12 +605,14 @@ router.put('/users/:id', (req, res) => {
         SET email = ?, role = ?, groups = ?, password_hash = ?, display_name = ?
         WHERE id = ?
       `).run(email.trim(), role, groupsJson, hash, displayName, id);
+      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert (inkl. Passwortänderung)`, { userId: id, role, email: email.trim() }, req.ip);
     } else {
       db.prepare(`
         UPDATE users
         SET email = ?, role = ?, groups = ?, display_name = ?
         WHERE id = ?
       `).run(email.trim(), role, groupsJson, displayName, id);
+      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert`, { userId: id, role, email: email.trim() }, req.ip);
     }
 
     res.json({ success: true, message: 'Benutzer erfolgreich aktualisiert.' });
