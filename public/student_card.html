@@ -392,6 +392,14 @@
       line-height: 1.2;
     }
 
+    /* ─── Temporal-Interlacing: Monospace-Raster für Screenshot-Schutz ─── */
+    .interlaced-field {
+      font-family: 'Courier New', 'Lucida Console', monospace !important;
+      letter-spacing: 0.08em;
+      white-space: pre;   /* Leerzeichen behalten ihre volle Breite */
+      display: inline-block;
+    }
+
     /* Schulleiter-Unterschrift, Name & Hologramm Badge (Oberhalb der Trennlinie) */
     .signature-hologram-row {
       display: flex;
@@ -1630,6 +1638,68 @@
     }
     requestAnimationFrame(updateClock);
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // TEMPORAL INTERLACING — Screenshot-Schutz für Personendaten
+    //
+    // Funktionsprinzip (wie bei Interlaced-Displays):
+    // Frame A (phase=0): Zeigt Zeichen an geraden Positionen (0,2,4,…),
+    //                    ungerade Positionen = Haarbreites Leerzeichen (gleiche Breite!)
+    // Frame B (phase=1): Zeigt Zeichen an ungeraden Positionen (1,3,5,…),
+    //                    gerade Positionen = Haarbreites Leerzeichen
+    //
+    // Auge (60 fps):   integriert A+B → vollständiger Text sichtbar
+    // Screenshot:      friert genau EINEN Frame ein → Zahnlücken-Muster
+    //
+    // WICHTIG: Monospace-Font + white-space:pre → alle Slots gleich breit,
+    // sodass das Layout trotz fehlender Zeichen NICHT springt.
+    // ─────────────────────────────────────────────────────────────────────────
+    const INTERLACED_IDS = ['card-name', 'card-birth', 'card-birthplace'];
+
+    // Originaltexte merken (werden beim Befüllen gesetzt)
+    const _interlacedTexts = {};
+
+    // Hilfsfunktion: Baut den Interlacing-Inhalt für einen Element-Slot
+    function buildInterlacedHTML(text, phase) {
+      // Jedes Zeichen bekommt einen eigenen <span> mit fester Breite.
+      // Das unsichtbare Zeichen ist ein HAIR SPACE ( ) + gleiche Farbe wie BG,
+      // alternativ einfach ein normales Leerzeichen (Monospace = gleiche Breite).
+      let html = '';
+      for (let i = 0; i < text.length; i++) {
+        const visible = (i % 2 === phase);
+        const ch = text[i];
+        if (visible) {
+          html += `<span>${ch === ' ' ? '\u00a0' : ch}</span>`; // \u00a0 = nbsp
+        } else {
+          // Gleiche Breite, unsichtbar — Monospace-Leerzeichen behält die Slot-Breite
+          html += `<span style="visibility:hidden">${ch === ' ' ? '\u00a0' : ch}</span>`;
+        }
+      }
+      return html;
+    }
+
+    // Setzt den Text eines Feldes als Interlaced-Feld
+    function setInterlacedText(id, text) {
+      _interlacedTexts[id] = text;
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('interlaced-field');
+    }
+
+    // rAF-Loop: schaltet Phase jeden Frame
+    let _interlacePhase = 0;
+    function runInterlacing() {
+      _interlacePhase ^= 1; // toggle 0/1
+      for (const id of INTERLACED_IDS) {
+        const text = _interlacedTexts[id];
+        if (!text) continue;
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.innerHTML = buildInterlacedHTML(text, _interlacePhase);
+      }
+      requestAnimationFrame(runInterlacing);
+    }
+    requestAnimationFrame(runInterlacing);
+
 
     // Fetch Card Data
 
@@ -1881,8 +1951,9 @@
         document.getElementById('card-expiry').innerText = '—';
         document.getElementById('card-mediothek-number-display').innerText = '—';
       } else {
-        document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
-        document.getElementById('card-birthplace').innerText = data.birth_place || '-';
+        // Personendaten mit Interlacing-Schutz setzen
+        setInterlacedText('card-name', `${data.last_name}, ${data.first_name}`);
+        setInterlacedText('card-birthplace', data.birth_place || '-');
         document.getElementById('card-mediothek-number-display').innerText = data.mediothek_number || '-';
         
         // Geburtsdatum
@@ -1895,7 +1966,7 @@
             birthStr = data.birth_date;
           }
         }
-        document.getElementById('card-birth').innerText = birthStr;
+        setInterlacedText('card-birth', birthStr);
         
         // Ablaufdatum
         if (data.expires_at) {
