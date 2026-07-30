@@ -62,9 +62,14 @@ router.post('/login', async (req, res) => {
           display_name: localUser.display_name || ''
         };
         req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
+        const returnTo = req.session.returnTo || null;
+        if (returnTo) {
+          delete req.session.returnTo;
+        }
+
         const isOauth = !!req.session.oauthQuery;
         logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, req.ip);
-        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
+        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
       }
     }
 
@@ -120,11 +125,14 @@ router.post('/login', async (req, res) => {
           givenName: ldapUser.givenName,
           sn: ldapUser.sn
         };
-        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
+        const returnTo = req.session.returnTo || null;
+        if (returnTo) {
+          delete req.session.returnTo;
+        }
 
         const isOauth = !!req.session.oauthQuery;
         logEvent('info', 'login_success', `LDAP-Login erfolgreich für: ${ldapUser.username}`, { userId: userId, role: role, groups: ldapUser.rawGroups }, req.ip);
-        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth });
+        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
       }
     }
 

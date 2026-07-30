@@ -113,8 +113,13 @@ router.get('/sso/:id', (req, res) => {
   const user = req.session.user;
 
   try {
-    const tile = db.prepare('SELECT * FROM tiles WHERE id = ?').get(tileId);
+    let tile = db.prepare('SELECT * FROM tiles WHERE id = ?').get(tileId);
     
+    if (!tile) {
+      // Fallback: Nach Titel/Slug suchen (z.B. /sso/fortbildung oder /sso/moodle)
+      tile = db.prepare('SELECT * FROM tiles WHERE LOWER(title) = ? OR LOWER(title) LIKE ?').get(tileId.toLowerCase(), `%${tileId.toLowerCase()}%`);
+    }
+
     if (!tile) {
       return res.status(404).send('Dienst nicht gefunden.');
     }
@@ -150,6 +155,11 @@ router.get('/sso/:id', (req, res) => {
     }
 
     if (!hasAccess) {
+      if (!user) {
+        // Nicht angemeldet! Speichere Kachel-Ziel in der Session und leite zum Login weiter
+        req.session.returnTo = `/api/tiles/sso/${tile.id}`;
+        return res.redirect('/?login_required=1');
+      }
       return res.status(403).send('Zugriff verweigert. Sie haben keine Berechtigung für diesen Dienst.');
     }
 

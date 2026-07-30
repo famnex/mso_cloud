@@ -259,6 +259,11 @@ async function handleLogin(e) {
         window.location.href = 'api/oauth/authorize';
         return;
       }
+
+      if (data.return_to) {
+        window.location.href = data.return_to;
+        return;
+      }
       
       await checkAuthStatus();
       await loadTiles();
@@ -501,9 +506,15 @@ function checkPasswordResetToken() {
 
 function checkOauthRedirect() {
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('login_redirect') === 'oauth') {
+  if (urlParams.get('login_redirect') === 'oauth' || urlParams.get('login_required') === '1') {
     if (!currentUser) {
       openModal('login-modal');
+      const alertBox = document.getElementById('login-alert');
+      if (alertBox && urlParams.get('login_required') === '1') {
+        alertBox.innerText = 'Bitte melden Sie sich an, um auf den angeforderten Dienst zuzugreifen.';
+        alertBox.className = 'alert alert-info';
+        alertBox.style.display = 'block';
+      }
     }
   }
 }
