@@ -190,6 +190,18 @@
       visibility: visible;
       transform: scale(1);
     }
+    .card-container.screen-protected {
+      filter: blur(60px) brightness(0.05) !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      transition: filter 0.1s ease, opacity 0.1s ease !important;
+    }
+
+    @media print {
+      body, html {
+        display: none !important;
+      }
+    }
 
     /* Hochkant Plastikkarte */
     .student-card {
@@ -2074,18 +2086,30 @@
     document.addEventListener('copy', e => e.preventDefault());
     document.addEventListener('cut', e => e.preventDefault());
 
-    // 3. Diskreter Anti-Debugging Check
-    (function antiDebug() {
-      function checkDevTools() {
-        const start = performance.now();
-        // Timing-Trap
-        const end = performance.now();
-        if (end - start > 100) {
-          console.clear();
-        }
+    // 4. Active Screen & Screenshot Protection (App Switcher, PrintScreen & Window Blur Blackout)
+    function applyScreenProtection() {
+      const cardFrame = document.getElementById('card-frame');
+      if (cardFrame) cardFrame.classList.add('screen-protected');
+    }
+
+    function removeScreenProtection() {
+      const cardFrame = document.getElementById('card-frame');
+      if (cardFrame) cardFrame.classList.remove('screen-protected');
+    }
+
+    window.addEventListener('blur', () => applyScreenProtection());
+    window.addEventListener('focus', () => removeScreenProtection());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) applyScreenProtection();
+      else removeScreenProtection();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'PrintScreen' || e.keyCode === 44) {
+        applyScreenProtection();
+        setTimeout(removeScreenProtection, 2500);
       }
-      setInterval(checkDevTools, 1500);
-    })();
+    });
 
     // Start
     switchLanguage(currentLang);
