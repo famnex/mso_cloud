@@ -1,23 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { db, getConfig } = require('../db');
+const { db, getConfig, logEvent } = require('../db');
 const studentDb = require('../student_db');
 
 /**
- * Holt die Ausweis-Daten des aktuell eingeloggten Schülers.
+ * Holt die Ausweis-Daten des aktuell eingeloggten Schülers und protokolliert den Zugriff.
  */
 router.get('/card', async (req, res) => {
   const user = req.session.user;
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
+
   if (!user) {
+    if (typeof logEvent === 'function') {
+      logEvent('warn', 'student_card_unauthorized', 'Schülerausweis-Abruf fehlgeschlagen: Nicht angemeldet', null, clientIp);
+    }
     return res.status(401).json({ error: 'Nicht angemeldet.' });
   }
 
   try {
     let profile = await studentDb.getStudentProfile(user);
     const disableCheck = getConfig('disable_student_check', '0') === '1';
+    let isAdminPreview = false;
 
     if (!profile) {
       if (disableCheck || user.role === 'admin') {
+        isAdminPreview = true;
         // Dummy-Profil für Testzwecke / Admin-Vorschau erzeugen (Base64-kodiertes SVG für volle Canvas-Kompatibilität)
         const nameParts = (user.display_name || user.username).split(' ');
         const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" width="147" height="196" viewBox="0 0 147 196"><rect width="147" height="196" fill="#1e293b"/><path d="M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z" fill="#38bdf8"/><text x="73.5" y="170" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="sans-serif" font-weight="bold">ADMIN VORSCHAU</text></svg>`;
@@ -33,6 +40,9 @@ router.get('/card', async (req, res) => {
           card_status: 'Bild verifiziert'
         };
       } else {
+        if (typeof logEvent === 'function') {
+          logEvent('warn', 'student_card_not_found', `Schülerausweis-Abruf fehlgeschlagen: Kein Schülerprofil für User ${user.username}`, { userId: user.id }, clientIp);
+        }
         return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
       }
     } else {
@@ -79,6 +89,72 @@ router.get('/card', async (req, res) => {
     }
     const expiresAt = `${expirationYear}-07-31`;
 
+    // Status- und Gültigkeitsauswertung
+    const rawStatus = profile.card_status || 'Bild ungeprüft / Kein Bild';
+    const isRevoked = rawStatus === 'Ausweis gesperrt' || rawStatus === 'gesperrt' || rawStatus === 'Ungültig';
+    const expiryDate = new Date(expirationYear, 6, 31, 23, 59, 59);
+    const isExpired = now > expiryDate;
+    const isVerified = rawStatus === 'Bild genehmigt' || 
+                       rawStatus === 'genehmigt' || 
+                       rawStatus === 'Bild verifiziert' ||
+                       rawStatus === 'Bild akzeptiert' ||
+                       rawStatus === 'Ausweis gedruckt' ||
+                       rawStatus === 'Ausweis ausgegeben';
+    const hasNoImage = !profile.card_image;
+
+    let statusSummary = 'Gültig';
+    let logLevel = 'info';
+
+    if (isRevoked) {
+      statusSummary = 'Ausweis gesperrt';
+      logLevel = 'warn';
+    } else if (isExpired) {
+      statusSummary = `Abgelaufen (Gültig bis ${expiresAt})`;
+      logLevel = 'warn';
+    } else if (hasNoImage) {
+      statusSummary = 'Kein Foto vorhanden';
+      logLevel = 'warn';
+    } else if (!isVerified) {
+      statusSummary = `Foto ungeprüft (${rawStatus})`;
+      logLevel = 'warn';
+    }
+
+    if (isAdminPreview) {
+      statusSummary += ' [Admin-Vorschau]';
+    }
+
+    // Abruf-Quelle ermitteln (PWA App, Service Worker oder Web-Browser)
+    const reqSource = req.query.source || req.headers['x-pwa-source'] || req.headers['x-pwa-request'];
+    let sourceLabel = 'Web-Browser';
+    if (reqSource === 'pwa' || reqSource === 'standalone') {
+      sourceLabel = 'PWA App (Homescreen)';
+    } else if (reqSource === 'sw' || reqSource === 'service-worker') {
+      sourceLabel = 'PWA Service Worker';
+    } else if (reqSource) {
+      sourceLabel = `PWA (${reqSource})`;
+    }
+
+    // Protokolleintrag schreiben
+    if (typeof logEvent === 'function') {
+      const studentName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.username;
+      logEvent(
+        logLevel,
+        'student_card_access',
+        `Schülerausweis abgerufen für User: ${user.username} (${studentName}) - Status: ${statusSummary} [Quelle: ${sourceLabel}]`,
+        {
+          username: user.username,
+          userId: user.id,
+          name: studentName,
+          card_status: rawStatus,
+          expires_at: expiresAt,
+          status_summary: statusSummary,
+          source: sourceLabel,
+          is_admin_preview: isAdminPreview
+        },
+        clientIp
+      );
+    }
+
     res.json({
       first_name: profile.first_name,
       last_name: profile.last_name,
@@ -103,6 +179,9 @@ router.get('/card', async (req, res) => {
     });
   } catch (err) {
     console.error('Fehler beim Laden des Schülerausweises:', err);
+    if (typeof logEvent === 'function') {
+      logEvent('error', 'student_card_error', `Fehler beim Laden des Schülerausweises für User ${user ? user.username : 'unbekannt'}: ${err.message}`, { error: err.message }, clientIp);
+    }
     res.status(500).json({ error: 'Fehler beim Laden des Profils: ' + err.message });
   }
 });

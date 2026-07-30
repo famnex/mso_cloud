@@ -184,11 +184,11 @@
       transform: translateX(100%);
     }
 
-    /* Kopierschutz-Wasserzeichen: Guillochen & feine Sicherheitslinien über dem gesamten Ausweis */
+    /* Kopierschutz-Wasserzeichen: Guillochen & feine Sicherheitslinien im Hintergrund des Ausweises */
     .security-overlay {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      z-index: 45; /* Liegt über allen Bildelementen zum Schutz vor Screenshots & Kopieren */
+      z-index: 3; /* Hinter Texten, Bildern und Inhalten auf der Karte */
       pointer-events: none;
       opacity: 0.14;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 40 Q 30 10, 60 40 T 120 40' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 80 Q 30 50, 60 80 T 120 80' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 100 Q 30 70, 60 100 T 120 100' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 20 Q 30 -10, 60 20 T 120 20' fill='none' stroke='%23000000' stroke-width='0.8'/%3E%3C/svg%3E");
@@ -1410,7 +1410,9 @@
     // Fetch Card Data
     async function loadCardData() {
       try {
-        const res = await fetch('api/student/card');
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const sourceParam = isStandalone ? 'pwa' : 'web';
+        const res = await fetch(`api/student/card?source=${sourceParam}`);
         if (!res.ok) throw new Error('Nicht autorisiert.');
         
         const data = await res.json();
