@@ -89,6 +89,8 @@ router.get('/card', async (req, res) => {
       expires_at: expiresAt,
       server_time: new Date().toISOString(),
       card_primary_color: getConfig('card_primary_color', '#3b82f6'),
+      card_secondary_color: getConfig('card_secondary_color', '#8b5cf6'),
+      card_install_instructions: getConfig('card_install_instructions', ''),
       card_school_name: getConfig('card_school_name', 'Modellschule Obersberg'),
       card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),
       card_logo: getConfig('card_logo', ''),

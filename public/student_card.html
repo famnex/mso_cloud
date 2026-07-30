@@ -27,7 +27,9 @@
       --card-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 40%, #f1f5f9 100%);
       --card-border: rgba(0, 0, 0, 0.08); /* Dunkle, dezente Ränder */
       --accent: #3b82f6; /* Wird dynamisch überschrieben */
-      --accent-glow: rgba(59, 130, 246, 0.12);
+      --secondary: #8b5cf6; /* Sekundärfarbe, wird dynamisch überschrieben */
+      --accent-glow: rgba(59, 130, 246, 0.18);
+      --secondary-glow: rgba(139, 92, 246, 0.18);
       --text: #0f172a; /* Dunkler Text für super Lesbarkeit */
       --text-secondary: #475569; /* Dezenterer dunklerer Text */
       --success: #10b981;
@@ -60,20 +62,39 @@
       position: relative;
     }
 
-    /* Background Animation */
-    body::before {
+    /* Background Animation — dual color orbs */
+    body::before, body::after {
       content: '';
       position: absolute;
-      top: -50%; left: -50%; width: 200%; height: 200%;
-      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
-      animation: rotateBg 25s linear infinite;
-      z-index: 1;
+      border-radius: 50%;
       pointer-events: none;
+      z-index: 1;
     }
-
-    @keyframes rotateBg {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    body::before {
+      width: 70vmax; height: 70vmax;
+      top: -20vmax; left: -15vmax;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      animation: orbFloat 18s ease-in-out infinite alternate;
+      filter: blur(25px);
+      opacity: 0.95;
+    }
+    body::after {
+      width: 60vmax; height: 60vmax;
+      bottom: -15vmax; right: -10vmax;
+      background: radial-gradient(circle, var(--secondary-glow) 0%, transparent 70%);
+      animation: orbFloat2 22s ease-in-out infinite alternate;
+      filter: blur(30px);
+      opacity: 0.9;
+    }
+    @keyframes orbFloat {
+      0%   { transform: translate(0,  0)   scale(1); }
+      50%  { transform: translate(8vw, 6vh) scale(1.15); }
+      100% { transform: translate(4vw, 12vh) scale(0.95); }
+    }
+    @keyframes orbFloat2 {
+      0%   { transform: translate(0, 0)    scale(1); }
+      50%  { transform: translate(-6vw,-8vh) scale(1.1); }
+      100% { transform: translate(-3vw,-4vh) scale(1.2); }
     }
 
     /* Top Bar Controls */
@@ -122,7 +143,7 @@
       width: 100%;
       max-width: 330px;
       z-index: 10;
-      margin-top: 30px;
+      margin-top: 8px;
     }
 
     /* Hochkant Plastikkarte */
@@ -639,6 +660,76 @@
       opacity: 0.95;
       transform: translateY(-1px);
     }
+
+    /* Platform icon badge */
+    .platform-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.04);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 12px;
+    }
+
+    /* Markdown rendered admin instructions */
+    .admin-install-notes {
+      font-size: 0.8rem;
+      color: #475569;
+      line-height: 1.55;
+      text-align: left;
+      background: rgba(59,130,246,0.05);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+    }
+    .admin-install-notes strong { font-weight: 700; color: #0f172a; }
+    .admin-install-notes em { font-style: italic; }
+    .admin-install-notes a { color: var(--accent); }
+    .admin-install-notes ul { margin-left: 16px; }
+
+    /* Motion permission banner */
+    #motion-permission-banner {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
+      color: #fff;
+      border-radius: 40px;
+      padding: 12px 22px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 3000;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      animation: bannerPulse 2s ease-in-out infinite;
+      cursor: pointer;
+      white-space: nowrap;
+      max-width: 90vw;
+    }
+    #motion-permission-banner .banner-icon {
+      font-size: 1.4rem;
+      animation: bannerShake 1.5s ease-in-out infinite;
+    }
+    @keyframes bannerPulse {
+      0%, 100% { box-shadow: 0 8px 24px rgba(0,0,0,0.2), 0 0 0 0 rgba(59,130,246,0.4); }
+      50%       { box-shadow: 0 8px 24px rgba(0,0,0,0.2), 0 0 0 10px rgba(59,130,246,0); }
+    }
+    @keyframes bannerShake {
+      0%, 100% { transform: rotate(0deg); }
+      20%      { transform: rotate(-15deg); }
+      40%      { transform: rotate(15deg); }
+      60%      { transform: rotate(-8deg); }
+      80%      { transform: rotate(8deg); }
+    }
   </style>
 </head>
 <body>
@@ -658,19 +749,32 @@
     <i class="fa-solid fa-cloud-sun"></i> <span data-i18n="offlineMode">Offline-Modus active</span>
   </div>
 
+  <!-- Motion Permission Banner (iOS only) -->
+  <div id="motion-permission-banner" style="display:none;" onclick="requestMotionPermission()">
+    <span class="banner-icon">📲</span>
+    <span id="motion-banner-text">Tippe hier, um Bewegungsanimation zu aktivieren</span>
+  </div>
+
   <!-- PWA Install Prompt Overlay -->
   <div class="pwa-prompt-overlay" id="pwa-prompt">
     <div class="pwa-prompt-card">
       <button class="pwa-close-btn" onclick="dismissPwaPrompt()"><i class="fa-solid fa-xmark"></i></button>
       <div class="pwa-icon-logo"><i class="fa-solid fa-address-card"></i></div>
+
+      <!-- Platform badge (set dynamically) -->
+      <div id="pwa-platform-badge" class="platform-badge" style="display:none;"></div>
+
       <h3 id="pwa-prompt-title">Ausweis installieren</h3>
       <p class="pwa-desc" id="pwa-prompt-desc">Installiere diesen digitalen Schülerausweis als App auf deinem Homescreen, um ihn offline vorzuzeigen und jederzeit griffbereit zu haben.</p>
+
+      <!-- Custom admin instructions (Markdown rendered) -->
+      <div class="admin-install-notes" id="pwa-admin-notes" style="display:none;"></div>
       
       <div class="pwa-benefits">
         <div class="benefit-item">
           <i class="fa-solid fa-bolt benefit-icon"></i>
           <div>
-            <h4 id="pwa-benefit-1-title">Schnell & Direkt</h4>
+            <h4 id="pwa-benefit-1-title">Schnell &amp; Direkt</h4>
             <p id="pwa-benefit-1-desc">Direktzugriff über dein App-Icon auf dem Homescreen.</p>
           </div>
         </div>
@@ -685,15 +789,35 @@
 
       <div class="pwa-instructions">
         <h4 id="pwa-instruct-title">Installationsanleitung:</h4>
-        <!-- iOS Anleitung -->
+        <!-- iOS Safari -->
         <div id="pwa-ios-instructions" style="display: none;">
-          <p class="instruct-step"><span class="step-num">1</span> Tippe im Browser unten auf das Teilen-Symbol <i class="fa-solid fa-share-from-square" style="color:var(--accent);"></i>.</p>
-          <p class="instruct-step"><span class="step-num">2</span> Wähle **„Zum Home-Bildschirm“** <i class="fa-solid fa-square-plus" style="color:var(--accent);"></i> aus.</p>
+          <p class="instruct-step"><span class="step-num">1</span> Tippe unten in Safari auf <i class="fa-solid fa-share-from-square" style="color:var(--accent);"></i> <strong>Teilen</strong>.</p>
+          <p class="instruct-step"><span class="step-num">2</span> Wähle <i class="fa-solid fa-square-plus" style="color:var(--accent);"></i> <strong>„Zum Home-Bildschirm"</strong>.</p>
+          <p class="instruct-step"><span class="step-num">3</span> Bestätige mit <strong>„Hinzufügen"</strong>.</p>
         </div>
-        <!-- Android Anleitung -->
+        <!-- Android Chrome mit nativer Aufforderung -->
+        <div id="pwa-android-native-instructions" style="display: none;">
+          <p class="instruct-step"><span class="step-num">1</span> Tippe auf <strong>„Jetzt installieren"</strong> unten.</p>
+        </div>
+        <!-- Android Chrome ohne native Aufforderung -->
         <div id="pwa-android-instructions" style="display: none;">
-          <p class="instruct-step"><span class="step-num">1</span> Tippe oben rechts auf die Menüpunkte <i class="fa-solid fa-ellipsis-vertical" style="color:var(--accent);"></i>.</p>
-          <p class="instruct-step"><span class="step-num">2</span> Wähle **„App installieren“** oder **„Zum Startbildschirm“**.</p>
+          <p class="instruct-step"><span class="step-num">1</span> Tippe oben rechts auf <i class="fa-solid fa-ellipsis-vertical" style="color:var(--accent);"></i>.</p>
+          <p class="instruct-step"><span class="step-num">2</span> Wähle <strong>„App installieren"</strong> oder <strong>„Zum Startbildschirm"</strong>.</p>
+        </div>
+        <!-- Samsung Internet -->
+        <div id="pwa-samsung-instructions" style="display: none;">
+          <p class="instruct-step"><span class="step-num">1</span> Tippe unten auf <i class="fa-solid fa-bars" style="color:var(--accent);"></i>.</p>
+          <p class="instruct-step"><span class="step-num">2</span> Tippe auf <strong>„Seite hinzufügen"</strong> → <strong>„Zur Startseite"</strong>.</p>
+        </div>
+        <!-- Firefox Mobile -->
+        <div id="pwa-firefox-instructions" style="display: none;">
+          <p class="instruct-step"><span class="step-num">1</span> Tippe oben auf <i class="fa-solid fa-ellipsis-vertical" style="color:var(--accent);"></i>.</p>
+          <p class="instruct-step"><span class="step-num">2</span> Wähle <strong>„Installieren"</strong>.</p>
+        </div>
+        <!-- Desktop -->
+        <div id="pwa-desktop-instructions" style="display: none;">
+          <p class="instruct-step"><span class="step-num">1</span> Klicke auf <i class="fa-solid fa-circle-plus" style="color:var(--accent);"></i> in der Adressleiste.</p>
+          <p class="instruct-step"><span class="step-num">2</span> Bestätige mit <strong>„Installieren"</strong>.</p>
         </div>
       </div>
 
@@ -916,25 +1040,63 @@
       checkPwaInstallPrompt();
     });
 
-    // PWA overlay popup logic
+    // Platform detection
+    function detectPlatform() {
+      const ua = navigator.userAgent;
+      if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return 'ios';
+      if (/SamsungBrowser/i.test(ua)) return 'samsung';
+      if (/Firefox/i.test(ua) && /Mobi/i.test(ua)) return 'firefox';
+      if (/Android/i.test(ua)) return 'android';
+      return 'desktop';
+    }
+
+    // PWA overlay popup logic with platform-specific instructions
     function checkPwaInstallPrompt() {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isDismissed = sessionStorage.getItem('pwa_prompt_dismissed') === 'true';
+      if (isStandalone || isDismissed) return;
 
-      if (isMobile && !isStandalone && !isDismissed) {
+      const platform = detectPlatform();
+      const badge = document.getElementById('pwa-platform-badge');
+
+      // Hide all platform instruction blocks first
+      ['ios','android-native','android','samsung','firefox','desktop'].forEach(id => {
+        const el = document.getElementById('pwa-' + id + '-instructions');
+        if (el) el.style.display = 'none';
+      });
+
+      if (platform === 'ios') {
+        badge.innerHTML = '<i class="fa-brands fa-apple"></i> iOS Safari';
+        badge.style.display = 'inline-flex';
+        document.getElementById('pwa-ios-instructions').style.display = 'block';
         document.getElementById('pwa-prompt').style.display = 'flex';
-        
-        // Match specific instructions
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        if (isIOS) {
-          document.getElementById('pwa-ios-instructions').style.display = 'block';
-          document.getElementById('pwa-android-instructions').style.display = 'none';
+      } else if (platform === 'samsung') {
+        badge.innerHTML = '<i class="fa-solid fa-mobile-screen"></i> Samsung Internet';
+        badge.style.display = 'inline-flex';
+        document.getElementById('pwa-samsung-instructions').style.display = 'block';
+        document.getElementById('pwa-prompt').style.display = 'flex';
+      } else if (platform === 'firefox') {
+        badge.innerHTML = '<i class="fa-brands fa-firefox-browser"></i> Firefox';
+        badge.style.display = 'inline-flex';
+        document.getElementById('pwa-firefox-instructions').style.display = 'block';
+        document.getElementById('pwa-prompt').style.display = 'flex';
+      } else if (platform === 'android') {
+        badge.innerHTML = '<i class="fa-brands fa-android"></i> Android Chrome';
+        badge.style.display = 'inline-flex';
+        if (deferredPrompt) {
+          document.getElementById('pwa-android-native-instructions').style.display = 'block';
+          document.getElementById('pwa-install-btn').style.display = 'block';
         } else {
-          if (!deferredPrompt) {
-            document.getElementById('pwa-android-instructions').style.display = 'block';
-          }
+          document.getElementById('pwa-android-instructions').style.display = 'block';
         }
+        document.getElementById('pwa-prompt').style.display = 'flex';
+      } else {
+        // Desktop
+        badge.innerHTML = '<i class="fa-solid fa-desktop"></i> Desktop';
+        badge.style.display = 'inline-flex';
+        document.getElementById('pwa-desktop-instructions').style.display = 'block';
+        if (deferredPrompt) document.getElementById('pwa-install-btn').style.display = 'block';
+        document.getElementById('pwa-prompt').style.display = 'flex';
       }
     }
 
@@ -943,7 +1105,7 @@
       sessionStorage.setItem('pwa_prompt_dismissed', 'true');
     }
 
-    // Trigger installation
+    // Trigger installation (Android Chrome native prompt)
     const installBtn = document.getElementById('pwa-install-btn');
     if (installBtn) {
       installBtn.addEventListener('click', async () => {
@@ -955,6 +1117,39 @@
           dismissPwaPrompt();
         }
       });
+    }
+
+    // Motion Permission for iOS (Gyroscope)
+    function requestMotionPermission() {
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+          .then(state => {
+            if (state === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientation);
+            }
+          })
+          .catch(err => console.warn('Gyro permission denied:', err))
+          .finally(() => {
+            const banner = document.getElementById('motion-permission-banner');
+            if (banner) banner.style.display = 'none';
+            sessionStorage.setItem('mso_motion_asked', '1');
+          });
+      }
+    }
+
+    // Set up gyroscope / device orientation
+    if (window.DeviceOrientationEvent) {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+: show tap-to-enable banner (if not already asked this session)
+        if (sessionStorage.getItem('mso_motion_asked') !== '1') {
+          const banner = document.getElementById('motion-permission-banner');
+          if (banner) banner.style.display = 'flex';
+        }
+      } else {
+        // Android / Desktop: directly activate without permission dialog
+        window.addEventListener('deviceorientation', handleOrientation);
+      }
     }
 
     // Switch Language Handler
@@ -1135,11 +1330,40 @@
     });
     setInterval(loadCardData, 15 * 60 * 1000); // Proaktiv alle 15 Minuten refreshen
 
+    // Simple Markdown subset renderer (bold, italic, links, list items, line breaks)
+    function renderMarkdown(md) {
+      if (!md) return '';
+      let html = md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+        .replace(/^[\-\*]\s+(.+)$/gm, '<li>$1</li>')
+        .replace(/\n/g, '<br>');
+      html = html.replace(/(<li>[^<]*<\/li>)/g, (m) => '<ul>' + m + '</ul>');
+      return html;
+    }
+
     async function renderCard(data, isOffline) {
-      // 1. Theme Farbe anwenden
+      // 1. Primär- und Sekundärfarbe anwenden
       if (data.card_primary_color) {
         document.documentElement.style.setProperty('--accent', data.card_primary_color);
-        document.documentElement.style.setProperty('--accent-glow', data.card_primary_color + '1F');
+        document.documentElement.style.setProperty('--accent-glow', data.card_primary_color + '30');
+      }
+      if (data.card_secondary_color) {
+        document.documentElement.style.setProperty('--secondary', data.card_secondary_color);
+        document.documentElement.style.setProperty('--secondary-glow', data.card_secondary_color + '30');
+      }
+
+      // 1b. Admin-definierte Installationshinweise in PWA-Modal einfügen
+      const adminNotesEl = document.getElementById('pwa-admin-notes');
+      if (adminNotesEl) {
+        if (data.card_install_instructions && data.card_install_instructions.trim()) {
+          adminNotesEl.innerHTML = renderMarkdown(data.card_install_instructions);
+          adminNotesEl.style.display = 'block';
+        } else {
+          adminNotesEl.style.display = 'none';
+        }
       }
 
       // Favicon dynamisch setzen (Plattform-Logo bevorzugt, Fallback: Schullogo, Fallback: default favicon.ico)

@@ -579,9 +579,20 @@
                 <input type="text" id="card_principal_name" class="form-control" placeholder="OStD Karsten Backhaus" required>
               </div>
 
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                <div class="form-group">
+                  <label for="card_primary_color">Primärfarbe (Ausweis & Gradient)</label>
+                  <input type="color" id="card_primary_color" class="form-control" style="height: 45px; padding: 5px; cursor: pointer;" value="#3b82f6" required>
+                </div>
+                <div class="form-group">
+                  <label for="card_secondary_color">Sekundärfarbe (Animation & Akzente)</label>
+                  <input type="color" id="card_secondary_color" class="form-control" style="height: 45px; padding: 5px; cursor: pointer;" value="#8b5cf6" required>
+                </div>
+              </div>
+
               <div class="form-group" style="margin-bottom: 15px;">
-                <label for="card_primary_color">Primärfarbe des Ausweises</label>
-                <input type="color" id="card_primary_color" class="form-control" style="height: 45px; padding: 5px; cursor: pointer;" value="#3b82f6" required>
+                <label for="card_install_instructions">Benutzerdefinierte PWA-Installationsanleitung (Markdown unterstützt)</label>
+                <textarea id="card_install_instructions" class="form-control" rows="3" placeholder="Zusätzliche Installations-Hinweise für Schüler (Markdown wie **Fett**, *Kursiv*, Links & Listen erlaubt)..."></textarea>
               </div>
 
               <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">

@@ -1158,6 +1158,14 @@ async function loadAdminConfig() {
     if (cardColorInput) {
       cardColorInput.value = cfg.card_primary_color || '#3b82f6';
     }
+    const cardSecColorInput = document.getElementById('card_secondary_color');
+    if (cardSecColorInput) {
+      cardSecColorInput.value = cfg.card_secondary_color || '#8b5cf6';
+    }
+    const cardInstrInput = document.getElementById('card_install_instructions');
+    if (cardInstrInput) {
+      cardInstrInput.value = cfg.card_install_instructions || '';
+    }
     const cardPwaLoggingInput = document.getElementById('card_pwa_logging');
     if (cardPwaLoggingInput) {
       cardPwaLoggingInput.checked = cfg.card_pwa_logging === '1';
@@ -3618,6 +3626,8 @@ async function saveCardConfig(e) {
     card_school_name: document.getElementById('card_school_name').value.trim(),
     card_principal_name: document.getElementById('card_principal_name').value.trim(),
     card_primary_color: document.getElementById('card_primary_color').value,
+    card_secondary_color: document.getElementById('card_secondary_color').value,
+    card_install_instructions: document.getElementById('card_install_instructions').value.trim(),
     card_logo: logoImg.src && logoImg.src.startsWith('data:') ? logoImg.src : '',
     card_pwa_icon: pwaIconImg.src && pwaIconImg.src.startsWith('data:') ? pwaIconImg.src : '',
     card_seal: sealImg.src && sealImg.src.startsWith('data:') ? sealImg.src : '',
