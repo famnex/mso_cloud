@@ -647,6 +647,12 @@ function switchTab(tabId, element) {
   document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
 
+  // Sidebar schliessen bei mobiler Ansicht
+  const sidebar = document.querySelector('.admin-sidebar');
+  if (sidebar) {
+    sidebar.classList.remove('open');
+  }
+
   // Daten für den ausgewählten Tab laden
   loadAdminTabContent(tabId);
 }
@@ -3532,6 +3538,13 @@ function removePlatformLogo() {
   document.getElementById('platform_logo').value = '';
   document.getElementById('platform_logo_preview').src = '';
   document.getElementById('platform_logo_preview_container').style.display = 'none';
+}
+
+function toggleAdminSidebar() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  if (sidebar) {
+    sidebar.classList.toggle('open');
+  }
 }
 
 

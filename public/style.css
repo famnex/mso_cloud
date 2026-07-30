@@ -851,9 +851,122 @@ input:checked + .slider:before {
 @media (max-width: 900px) {
   .admin-layout {
     grid-template-columns: 1fr;
+    position: relative;
+  }
+  .admin-menu-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+  }
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px;
+    height: 100vh;
+    z-index: 9999;
+    transition: all 0.3s ease;
+    border-radius: 0;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid var(--panel-border);
+    overflow-y: auto;
+  }
+  .admin-sidebar.open {
+    left: 0;
   }
   header {
     padding: 0 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Card-based responsive Tables (Accordion replacement) */
+  .admin-table-container {
+    border: none;
+    background: transparent;
+  }
+  .admin-table, .admin-table thead, .admin-table tbody, .admin-table th, .admin-table td, .admin-table tr {
+    display: block;
+    width: 100%;
+  }
+  .admin-table thead {
+    display: none;
+  }
+  .admin-table tr {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    margin-bottom: 15px;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  }
+  .admin-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: right;
+  }
+  .admin-table td:last-child {
+    border-bottom: none;
+    margin-top: 10px;
+    padding-top: 12px;
+  }
+  
+  /* Dynamic CSS data label fallback */
+  .admin-table td::before {
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-right: 15px;
+    text-align: left;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Target labels dynamically based on table and index */
+  #admin-users-table-body td:nth-of-type(1)::before { content: "Benutzername"; }
+  #admin-users-table-body td:nth-of-type(2)::before { content: "E-Mail"; }
+  #admin-users-table-body td:nth-of-type(3)::before { content: "Typ"; }
+  #admin-users-table-body td:nth-of-type(4)::before { content: "Rolle"; }
+  #admin-users-table-body td:nth-of-type(5)::before { content: "Gruppen"; }
+  #admin-users-table-body td:nth-of-type(6)::before { content: "Erstellt"; }
+  #admin-users-table-body td:nth-of-type(7)::before { content: "Aktionen"; }
+  
+  #admin-tiles-table-body td:nth-of-type(1)::before { content: "Dienst (Name)"; }
+  #admin-tiles-table-body td:nth-of-type(2)::before { content: "Sichtbarkeit"; }
+  #admin-tiles-table-body td:nth-of-type(3)::before { content: "SSO-Verfahren"; }
+  #admin-tiles-table-body td:nth-of-type(4)::before { content: "Sortierung"; }
+  #admin-tiles-table-body td:nth-of-type(5)::before { content: "Aktionen"; }
+
+  #admin-mappings-table-body td:nth-of-type(1)::before { content: "LDAP-Gruppe"; }
+  #admin-mappings-table-body td:nth-of-type(2)::before { content: "Ziel-Rolle"; }
+  #admin-mappings-table-body td:nth-of-type(3)::before { content: "Zusatz-Rolle"; }
+  #admin-mappings-table-body td:nth-of-type(4)::before { content: "Aktionen"; }
+
+  #admin-messages-table-body td:nth-of-type(1)::before { content: "Titel / Vorschau"; }
+  #admin-messages-table-body td:nth-of-type(2)::before { content: "Zielgruppen"; }
+  #admin-messages-table-body td:nth-of-type(3)::before { content: "Ablaufdatum"; }
+  #admin-messages-table-body td:nth-of-type(4)::before { content: "Erstellt"; }
+  #admin-messages-table-body td:nth-of-type(5)::before { content: "Aktionen"; }
+
+  #oauth-clients-list td:nth-of-type(1)::before { content: "Name"; }
+  #oauth-clients-list td:nth-of-type(2)::before { content: "Client-ID"; }
+  #oauth-clients-list td:nth-of-type(3)::before { content: "Aktionen"; }
+
+  #admin-logs-table-body td:nth-of-type(1)::before { content: "Zeit"; }
+  #admin-logs-table-body td:nth-of-type(2)::before { content: "Level"; }
+  #admin-logs-table-body td:nth-of-type(3)::before { content: "Aktion"; }
+  #admin-logs-table-body td:nth-of-type(4)::before { content: "Meldung"; }
+  #admin-logs-table-body td:nth-of-type(5)::before { content: "IP-Adresse"; }
+  #admin-logs-table-body td:nth-of-type(6)::before { content: "Aktionen"; }
+
+  .actions-cell {
+    justify-content: flex-end;
+    width: auto !important;
   }
 }
 
