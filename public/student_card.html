@@ -403,16 +403,22 @@
       position: relative;
     }
 
+    /* Unterschriften-Container: overflow:visible damit Canvas 200%-skaliert
+       herausragen kann. Ankerpunkt oben links bleibt via position:relative fixiert. */
     .signature-seal-area {
       position: relative;
+      /* Breite = halbe Canvas-Breite: so bleibt rechts Platz fürs Hologramm */
       width: 200px;
-      height: 70px;
+      /* Höhe explizit auf auto → Canvas bestimmt die Höhe */
+      height: auto;
       z-index: 20;
+      overflow: visible;
     }
 
     .principal-container {
       width: 100%;
-      height: 100%;
+      height: auto;
+      overflow: visible;
     }
 
     /* Horizontaler Trennstrich zwischen Schulleiter/Hologramm (oben) und Gültigkeit/QR-Code (unten) */
@@ -1673,20 +1679,27 @@
         const angleDeg = (Math.random() - 0.5) * 90;
         const angleRad = angleDeg * Math.PI / 180;
 
-        // Sehr niedrige, wechselnde Deckkraft → fast unsichtbar für Auge, aber im Foto
-        // wird ein einziger Wert eingefroren (zwischen 0.06 und 0.13)
-        const alpha = 0.06 + Math.random() * 0.07;
+        // Deckkraft: für das Auge flimmert es (wechselt je Frame),
+        // im Screenshot wird ein einzelner Wert eingefroren → gut lesbar.
+        // Range 0.20–0.38: im Livebild kaum wahrnehmbar, im Foto kräftig sichtbar.
+        const alpha = 0.20 + Math.random() * 0.18;
 
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(angleRad);
 
-        // Dünne Konturschrift (strokeText, kein fillText)
-        ctx.font = 'bold 28px "Arial", sans-serif';
+        // Gefüllter Text (kräftige Farbe) + dünne Kontur für Schärfe im Foto
+        ctx.font = 'bold 42px "Arial Black", "Arial", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.lineWidth = 0.8;
-        ctx.strokeStyle = `rgba(180, 0, 0, ${alpha})`;
+
+        // 1. Füllung: kräftiges Rot
+        ctx.fillStyle = `rgba(200, 0, 0, ${alpha})`;
+        ctx.fillText(TEXT, 0, 0);
+
+        // 2. Kontur: dunklere Linie für Klarheit
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = `rgba(120, 0, 0, ${Math.min(alpha + 0.08, 0.55)})`;
         ctx.strokeText(TEXT, 0, 0);
 
         ctx.restore();
@@ -2159,24 +2172,31 @@
 
 
       // --- CANVAS 2: Unterschrift + Text (Schulleiter/in & Name) ---
+      // Unterschrift: 200% Skalierung, Ankerpunkt oben links bleibt fixiert.
+      // Canvas-Koordinatensystem: 400px × 140px (Anzeigegröße),
+      // interner DPR-Faktor wie gehabt für Retina-Schärfe.
+      const SIG_W = 400;  // 200% von 200px
+      const SIG_H = 140;  // 200% von 70px
       const sigCanvas = document.createElement('canvas');
       const sigCtx = sigCanvas.getContext('2d');
-      sigCanvas.width = 200 * dpr;
-      sigCanvas.height = 70 * dpr;
+      sigCanvas.width = SIG_W * dpr;
+      sigCanvas.height = SIG_H * dpr;
       sigCtx.scale(dpr, dpr);
 
       if (!shouldBlockContent) {
         // 1. Unterschriften-Grafik laden & zeichnen (NUR wenn aktiv!)
+        // Maximalbreite/höhe ist jetzt doppelt so groß → 200% Skalierung.
         const sigImg = new Image();
         sigImg.crossOrigin = "anonymous";
         
         const sigLoaded = new Promise((resolve) => {
           if (data.card_signature) {
             sigImg.onload = () => {
-              const ratio = Math.min(190 / sigImg.width, 36 / sigImg.height);
+              // Bild skalieren auf max 380px breit / 72px hoch (= 200% der alten 190×36)
+              const ratio = Math.min(380 / sigImg.width, 72 / sigImg.height);
               const w = sigImg.width * ratio;
               const h = sigImg.height * ratio;
-              
+              // Ankerpunkt oben links = (0, 0) → fixiert!
               sigCtx.drawImage(sigImg, 0, 0, w, h);
               resolve();
             };
@@ -2191,32 +2211,34 @@
 
         await sigLoaded;
 
-        // 2. Bezeichnungen auf Canvas zeichnen (untrennbar mit Unterschrift verschmolzen!)
+        // 2. Bezeichnungen auf Canvas zeichnen – y-Koordinaten ebenfalls 200% skaliert
         const labelText = translations[currentLang].labelPrincipal || 'Schulleiter/in';
         sigCtx.fillStyle = '#475569';
-        sigCtx.font = '700 9.5px "Outfit", sans-serif';
+        sigCtx.font = '700 19px "Outfit", sans-serif';  // 2× 9.5px
         sigCtx.textAlign = 'left';
         sigCtx.textBaseline = 'top';
-        sigCtx.fillText(labelText.toUpperCase(), 2, 38);
+        sigCtx.fillText(labelText.toUpperCase(), 4, 76);  // 2× y=38, 2× x=2
 
         const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
         sigCtx.fillStyle = '#0f172a';
-        sigCtx.font = '600 12.5px "Outfit", sans-serif';
-        sigCtx.fillText(principalName, 2, 52);
+        sigCtx.font = '600 25px "Outfit", sans-serif';    // 2× 12.5px
+        sigCtx.fillText(principalName, 4, 104);            // 2× y=52
       } else {
         // Bei Sperrung: Leeres Canvas zeichnen (keine Unterschrift, kein Schulleitername!)
         sigCtx.fillStyle = '#ef4444';
-        sigCtx.font = '700 10px "Outfit", sans-serif';
+        sigCtx.font = '700 20px "Outfit", sans-serif';
         sigCtx.textAlign = 'left';
         sigCtx.textBaseline = 'top';
-        sigCtx.fillText('AUSWEIS UNGÜLTIG', 2, 38);
+        sigCtx.fillText('AUSWEIS UNGÜLTIG', 4, 76);
       }
 
       // Unterschriften-Container befüllen
+      // CSS-Größe: 400×140px, aber position: absolute + top:0 left:0
+      // hält den Ankerpunkt oben links identisch zum alten 200×70px Block.
       const sigContainer = document.getElementById('signature-container');
       sigContainer.innerHTML = '';
-      sigCanvas.style.width = '200px';
-      sigCanvas.style.height = '70px';
+      sigCanvas.style.width = `${SIG_W}px`;
+      sigCanvas.style.height = `${SIG_H}px`;
       sigCanvas.style.pointerEvents = 'none';
       sigCanvas.style.userSelect = 'none';
       sigContainer.appendChild(sigCanvas);
