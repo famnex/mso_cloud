@@ -1265,47 +1265,47 @@ async function loadAdminConfig() {
 // Guillochen SVG Generator für Admin Live-Vorschau
 function generateAdminGuillocheSvg(pattern, fineness, density) {
   const w = parseFloat(fineness) || 1.2;
-  const count = parseInt(density, 10) || 10;
+  const count = Math.max(3, parseInt(density, 10) || 10);
   let paths = '';
 
   if (pattern === 'waves_double') {
-    const step = 120 / (count + 1);
-    for (let i = 1; i <= count; i++) {
+    const step = 120 / count;
+    for (let i = 0; i < count; i++) {
       const y = (i * step).toFixed(1);
-      const amp = 15 + (i % 3) * 5;
-      paths += `<path d='M0 ${y} Q 30 ${(y - amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
-      paths += `<path d='M0 ${y} Q 30 ${(parseFloat(y) + amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>`;
+      const amp = 12 + (i % 3) * 4;
+      paths += `<path d='M0 ${y} C 30 ${(y - amp).toFixed(1)}, 90 ${(parseFloat(y) + amp).toFixed(1)}, 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
+      paths += `<path d='M0 ${y} C 30 ${(parseFloat(y) + amp).toFixed(1)}, 90 ${(y - amp).toFixed(1)}, 120 ${y}' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>`;
     }
   } else if (pattern === 'radial') {
-    const rStep = 56 / count;
+    const rStep = 60 / count;
     for (let i = 1; i <= count; i++) {
       const r = (i * rStep).toFixed(1);
       const dash = i % 2 === 0 ? " stroke-dasharray='4,2'" : "";
       paths += `<circle cx='60' cy='60' r='${r}' fill='none' stroke='#000000' stroke-width='${w}'${dash}/>`;
     }
-    paths += `<path d='M60 0 Q 75 30, 60 60 T 60 120' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
-    paths += `<path d='M0 60 Q 30 75, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
+    paths += `<path d='M60 0 L60 120' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
+    paths += `<path d='M0 60 L120 60' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
   } else if (pattern === 'crosshatch') {
     const step = 120 / count;
-    for (let i = 0; i <= count; i++) {
+    for (let i = 0; i < count; i++) {
       const offset = (i * step).toFixed(1);
       paths += `<line x1='0' y1='${offset}' x2='${(120 - offset).toFixed(1)}' y2='120' stroke='#000000' stroke-width='${w}'/>`;
       paths += `<line x1='${offset}' y1='0' x2='120' y2='${(120 - offset).toFixed(1)}' stroke='#000000' stroke-width='${w}'/>`;
     }
   } else if (pattern === 'spiral') {
-    const rStep = 52 / count;
+    const rStep = 60 / count;
     for (let i = 1; i <= count; i++) {
       const r = i * rStep;
-      const rx = (r * 0.5).toFixed(1);
+      const rx = (r * 0.4).toFixed(1);
       paths += `<rect x='${(60 - r).toFixed(1)}' y='${(60 - r).toFixed(1)}' width='${(r * 2).toFixed(1)}' height='${(r * 2).toFixed(1)}' rx='${rx}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
     }
   } else {
-    // Default waves
-    const step = 120 / (count + 1);
-    for (let i = 1; i <= count; i++) {
+    // Default waves (C1-nahtlos kachelnde Wellen ohne Knicke oder Lücken)
+    const step = 120 / count;
+    for (let i = 0; i < count; i++) {
       const y = (i * step).toFixed(1);
-      const amp = 15 + (i % 2) * 8;
-      paths += `<path d='M0 ${y} Q 30 ${(y - amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
+      const amp = 12 + (i % 2) * 6;
+      paths += `<path d='M0 ${y} C 30 ${(y - amp).toFixed(1)}, 90 ${(parseFloat(y) + amp).toFixed(1)}, 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
     }
   }
 

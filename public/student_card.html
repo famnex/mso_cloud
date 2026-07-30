@@ -1661,9 +1661,9 @@
         const step = 120 / count;
         for (let i = 0; i < count; i++) {
           const y = (i * step).toFixed(1);
-          const amp = 15 + (i % 3) * 4;
-          paths += `<path d='M0 ${y} Q 30 ${(y - amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
-          paths += `<path d='M0 ${y} Q 30 ${(parseFloat(y) + amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>`;
+          const amp = 12 + (i % 3) * 4;
+          paths += `<path d='M0 ${y} C 30 ${(y - amp).toFixed(1)}, 90 ${(parseFloat(y) + amp).toFixed(1)}, 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
+          paths += `<path d='M0 ${y} C 30 ${(parseFloat(y) + amp).toFixed(1)}, 90 ${(y - amp).toFixed(1)}, 120 ${y}' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>`;
         }
       } else if (pattern === 'radial') {
         const rStep = 60 / count;
@@ -1672,8 +1672,8 @@
           const dash = i % 2 === 0 ? " stroke-dasharray='4,2'" : "";
           paths += `<circle cx='60' cy='60' r='${r}' fill='none' stroke='#000000' stroke-width='${w}'${dash}/>`;
         }
-        paths += `<path d='M60 0 Q 75 30, 60 60 T 60 120' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
-        paths += `<path d='M0 60 Q 30 75, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
+        paths += `<path d='M60 0 L60 120' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
+        paths += `<path d='M0 60 L120 60' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
       } else if (pattern === 'crosshatch') {
         const step = 120 / count;
         for (let i = 0; i < count; i++) {
@@ -1689,12 +1689,12 @@
           paths += `<rect x='${(60 - r).toFixed(1)}' y='${(60 - r).toFixed(1)}' width='${(r * 2).toFixed(1)}' height='${(r * 2).toFixed(1)}' rx='${rx}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
         }
       } else {
-        // Default waves (Nahtlos kachelnde Wellen ohne Lücke)
+        // Default waves (C1-nahtlos kachelnde Wellen ohne Knicke oder Lücken)
         const step = 120 / count;
         for (let i = 0; i < count; i++) {
           const y = (i * step).toFixed(1);
-          const amp = 15 + (i % 2) * 6;
-          paths += `<path d='M0 ${y} Q 30 ${(y - amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
+          const amp = 12 + (i % 2) * 6;
+          paths += `<path d='M0 ${y} C 30 ${(y - amp).toFixed(1)}, 90 ${(parseFloat(y) + amp).toFixed(1)}, 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
         }
       }
 
