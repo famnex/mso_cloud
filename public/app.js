@@ -1162,6 +1162,22 @@ async function loadAdminConfig() {
     if (cardSecColorInput) {
       cardSecColorInput.value = cfg.card_secondary_color || '#8b5cf6';
     }
+    const cardGPatternInput = document.getElementById('card_guilloche_pattern');
+    if (cardGPatternInput) {
+      cardGPatternInput.value = cfg.card_guilloche_pattern || 'waves';
+    }
+    const cardGAngleInput = document.getElementById('card_guilloche_angle');
+    if (cardGAngleInput) {
+      cardGAngleInput.value = cfg.card_guilloche_angle || '0';
+      const angleValEl = document.getElementById('card_guilloche_angle_val');
+      if (angleValEl) angleValEl.innerText = (cfg.card_guilloche_angle || '0') + '°';
+    }
+    const cardGFinenessInput = document.getElementById('card_guilloche_fineness');
+    if (cardGFinenessInput) {
+      cardGFinenessInput.value = cfg.card_guilloche_fineness || '1.2';
+      const fineValEl = document.getElementById('card_guilloche_fineness_val');
+      if (fineValEl) fineValEl.innerText = parseFloat(cfg.card_guilloche_fineness || '1.2').toFixed(1) + ' px';
+    }
     const cardInstrInput = document.getElementById('card_install_instructions');
     if (cardInstrInput) {
       cardInstrInput.value = cfg.card_install_instructions || '';
@@ -3627,6 +3643,9 @@ async function saveCardConfig(e) {
     card_principal_name: document.getElementById('card_principal_name').value.trim(),
     card_primary_color: document.getElementById('card_primary_color').value,
     card_secondary_color: document.getElementById('card_secondary_color').value,
+    card_guilloche_pattern: document.getElementById('card_guilloche_pattern') ? document.getElementById('card_guilloche_pattern').value : 'waves',
+    card_guilloche_angle: document.getElementById('card_guilloche_angle') ? document.getElementById('card_guilloche_angle').value : '0',
+    card_guilloche_fineness: document.getElementById('card_guilloche_fineness') ? document.getElementById('card_guilloche_fineness').value : '1.2',
     card_install_instructions: document.getElementById('card_install_instructions').value.trim(),
     card_logo: logoImg.src && logoImg.src.startsWith('data:') ? logoImg.src : '',
     card_pwa_icon: pwaIconImg.src && pwaIconImg.src.startsWith('data:') ? pwaIconImg.src : '',
