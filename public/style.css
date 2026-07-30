@@ -133,6 +133,25 @@ header {
   -webkit-text-fill-color: transparent;
 }
 
+.header-welcome-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  margin: 0 15px;
+  opacity: 0.9;
+  display: none; /* Standardmäßig auf schmalen Bildschirmen ganz ausblenden */
+}
+
+@media (min-width: 1050px) {
+  .header-welcome-title {
+    display: block;
+  }
+}
+
 .user-dropdown {
   position: absolute;
   top: 50px;

@@ -120,11 +120,10 @@ async function checkAuthStatus() {
     }
     document.getElementsByTagName('head')[0].appendChild(faviconLink);
 
-    // Willkommens-Jumbo
-    const jumboTitle = document.getElementById('jumbo-title');
-    if (jumboTitle) {
-      jumboTitle.innerText = `Willkommen im ${platformName} Portal`;
-    }
+    // Willkommenstext im Header
+    document.querySelectorAll('.header-welcome-title, #jumbo-title').forEach(el => {
+      el.innerText = `Willkommen im ${platformName} Portal`;
+    });
 
     // Logo Texte
     document.querySelectorAll('.logo-text').forEach(el => {

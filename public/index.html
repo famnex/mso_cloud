@@ -16,11 +16,12 @@
     
     <!-- ANONYMOUS HEADER -->
     <div id="header-anonymous" style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-      <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
+      <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer; flex-shrink: 0;">
         <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo">
         <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">MSO Cloud</span>
       </div>
-      <div class="nav-controls" style="display: flex; align-items: center; gap: 15px;">
+      <div class="header-welcome-title">Willkommen im MSO Cloud Portal</div>
+      <div class="nav-controls" style="display: flex; align-items: center; gap: 15px; flex-shrink: 0;">
         <button class="btn-icon" id="theme-toggle-anon" onclick="toggleTheme()" title="Design umschalten">
           <i class="fa-solid fa-moon"></i>
         </button>
@@ -33,13 +34,16 @@
     <!-- AUTHENTICATED HEADER (Standardmäßig ausgeblendet) -->
     <div id="header-authenticated" style="width: 100%; display: none; justify-content: space-between; align-items: center;">
       <!-- Left Side: Logo & Tagline -->
-      <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer;">
+      <div class="logo-section" onclick="closeAllViews()" style="display: flex; align-items: center; gap: 15px; cursor: pointer; flex-shrink: 0;">
         <img src="logo.png" class="logo-img" style="height: 40px; object-fit: contain;" alt="MSO Logo">
         <span class="logo-text" style="font-weight: 600; font-size: 1.1rem; letter-spacing: -0.3px; color: var(--text-primary);">MSO Cloud</span>
       </div>
 
+      <!-- Center: Welcome Title (Desktop Only) -->
+      <div class="header-welcome-title">Willkommen im MSO Cloud Portal</div>
+
       <!-- Right Side: Controls, User Info & Dropdown -->
-      <div style="display: flex; align-items: center; gap: 15px;">
+      <div style="display: flex; align-items: center; gap: 15px; flex-shrink: 0;">
 
         <!-- Megafon News-Button & Dark/Light Toggle -->
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -88,13 +92,6 @@
 
   <!-- MAIN MAINVIEW -->
   <main id="main-view">
-    <div class="jumbotron">
-      <h1 id="jumbo-title">Willkommen im MSO Cloud Portal</h1>
-      <p id="jumbo-desc">Auf dieser Auswahlseite erhalten Sie einen Überblick über die digitalen Dienste der Modellschule Obersberg.</p>
-    </div>
-
-
-
     <!-- TILES GRID -->
     <div class="tiles-grid" id="tiles-container">
       <!-- Dynamisch gerenderte Kacheln per app.js -->
