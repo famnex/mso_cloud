@@ -182,20 +182,32 @@ function renderAuthenticatedHeader() {
   // Render Admin Button right container if admin
   renderAdminButton();
 
+  const isAdmin = currentUser.role === 'admin';
+
   // Toggle student card visibility in dropdown
   const cardLink = document.getElementById('header-card-link');
   if (cardLink) {
-    cardLink.style.display = isStudent ? 'block' : 'none';
+    cardLink.style.display = (isStudent || isAdmin) ? 'block' : 'none';
+    if (isAdmin && !isStudent) {
+      cardLink.innerHTML = '<i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis (Vorschau)';
+    } else {
+      cardLink.innerHTML = '<i class="fa-solid fa-address-card" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Schülerausweis';
+    }
   }
 
   // Toggle user profile link visibility based on student status
   const profileLink = document.getElementById('header-profile-link');
   if (profileLink) {
-    profileLink.style.display = isStudent ? 'block' : 'none';
+    profileLink.style.display = (isStudent || isAdmin) ? 'block' : 'none';
+    if (isAdmin && !isStudent) {
+      profileLink.innerHTML = '<i class="fa-solid fa-user-gear" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Benutzerprofil & Zugänge (Vorschau)';
+    } else {
+      profileLink.innerHTML = '<i class="fa-solid fa-user-gear" style="margin-right: 10px; color: var(--accent-color); width: 16px;"></i> Benutzerprofil & Zugänge';
+    }
   }
 
   // Load student profile details
-  if (isStudent) {
+  if (isStudent || isAdmin) {
     loadStudentProfile();
   }
 }
@@ -3165,7 +3177,10 @@ async function loadStudentProfile() {
     document.getElementById('student-sph-password-display').innerText = profile.sph_password || '-';
 
     const statusEl = document.getElementById('student-account-status');
-    if (profile.account_status === 'true') {
+    if (profile.is_preview) {
+      statusEl.innerText = 'Aktiv (Admin-Vorschau mit Dummy-Daten)';
+      statusEl.style.color = 'var(--accent-color)';
+    } else if (profile.account_status === 'true') {
       statusEl.innerText = 'Aktiv';
       statusEl.style.color = 'var(--success-color)';
     } else {
