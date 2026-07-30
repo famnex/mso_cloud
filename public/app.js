@@ -1359,9 +1359,11 @@ function updateAdminCardLivePreview() {
 
   const pwaIconImg = document.getElementById('card-pwa-icon-preview');
   const prevWatermarkImg = document.getElementById('admin-preview-watermark-img');
-  if (pwaIconImg && prevWatermarkImg) {
+  const prevHoloImg = document.getElementById('admin-preview-hologram-img');
+  if (pwaIconImg) {
     if (pwaIconImg.style.display !== 'none' && pwaIconImg.src && pwaIconImg.src.startsWith('data:')) {
-      prevWatermarkImg.src = pwaIconImg.src;
+      if (prevWatermarkImg) prevWatermarkImg.src = pwaIconImg.src;
+      if (prevHoloImg) prevHoloImg.src = pwaIconImg.src;
     }
   }
 

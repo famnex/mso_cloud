@@ -502,6 +502,68 @@
       flex-shrink: 0;
     }
 
+    /* Hologram PWA Badge über dem QR-Code */
+    .hologram-pwa-icon-box {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      border: 1.5px solid rgba(255, 255, 255, 0.45);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28),
+                  0 0 12px rgba(59, 130, 246, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      margin-bottom: 3px;
+      flex-shrink: 0;
+    }
+
+    .hologram-pwa-icon-box img {
+      width: 80%;
+      height: 80%;
+      object-fit: contain;
+      z-index: 2;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+      transition: transform 0.1s ease-out;
+    }
+
+    .hologram-shine {
+      position: absolute;
+      inset: -60%;
+      background: linear-gradient(
+        115deg,
+        rgba(255, 0, 128, 0) 0%,
+        rgba(255, 0, 128, 0.5) 20%,
+        rgba(0, 255, 255, 0.6) 40%,
+        rgba(255, 255, 0, 0.6) 60%,
+        rgba(0, 255, 128, 0.5) 80%,
+        rgba(0, 255, 128, 0) 100%
+      );
+      mix-blend-mode: color-dodge;
+      opacity: 0.88;
+      z-index: 3;
+      pointer-events: none;
+      transform-origin: center center;
+      transition: transform 0.08s ease-out;
+      will-change: transform;
+    }
+
+    .hologram-pwa-icon-box::after {
+      content: '';
+      position: absolute;
+      top: -30%;
+      left: -30%;
+      width: 160%;
+      height: 160%;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0) 60%);
+      opacity: 0.65;
+      z-index: 4;
+      pointer-events: none;
+    }
+
     /* Revoked / Error overlay screen */
     .revoked-overlay {
       position: absolute;
@@ -1033,8 +1095,12 @@
             </div>
           </div>
 
-          <!-- QR Code Container (mit Mediotheksnummer darunter) -->
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; z-index: 10; position: relative;">
+          <!-- QR Code Container (mit Hologramm App-Icon darüber & Mediotheksnummer darunter) -->
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; z-index: 10; position: relative;">
+            <div class="hologram-pwa-icon-box" id="hologram-pwa-box" title="MSO Hologramm-Authentifizierung">
+              <div class="hologram-shine" id="hologram-shine-el"></div>
+              <img id="card-hologram-icon" src="media/icon-512.png" alt="Hologram Icon">
+            </div>
             <div class="qr-code-box" id="qrcode-box" title="Scan Mediotheksnummer"></div>
             <span style="font-family: monospace; font-size: 0.7rem; font-weight: 700; color: var(--text);" id="card-mediothek-number-display">-</span>
           </div>
@@ -1408,6 +1474,20 @@
       currentTiltX += (targetTiltX - currentTiltX) * 0.12;
       currentTiltY += (targetTiltY - currentTiltY) * 0.12;
       card.style.transform = `rotateX(${currentTiltX}deg) rotateY(${currentTiltY}deg)`;
+
+      // Hologramm Glanz- und Parallax-Verschiebung beim Kippen
+      const holoShine = document.getElementById('hologram-shine-el');
+      const holoImg = document.getElementById('card-hologram-icon');
+      if (holoShine) {
+        const shiftX = currentTiltY * 2.5;
+        const shiftY = currentTiltX * 2.5;
+        const rot = currentTiltY * 4.0;
+        holoShine.style.transform = `translate3d(${shiftX}px, ${shiftY}px, 0) rotate(${rot}deg)`;
+      }
+      if (holoImg) {
+        holoImg.style.transform = `translate3d(${currentTiltY * 0.8}px, ${currentTiltX * 0.8}px, 0) scale(1.06)`;
+      }
+
       requestAnimationFrame(updateCard3D);
     }
     requestAnimationFrame(updateCard3D);
@@ -1649,6 +1729,12 @@
       if (securityOverlay) {
         securityOverlay.style.backgroundImage = generateGuillocheSvg(gPattern, gFineness, gDensity);
         securityOverlay.style.transform = `rotate(${gAngle}deg)`;
+      }
+
+      // 1d. Hologramm PWA App-Icon befüllen
+      const holoImg = document.getElementById('card-hologram-icon');
+      if (holoImg) {
+        holoImg.src = data.card_pwa_icon || 'media/icon-512.png';
       }
 
       // 1c. Admin-definierte Installationshinweise in PWA-Modal einfügen
