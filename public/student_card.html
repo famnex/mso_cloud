@@ -1052,9 +1052,6 @@
       <!-- Kopierschutz-Overlays (Guillochen über allen Bildern) -->
       <div class="security-overlay"></div>
       
-      <!-- Unsichtbares / Aufblitzendes UNGÜLTIG Stempel-Overlay für Foto & Screenshot-Falle -->
-      <canvas id="anti-screenshot-watermark-canvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 25; pointer-events: none; opacity: 1;"></canvas>
-      
       <!-- Logo-Wasserzeichen im Hintergrund -->
       <div class="logo-watermark" id="logo-watermark-container"></div>
       
@@ -1632,86 +1629,9 @@
     }
     requestAnimationFrame(updateClock);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ANTI-SCREENSHOT FEATURE 2: UNGÜLTIG Geisterstempel
-    // Jeden Frame wird "UNGÜLTIG" in dünner Konturschrift an einer zufälligen
-    // Position & Rotation auf den Card-Canvas gerendert.
-    // Bei 60 fps verschmiert es für das Auge zu einem kaum wahrnehmbaren Rauschen.
-    // Ein Screenshot friert exakt EINEN Frame ein → Text klar sichtbar.
-    // ─────────────────────────────────────────────────────────────────────────
-    (function initAntiScreenshotWatermark() {
-      const cvs = document.getElementById('anti-screenshot-watermark-canvas');
-      if (!cvs) return;
-      const ctx = cvs.getContext('2d');
-
-      // Resize canvas to match the physical card pixel size
-      function resizeCanvas() {
-        const card = document.getElementById('student-card');
-        if (!card) return;
-        const r = card.getBoundingClientRect();
-        cvs.width  = r.width  * (window.devicePixelRatio || 1);
-        cvs.height = r.height * (window.devicePixelRatio || 1);
-        cvs.style.width  = r.width  + 'px';
-        cvs.style.height = r.height + 'px';
-        ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-      }
-      resizeCanvas();
-      window.addEventListener('resize', resizeCanvas);
-
-      // Vorberechnete Zufalls-Positionen für maximale Verteilung über die Karte
-      const TEXT = 'UNGÜLTIG';
-      let frame = 0;
-
-      function drawWatermark() {
-        const card = document.getElementById('student-card');
-        if (!card) { requestAnimationFrame(drawWatermark); return; }
-        const W = card.offsetWidth;
-        const H = card.offsetHeight;
-
-        ctx.clearRect(0, 0, W, H);
-
-        // Zufällige Position über die ganze Karte verteilt (mit Rand)
-        const margin = 60;
-        const x = margin + Math.random() * (W - margin * 2);
-        const y = margin + Math.random() * (H - margin * 2);
-
-        // Zufällige Rotation zwischen -45° und +45°
-        const angleDeg = (Math.random() - 0.5) * 90;
-        const angleRad = angleDeg * Math.PI / 180;
-
-        // Deckkraft: für das Auge flimmert es (wechselt je Frame),
-        // im Screenshot wird ein einzelner Wert eingefroren → gut lesbar.
-        // Range 0.20–0.38: im Livebild kaum wahrnehmbar, im Foto kräftig sichtbar.
-        const alpha = 0.20 + Math.random() * 0.18;
-
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angleRad);
-
-        // Gefüllter Text (kräftige Farbe) + dünne Kontur für Schärfe im Foto
-        ctx.font = 'bold 42px "Arial Black", "Arial", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // 1. Füllung: kräftiges Rot
-        ctx.fillStyle = `rgba(200, 0, 0, ${alpha})`;
-        ctx.fillText(TEXT, 0, 0);
-
-        // 2. Kontur: dunklere Linie für Klarheit
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = `rgba(120, 0, 0, ${Math.min(alpha + 0.08, 0.55)})`;
-        ctx.strokeText(TEXT, 0, 0);
-
-        ctx.restore();
-
-        frame++;
-        requestAnimationFrame(drawWatermark);
-      }
-
-      requestAnimationFrame(drawWatermark);
-    })();
 
     // Fetch Card Data
+
     async function loadCardData() {
       try {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -2211,18 +2131,18 @@
 
         await sigLoaded;
 
-        // 2. Bezeichnungen auf Canvas zeichnen – y-Koordinaten ebenfalls 200% skaliert
+        // 2. Bezeichnungen auf Canvas zeichnen (originale Schriftgrößen, unverändertt)
         const labelText = translations[currentLang].labelPrincipal || 'Schulleiter/in';
         sigCtx.fillStyle = '#475569';
-        sigCtx.font = '700 19px "Outfit", sans-serif';  // 2× 9.5px
+        sigCtx.font = '700 9.5px "Outfit", sans-serif';
         sigCtx.textAlign = 'left';
         sigCtx.textBaseline = 'top';
-        sigCtx.fillText(labelText.toUpperCase(), 4, 76);  // 2× y=38, 2× x=2
+        sigCtx.fillText(labelText.toUpperCase(), 2, 76);
 
         const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
         sigCtx.fillStyle = '#0f172a';
-        sigCtx.font = '600 25px "Outfit", sans-serif';    // 2× 12.5px
-        sigCtx.fillText(principalName, 4, 104);            // 2× y=52
+        sigCtx.font = '600 12.5px "Outfit", sans-serif';
+        sigCtx.fillText(principalName, 2, 90);
       } else {
         // Bei Sperrung: Leeres Canvas zeichnen (keine Unterschrift, kein Schulleitername!)
         sigCtx.fillStyle = '#ef4444';
