@@ -1046,6 +1046,9 @@
       <!-- Kopierschutz-Overlays (Guillochen über allen Bildern) -->
       <div class="security-overlay"></div>
       
+      <!-- Unsichtbares / Aufblitzendes UNGÜLTIG Stempel-Overlay für Foto & Screenshot-Falle -->
+      <canvas id="anti-screenshot-watermark-canvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 25; pointer-events: none; opacity: 1;"></canvas>
+      
       <!-- Logo-Wasserzeichen im Hintergrund -->
       <div class="logo-watermark" id="logo-watermark-container"></div>
       
@@ -1591,22 +1594,109 @@
       }
     }
 
-    // Live-Clock Ticker with Date and time with MS
+    // ─────────────────────────────────────────────────────────────────────────
+    // ANTI-SCREENSHOT FEATURE 1: ms-Matsch
+    // Millisekunden-Ticker läuft im vollen rAF-Takt (~60 fps).
+    // Für das Auge wirkt die .000-Stelle wie ein normaler Zähler.
+    // Eine Kamera / Screenshot-Buffer friert exakt EINEN Frame ein → Matsch.
+    // Das Sekunden/Minuten/Stunden-Prefix wird nur 1x/Sekunde aktualisiert
+    // (= stabil lesbar), nur die ms-Stelle rotiert schnell.
+    // ─────────────────────────────────────────────────────────────────────────
+    let _clockPrefix = '';
+    let _clockSec = -1;
+
     function updateClock() {
       const now = new Date();
-      const day = String(now.getDate()).padStart(2, '0');
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const year = now.getFullYear();
-
-      const hrs = String(now.getHours()).padStart(2, '0');
-      const mins = String(now.getMinutes()).padStart(2, '0');
-      const secs = String(now.getSeconds()).padStart(2, '0');
+      const sec = now.getSeconds();
+      // Nur wenn sich die Sekunde geändert hat, neu rendern (spart DOM-Touches)
+      if (sec !== _clockSec) {
+        _clockSec = sec;
+        const day   = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year  = now.getFullYear();
+        const hrs   = String(now.getHours()).padStart(2, '0');
+        const mins  = String(now.getMinutes()).padStart(2, '0');
+        const secs  = String(sec).padStart(2, '0');
+        _clockPrefix = `${day}.${month}.${year} ${hrs}:${mins}:${secs}.`;
+      }
+      // ms läuft JEDEN Frame → Screenshot friert eine zufällige Ziffer ein = Matsch
       const ms = String(now.getMilliseconds()).padStart(3, '0');
-      
-      document.getElementById('ticker-time').innerText = `${day}.${month}.${year} ${hrs}:${mins}:${secs}.${ms}`;
+      document.getElementById('ticker-time').textContent = _clockPrefix + ms;
       requestAnimationFrame(updateClock);
     }
     requestAnimationFrame(updateClock);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ANTI-SCREENSHOT FEATURE 2: UNGÜLTIG Geisterstempel
+    // Jeden Frame wird "UNGÜLTIG" in dünner Konturschrift an einer zufälligen
+    // Position & Rotation auf den Card-Canvas gerendert.
+    // Bei 60 fps verschmiert es für das Auge zu einem kaum wahrnehmbaren Rauschen.
+    // Ein Screenshot friert exakt EINEN Frame ein → Text klar sichtbar.
+    // ─────────────────────────────────────────────────────────────────────────
+    (function initAntiScreenshotWatermark() {
+      const cvs = document.getElementById('anti-screenshot-watermark-canvas');
+      if (!cvs) return;
+      const ctx = cvs.getContext('2d');
+
+      // Resize canvas to match the physical card pixel size
+      function resizeCanvas() {
+        const card = document.getElementById('student-card');
+        if (!card) return;
+        const r = card.getBoundingClientRect();
+        cvs.width  = r.width  * (window.devicePixelRatio || 1);
+        cvs.height = r.height * (window.devicePixelRatio || 1);
+        cvs.style.width  = r.width  + 'px';
+        cvs.style.height = r.height + 'px';
+        ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+      }
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+
+      // Vorberechnete Zufalls-Positionen für maximale Verteilung über die Karte
+      const TEXT = 'UNGÜLTIG';
+      let frame = 0;
+
+      function drawWatermark() {
+        const card = document.getElementById('student-card');
+        if (!card) { requestAnimationFrame(drawWatermark); return; }
+        const W = card.offsetWidth;
+        const H = card.offsetHeight;
+
+        ctx.clearRect(0, 0, W, H);
+
+        // Zufällige Position über die ganze Karte verteilt (mit Rand)
+        const margin = 60;
+        const x = margin + Math.random() * (W - margin * 2);
+        const y = margin + Math.random() * (H - margin * 2);
+
+        // Zufällige Rotation zwischen -45° und +45°
+        const angleDeg = (Math.random() - 0.5) * 90;
+        const angleRad = angleDeg * Math.PI / 180;
+
+        // Sehr niedrige, wechselnde Deckkraft → fast unsichtbar für Auge, aber im Foto
+        // wird ein einziger Wert eingefroren (zwischen 0.06 und 0.13)
+        const alpha = 0.06 + Math.random() * 0.07;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angleRad);
+
+        // Dünne Konturschrift (strokeText, kein fillText)
+        ctx.font = 'bold 28px "Arial", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 0.8;
+        ctx.strokeStyle = `rgba(180, 0, 0, ${alpha})`;
+        ctx.strokeText(TEXT, 0, 0);
+
+        ctx.restore();
+
+        frame++;
+        requestAnimationFrame(drawWatermark);
+      }
+
+      requestAnimationFrame(drawWatermark);
+    })();
 
     // Fetch Card Data
     async function loadCardData() {
