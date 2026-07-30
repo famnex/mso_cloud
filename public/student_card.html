@@ -392,14 +392,13 @@
       line-height: 1.2;
     }
 
-    /* Schulleiter-Unterschrift & Name (Absolut positioniert, um den Dokumentenfluss nicht zu stören) */
+    /* Schulleiter-Unterschrift & Name */
     .signature-seal-area {
-      position: absolute;
-      left: 16px;
-      bottom: 110px; /* Direkt über dem Footer positioniert */
+      position: relative;
       width: 200px;
-      height: 80px;
+      height: 70px;
       z-index: 20;
+      margin-top: 6px;
     }
 
     .principal-container {
@@ -407,15 +406,15 @@
       height: 100%;
     }
 
-    /* QR-Code & Validity Zone */
+    /* QR-Code & Validity Zone (Horizontaler Trennstrich liegt genau unter dem Schulleiter-Namen) */
     .card-footer {
-      border-top: 1.5px solid rgba(15, 23, 42, 0.15);
-      padding-top: 10px;
+      border-top: 1.5px solid rgba(15, 23, 42, 0.18);
+      padding-top: 8px;
       display: flex;
       flex-direction: column;
       gap: 8px;
       z-index: 10;
-      margin-top: auto; /* Klebt den Footer ganz nach unten! */
+      margin-top: 4px;
     }
 
     /* Footer-Spalten getauscht, damit QR-Code rechts und Gültigkeit links ist */
@@ -2048,7 +2047,7 @@
       const sigCanvas = document.createElement('canvas');
       const sigCtx = sigCanvas.getContext('2d');
       sigCanvas.width = 200 * dpr;
-      sigCanvas.height = 80 * dpr;
+      sigCanvas.height = 70 * dpr;
       sigCtx.scale(dpr, dpr);
 
       if (!shouldBlockContent) {
@@ -2059,11 +2058,11 @@
         const sigLoaded = new Promise((resolve) => {
           if (data.card_signature) {
             sigImg.onload = () => {
-              const ratio = Math.min(190 / sigImg.width, 65 / sigImg.height);
+              const ratio = Math.min(190 / sigImg.width, 36 / sigImg.height);
               const w = sigImg.width * ratio;
               const h = sigImg.height * ratio;
               
-              sigCtx.drawImage(sigImg, 0, 2, w, h);
+              sigCtx.drawImage(sigImg, 0, 0, w, h);
               resolve();
             };
             sigImg.onerror = () => {
@@ -2080,29 +2079,29 @@
         // 2. Bezeichnungen auf Canvas zeichnen (untrennbar mit Unterschrift verschmolzen!)
         const labelText = translations[currentLang].labelPrincipal || 'Schulleiter/in';
         sigCtx.fillStyle = '#475569';
-        sigCtx.font = '700 10px "Outfit", sans-serif';
+        sigCtx.font = '700 9.5px "Outfit", sans-serif';
         sigCtx.textAlign = 'left';
         sigCtx.textBaseline = 'top';
-        sigCtx.fillText(labelText.toUpperCase(), 2, 45);
+        sigCtx.fillText(labelText.toUpperCase(), 2, 38);
 
         const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
         sigCtx.fillStyle = '#0f172a';
-        sigCtx.font = '600 13px "Outfit", sans-serif';
-        sigCtx.fillText(principalName, 2, 59);
+        sigCtx.font = '600 12.5px "Outfit", sans-serif';
+        sigCtx.fillText(principalName, 2, 52);
       } else {
         // Bei Sperrung: Leeres Canvas zeichnen (keine Unterschrift, kein Schulleitername!)
         sigCtx.fillStyle = '#ef4444';
         sigCtx.font = '700 10px "Outfit", sans-serif';
         sigCtx.textAlign = 'left';
         sigCtx.textBaseline = 'top';
-        sigCtx.fillText('AUSWEIS UNGÜLTIG', 2, 45);
+        sigCtx.fillText('AUSWEIS UNGÜLTIG', 2, 38);
       }
 
       // Unterschriften-Container befüllen
       const sigContainer = document.getElementById('signature-container');
       sigContainer.innerHTML = '';
       sigCanvas.style.width = '200px';
-      sigCanvas.style.height = '80px';
+      sigCanvas.style.height = '70px';
       sigCanvas.style.pointerEvents = 'none';
       sigCanvas.style.userSelect = 'none';
       sigContainer.appendChild(sigCanvas);
