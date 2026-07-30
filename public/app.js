@@ -207,7 +207,7 @@ function renderAuthenticatedHeader() {
   }
 
   // Load student profile details
-  if (isStudent || isAdmin) {
+  if (isStudent) {
     loadStudentProfile();
   }
 }
@@ -3238,10 +3238,14 @@ async function loadStudentProfile() {
 
 
 
-    // 2. Header Avatar & Anzeigenamen befüllen
-    const fullName = ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim();
-    document.getElementById('header-full-name').innerText = fullName || currentUser.username;
-    document.getElementById('header-user-avatar').src = profile.card_image || 'media/user.png';
+    // 2. Header Avatar & Anzeigenamen befüllen (Nur wenn es ein echter Schüler ist, nicht bei Admin-Vorschau)
+    if (!profile.is_preview) {
+      const fullName = ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim();
+      document.getElementById('header-full-name').innerText = fullName || currentUser.username;
+      if (profile.card_image) {
+        document.getElementById('header-user-avatar').src = profile.card_image;
+      }
+    }
 
     // 3. Schülerausweis Ansicht befüllen
     const cardFullName = document.getElementById('card-full-name');
