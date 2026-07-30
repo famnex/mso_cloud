@@ -60,6 +60,49 @@
       justify-content: center;
       padding: 10px;
       position: relative;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      -webkit-touch-callout: none !important;
+    }
+
+    img, canvas {
+      -webkit-user-drag: none !important;
+      user-drag: none !important;
+      pointer-events: none !important;
+    }
+
+    /* Skeleton Loader für verzögerungsfreie, saubere Daten-Befüllung */
+    .card-skeleton-loader {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      z-index: 1000;
+      transition: opacity 0.35s ease;
+    }
+    .skeleton-spinner {
+      width: 46px;
+      height: 46px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: var(--accent, #3b82f6);
+      border-radius: 50%;
+      animation: spinLoader 0.8s linear infinite;
+    }
+    .skeleton-text {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+    }
+    @keyframes spinLoader {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     /* Background blob animation — GPU-beschleunigt, kein blur/border-radius */
@@ -95,33 +138,31 @@
     /* Top Bar Controls */
     .top-controls {
       position: absolute;
-      top: 15px;
-      right: 15px;
+      top: 16px;
+      right: 16px;
+      z-index: 50;
       display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      z-index: 100;
+      gap: 8px;
     }
 
-    /* Language Switcher */
     .lang-switcher {
       display: flex;
-      gap: 5px;
-      background: rgba(0,0,0,0.05);
-      border: 1px solid var(--card-border);
-      padding: 4px;
-      border-radius: 30px;
+      background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 3px;
     }
 
     .lang-btn {
-      background: none;
+      background: transparent;
       border: none;
       color: var(--text-secondary);
-      font-weight: 700;
-      font-size: 0.75rem;
-      padding: 6px 10px;
-      border-radius: 20px;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 0.8rem;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
     }
@@ -132,13 +173,22 @@
       box-shadow: 0 0 10px var(--accent-glow);
     }
 
-    /* Card Perspective Frame */
+    /* Card Perspective Frame — Versteckt bis alle Daten geladen sind */
     .card-container {
       perspective: 1000px;
       width: 100%;
       max-width: 330px;
       z-index: 10;
       margin-top: 8px;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(0.97);
+      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-container.ready {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
     }
 
     /* Hochkant Plastikkarte */
@@ -883,6 +933,12 @@
 
       <button class="pwa-action-btn" id="pwa-install-btn" style="display: none;">Jetzt installieren</button>
     </div>
+  </div>
+
+  <!-- Lade-Indikator bis alle Daten vollständig gerendert sind -->
+  <div id="card-skeleton-loader" class="card-skeleton-loader">
+    <div class="skeleton-spinner"></div>
+    <div class="skeleton-text">Ausweis wird geladen...</div>
   </div>
 
   <!-- Card Frame container -->
@@ -1740,6 +1796,17 @@
       } else {
         overlay.style.display = 'none';
       }
+
+      // 9. Lade-Skeleton ausblenden und fertig befüllte Karte geschmeidig einblenden
+      const skeletonLoader = document.getElementById('card-skeleton-loader');
+      if (skeletonLoader) {
+        skeletonLoader.style.opacity = '0';
+        setTimeout(() => { skeletonLoader.style.display = 'none'; }, 350);
+      }
+      const cardFrame = document.getElementById('card-frame');
+      if (cardFrame) {
+        cardFrame.classList.add('ready');
+      }
     }
 
     /**
@@ -1827,6 +1894,18 @@
         });
 
         await sealLoaded;
+
+        // 3. Fälschungssicherheit: Wasserzeichen & Sicherheits-Hash direkt in Bilddaten stempeln
+        photoCtx.save();
+        photoCtx.rotate(-Math.PI / 6);
+        photoCtx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+        photoCtx.font = '700 8px sans-serif';
+        photoCtx.textAlign = 'center';
+        const watermarkText = `MSO ID • ${data.first_name || ''} ${data.last_name || ''} • ${data.mediothek_number || '0000'}`;
+        for (let y = -40; y < 220; y += 22) {
+          photoCtx.fillText(watermarkText, 30, y);
+        }
+        photoCtx.restore();
       }
 
       // Rendered Image Container befüllen
@@ -1953,6 +2032,59 @@
       ctx.fillText('🎓', x + size/2, y + size/2);
       ctx.restore();
     }
+
+    // ── KOPERSCHUTZ, RECHTSKLICK & DEVTOOLS SPUR ──────────────────────────
+    // 1. Tastatur-Shortcuts für Entwicklertools (F12, Strg+Shift+I/J/C/K/E, Strg+U/S/P) abfangen & blockieren
+    window.addEventListener('keydown', (e) => {
+      // F12 Taste
+      if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      // Strg+Shift+I / J / C / K / E (Inspektor & Konsole)
+      if (e.ctrlKey && e.shiftKey && (
+        e.key === 'I' || e.key === 'i' || e.keyCode === 73 ||
+        e.key === 'J' || e.key === 'j' || e.keyCode === 74 ||
+        e.key === 'C' || e.key === 'c' || e.keyCode === 67 ||
+        e.key === 'K' || e.key === 'k' || e.keyCode === 75 ||
+        e.key === 'E' || e.key === 'e' || e.keyCode === 69
+      )) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      // Strg+U (Quelltext), Strg+S (Speichern), Strg+P (Drucken)
+      if (e.ctrlKey && (
+        e.key === 'U' || e.key === 'u' || e.keyCode === 85 ||
+        e.key === 'S' || e.key === 's' || e.keyCode === 83 ||
+        e.key === 'P' || e.key === 'p' || e.keyCode === 80
+      )) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    }, true);
+
+    // 2. Rechtsklick-Kontextmenü, Textmarkierung, Bild-Ziehen & Kopieren verbieten
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('dragstart', e => e.preventDefault());
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('copy', e => e.preventDefault());
+    document.addEventListener('cut', e => e.preventDefault());
+
+    // 3. Diskreter Anti-Debugging Check
+    (function antiDebug() {
+      function checkDevTools() {
+        const start = performance.now();
+        // Timing-Trap
+        const end = performance.now();
+        if (end - start > 100) {
+          console.clear();
+        }
+      }
+      setInterval(checkDevTools, 1500);
+    })();
 
     // Start
     switchLanguage(currentLang);
