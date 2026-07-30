@@ -1167,10 +1167,24 @@
     }
 
     // PWA overlay popup logic with platform-specific instructions
+    function showMotionOverlay() {
+      const overlay = document.getElementById('motion-permission-overlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.style.opacity = '1';
+      }
+    }
+
+    // PWA overlay popup logic with platform-specific instructions
     function checkPwaInstallPrompt() {
+      const pwaPrompt = document.getElementById('pwa-prompt');
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
       const isDismissed = sessionStorage.getItem('pwa_prompt_dismissed') === 'true';
-      if (isStandalone || isDismissed) return;
+
+      if (isStandalone || isDismissed) {
+        showMotionOverlay();
+        return;
+      }
 
       const platform = detectPlatform();
       const badge = document.getElementById('pwa-platform-badge');
@@ -1185,17 +1199,17 @@
         badge.innerHTML = '<i class="fa-brands fa-apple"></i> iOS Safari';
         badge.style.display = 'inline-flex';
         document.getElementById('pwa-ios-instructions').style.display = 'block';
-        document.getElementById('pwa-prompt').style.display = 'flex';
+        if (pwaPrompt) pwaPrompt.style.display = 'flex';
       } else if (platform === 'samsung') {
         badge.innerHTML = '<i class="fa-solid fa-mobile-screen"></i> Samsung Internet';
         badge.style.display = 'inline-flex';
         document.getElementById('pwa-samsung-instructions').style.display = 'block';
-        document.getElementById('pwa-prompt').style.display = 'flex';
+        if (pwaPrompt) pwaPrompt.style.display = 'flex';
       } else if (platform === 'firefox') {
         badge.innerHTML = '<i class="fa-brands fa-firefox-browser"></i> Firefox';
         badge.style.display = 'inline-flex';
         document.getElementById('pwa-firefox-instructions').style.display = 'block';
-        document.getElementById('pwa-prompt').style.display = 'flex';
+        if (pwaPrompt) pwaPrompt.style.display = 'flex';
       } else if (platform === 'android') {
         badge.innerHTML = '<i class="fa-brands fa-android"></i> Android Chrome';
         badge.style.display = 'inline-flex';
@@ -1205,27 +1219,24 @@
         } else {
           document.getElementById('pwa-android-instructions').style.display = 'block';
         }
-        document.getElementById('pwa-prompt').style.display = 'flex';
+        if (pwaPrompt) pwaPrompt.style.display = 'flex';
       } else {
         // Desktop
         badge.innerHTML = '<i class="fa-solid fa-desktop"></i> Desktop';
         badge.style.display = 'inline-flex';
         document.getElementById('pwa-desktop-instructions').style.display = 'block';
         if (deferredPrompt) document.getElementById('pwa-install-btn').style.display = 'block';
-        document.getElementById('pwa-prompt').style.display = 'flex';
+        if (pwaPrompt) pwaPrompt.style.display = 'flex';
       }
     }
 
     function dismissPwaPrompt() {
-      document.getElementById('pwa-prompt').style.display = 'none';
+      const pwaPrompt = document.getElementById('pwa-prompt');
+      if (pwaPrompt) pwaPrompt.style.display = 'none';
       sessionStorage.setItem('pwa_prompt_dismissed', 'true');
-      // Auf iOS: Bewegungserlaubnis-Overlay erst jetzt zeigen
-      if (typeof DeviceOrientationEvent !== 'undefined' &&
-          typeof DeviceOrientationEvent.requestPermission === 'function' &&
-          sessionStorage.getItem('mso_motion_asked') !== '1') {
-        const overlay = document.getElementById('motion-permission-overlay');
-        if (overlay) overlay.style.display = 'flex';
-      }
+      
+      // Nach dem PWA-Prompt immer das Antipper-Overlay zum Freischalten anzeigen
+      showMotionOverlay();
     }
 
     // Trigger installation (Android Chrome native prompt)
@@ -1242,11 +1253,13 @@
       });
     }
 
-    // Motion Permission for iOS (Gyroscope)
+    // Motion Permission for Gyroscope & Card Activation
     function hideMotionOverlay() {
       const overlay = document.getElementById('motion-permission-overlay');
-      if (overlay) overlay.style.display = 'none';
-      sessionStorage.setItem('mso_motion_asked', '1');
+      if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.style.display = 'none'; }, 300);
+      }
     }
 
     function requestMotionPermission() {
@@ -1258,29 +1271,17 @@
               window.addEventListener('deviceorientation', handleOrientation);
             }
           })
-          .catch(err => console.warn('Gyro permission denied:', err))
+          .catch(err => console.warn('Gyro permission info:', err))
           .finally(() => hideMotionOverlay());
       } else {
+        if (window.DeviceOrientationEvent) {
+          window.addEventListener('deviceorientation', handleOrientation);
+        }
         hideMotionOverlay();
       }
     }
 
-    // Set up gyroscope / device orientation
-    if (window.DeviceOrientationEvent) {
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+: Overlay wird NACH dem PWA-Prompt in dismissPwaPrompt() angezeigt.
-        // Falls der PWA-Prompt bereits übersprungen wurde und Gyro noch nicht erlaubt:
-        const pwaDismissed = sessionStorage.getItem('pwa_prompt_dismissed') === 'true';
-        const motionAsked  = sessionStorage.getItem('mso_motion_asked') === '1';
-        if (pwaDismissed && !motionAsked) {
-          const overlay = document.getElementById('motion-permission-overlay');
-          if (overlay) overlay.style.display = 'flex';
-        }
-      } else {
-        // Android / Desktop: direkt ohne Dialog aktivieren
-        window.addEventListener('deviceorientation', handleOrientation);
-      }
-    }
+    // Gyroscope orientation listener handling is now initialized upon user tap in requestMotionPermission()
 
     // ── Background Blob Animation ─────────────────────────────────────────
     // Wandelt Hex-Farbe in rgba()-String um, damit CSS radial-gradient mit
