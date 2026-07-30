@@ -1408,14 +1408,6 @@ function attachAdminCardLivePreviewListeners() {
     }
   });
 }
-  inputIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('input', updateAdminCardLivePreview);
-      el.addEventListener('change', updateAdminCardLivePreview);
-    }
-  });
-}
 
 async function saveLdapConfig(e) {
   e.preventDefault();

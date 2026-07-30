@@ -51,8 +51,8 @@ self.addEventListener('activate', (e) => {
 
 // Network First strategy for all requests to ensure updates are instant while online
 self.addEventListener('fetch', (e) => {
-  // Nur GET-Anfragen cachen (APIs und statische Assets)
-  if (e.request.method !== 'GET') {
+  // Nur http/https GET-Anfragen cachen (Browser-Erweiterungen wie chrome-extension:// ignorieren)
+  if (e.request.method !== 'GET' || (!e.request.url.startsWith('http://') && !e.request.url.startsWith('https://'))) {
     e.respondWith(fetch(e.request));
     return;
   }
