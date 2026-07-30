@@ -508,7 +508,12 @@
       width: 44px;
       height: 44px;
       border-radius: 12px;
-      overflow: hidden;
+      overflow: hidden !important;
+      isolation: isolate;
+      clip-path: inset(0 round 12px);
+      -webkit-clip-path: inset(0 round 12px);
+      transform: translateZ(0);
+      -webkit-mask-image: -webkit-radial-gradient(white, black);
       background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       border: 1.5px solid rgba(255, 255, 255, 0.45);
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28),
@@ -1475,17 +1480,19 @@
       currentTiltY += (targetTiltY - currentTiltY) * 0.12;
       card.style.transform = `rotateX(${currentTiltX}deg) rotateY(${currentTiltY}deg)`;
 
-      // Hologramm Glanz- und Parallax-Verschiebung beim Kippen
+      // Hologramm Glanz- und Parallax-Verschiebung beim Kippen (Begrenzt auf max +-10px)
       const holoShine = document.getElementById('hologram-shine-el');
       const holoImg = document.getElementById('card-hologram-icon');
       if (holoShine) {
-        const shiftX = currentTiltY * 2.5;
-        const shiftY = currentTiltX * 2.5;
-        const rot = currentTiltY * 4.0;
+        const shiftX = Math.min(Math.max(currentTiltY * 1.0, -10), 10);
+        const shiftY = Math.min(Math.max(currentTiltX * 1.0, -10), 10);
+        const rot = Math.min(Math.max(currentTiltY * 2.0, -25), 25);
         holoShine.style.transform = `translate3d(${shiftX}px, ${shiftY}px, 0) rotate(${rot}deg)`;
       }
       if (holoImg) {
-        holoImg.style.transform = `translate3d(${currentTiltY * 0.8}px, ${currentTiltX * 0.8}px, 0) scale(1.06)`;
+        const imgX = Math.min(Math.max(currentTiltY * 0.3, -3), 3);
+        const imgY = Math.min(Math.max(currentTiltX * 0.3, -3), 3);
+        holoImg.style.transform = `translate3d(${imgX}px, ${imgY}px, 0) scale(1.04)`;
       }
 
       requestAnimationFrame(updateCard3D);
