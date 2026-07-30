@@ -67,16 +67,17 @@ router.get('/card', async (req, res) => {
       );
     }
 
-    // Ablaufdatum bestimmen (Stichtag: 1. September)
+    // Ablaufdatum bestimmen: Endet immer am 31. Juli.
+    // Ab dem 1. August gilt das nächste Schuljahr (31.07. des Folgejahres).
     const now = new Date();
     const currentYear = now.getFullYear();
-    const sepFirstCurrentYear = new Date(currentYear, 8, 1); // 8 = September (0-indexed)
-    
+    const augustFirst = new Date(currentYear, 7, 1); // Monat 7 = August (0-indexed)
+
     let expirationYear = currentYear;
-    if (now >= sepFirstCurrentYear) {
+    if (now >= augustFirst) {
       expirationYear = currentYear + 1;
     }
-    const expiresAt = `${expirationYear}-09-01`;
+    const expiresAt = `${expirationYear}-07-31`;
 
     res.json({
       first_name: profile.first_name,
