@@ -1247,9 +1247,160 @@ async function loadAdminConfig() {
       }
     }
 
+    // Live-Vorschau der Karte im Adminbereich initialisieren & aktualisieren
+    attachAdminCardLivePreviewListeners();
+    updateAdminCardLivePreview();
+
   } catch (err) {
     showAdminAlert('Konfiguration konnte nicht geladen werden.', 'danger');
   }
+}
+
+// Guillochen SVG Generator für Admin Live-Vorschau
+function generateAdminGuillocheSvg(pattern, fineness) {
+  const w = parseFloat(fineness) || 1.2;
+  let paths = '';
+
+  if (pattern === 'waves_double') {
+    paths = `
+      <path d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 60 Q 30 90, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 30 Q 30 0, 60 30 T 120 30' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 30 Q 30 60, 60 30 T 120 30' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 90 Q 30 60, 60 90 T 120 90' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 90 Q 30 120, 60 90 T 120 90' fill='none' stroke='#000000' stroke-width='${w}'/>
+    `;
+  } else if (pattern === 'radial') {
+    paths = `
+      <circle cx='60' cy='60' r='12' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <circle cx='60' cy='60' r='25' fill='none' stroke='#000000' stroke-width='${w}' stroke-dasharray='4,2'/>
+      <circle cx='60' cy='60' r='38' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <circle cx='60' cy='60' r='52' fill='none' stroke='#000000' stroke-width='${w}' stroke-dasharray='6,3'/>
+      <path d='M60 0 Q 75 30, 60 60 T 60 120' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>
+      <path d='M0 60 Q 30 75, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>
+    `;
+  } else if (pattern === 'crosshatch') {
+    paths = `
+      <path d='M0 0 L120 120 M-30 30 L90 150 M30 -30 L150 90' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M120 0 L0 120 M150 30 L30 150 M90 -30 L-30 90' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>
+      <path d='M0 60 Q 30 90, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>
+    `;
+  } else if (pattern === 'spiral') {
+    paths = `
+      <path d='M60 10 C 90 10, 110 30, 110 60 C 110 90, 90 110, 60 110 C 30 110, 10 90, 10 60 C 10 30, 30 10, 60 10 Z' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M60 25 C 80 25, 95 40, 95 60 C 95 80, 80 95, 60 95 C 40 95, 25 80, 25 60 C 25 40, 40 25, 60 25 Z' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 0 Q 60 120, 120 0' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 120 Q 60 0, 120 120' fill='none' stroke='#000000' stroke-width='${w}'/>
+    `;
+  } else {
+    // Default waves
+    paths = `
+      <path d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 40 Q 30 10, 60 40 T 120 40' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 80 Q 30 50, 60 80 T 120 80' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 100 Q 30 70, 60 100 T 120 100' fill='none' stroke='#000000' stroke-width='${w}'/>
+      <path d='M0 20 Q 30 -10, 60 20 T 120 20' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>
+    `;
+  }
+
+  const svgStr = `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>${paths.replace(/\s+/g, ' ').trim()}</svg>`;
+  return "url(\"data:image/svg+xml," + encodeURIComponent(svgStr) + "\")";
+}
+
+function updateAdminCardLivePreview() {
+  const schoolName = document.getElementById('card_school_name')?.value || 'Modellschule Obersberg';
+  const principalName = document.getElementById('card_principal_name')?.value || 'OStD Karsten Backhaus';
+  const primaryColor = document.getElementById('card_primary_color')?.value || '#3b82f6';
+  const pattern = document.getElementById('card_guilloche_pattern')?.value || 'waves';
+  const angle = parseInt(document.getElementById('card_guilloche_angle')?.value || '0', 10);
+  const fineness = parseFloat(document.getElementById('card_guilloche_fineness')?.value || '1.2');
+
+  const schoolEl = document.getElementById('admin-preview-school-title');
+  if (schoolEl) schoolEl.innerText = schoolName;
+
+  const principalEl = document.getElementById('admin-preview-principal-display');
+  if (principalEl) principalEl.innerText = principalName;
+
+  const badgeEl = document.getElementById('admin-preview-badge');
+  if (badgeEl) {
+    badgeEl.style.borderColor = primaryColor;
+    badgeEl.style.color = primaryColor;
+    badgeEl.style.background = primaryColor + '1F';
+  }
+  const logoFallback = document.getElementById('admin-preview-logo-fallback');
+  if (logoFallback) logoFallback.style.color = primaryColor;
+
+  const guillocheEl = document.getElementById('admin-card-preview-guilloche');
+  if (guillocheEl) {
+    guillocheEl.style.backgroundImage = generateAdminGuillocheSvg(pattern, fineness);
+    guillocheEl.style.transform = `rotate(${angle}deg)`;
+  }
+
+  // Image Previews
+  const logoImg = document.getElementById('card-logo-preview');
+  const prevLogoImg = document.getElementById('admin-preview-logo-img');
+  if (logoImg && prevLogoImg) {
+    if (logoImg.style.display !== 'none' && logoImg.src && logoImg.src.startsWith('data:')) {
+      prevLogoImg.src = logoImg.src;
+      prevLogoImg.style.display = 'block';
+      if (logoFallback) logoFallback.style.display = 'none';
+    } else {
+      prevLogoImg.style.display = 'none';
+      if (logoFallback) logoFallback.style.display = 'block';
+    }
+  }
+
+  const pwaIconImg = document.getElementById('card-pwa-icon-preview');
+  const prevWatermarkImg = document.getElementById('admin-preview-watermark-img');
+  if (pwaIconImg && prevWatermarkImg) {
+    if (pwaIconImg.style.display !== 'none' && pwaIconImg.src && pwaIconImg.src.startsWith('data:')) {
+      prevWatermarkImg.src = pwaIconImg.src;
+    }
+  }
+
+  const sealImg = document.getElementById('card-seal-preview');
+  const prevSealImg = document.getElementById('admin-preview-seal-img');
+  if (sealImg && prevSealImg) {
+    if (sealImg.style.display !== 'none' && sealImg.src && sealImg.src.startsWith('data:')) {
+      prevSealImg.src = sealImg.src;
+      prevSealImg.style.display = 'block';
+    } else {
+      prevSealImg.style.display = 'none';
+    }
+  }
+
+  const sigImg = document.getElementById('card-signature-preview');
+  const prevSigImg = document.getElementById('admin-preview-sig-img');
+  const prevSigText = document.getElementById('admin-preview-sig-placeholder');
+  if (sigImg && prevSigImg) {
+    if (sigImg.style.display !== 'none' && sigImg.src && sigImg.src.startsWith('data:')) {
+      prevSigImg.src = sigImg.src;
+      prevSigImg.style.display = 'block';
+      if (prevSigText) prevSigText.style.display = 'none';
+    } else {
+      prevSigImg.style.display = 'none';
+      if (prevSigText) prevSigText.style.display = 'inline';
+    }
+  }
+}
+
+let adminCardListenersAttached = false;
+function attachAdminCardLivePreviewListeners() {
+  if (adminCardListenersAttached) return;
+  adminCardListenersAttached = true;
+
+  const inputIds = [
+    'card_school_name', 'card_principal_name', 'card_primary_color', 'card_secondary_color',
+    'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness'
+  ];
+  inputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', updateAdminCardLivePreview);
+      el.addEventListener('change', updateAdminCardLivePreview);
+    }
+  });
 }
 
 async function saveLdapConfig(e) {
@@ -3625,6 +3776,10 @@ function previewImageFile(input, imgId) {
       const placeholderId = imgId.replace('preview', 'placeholder');
       const placeholder = document.getElementById(placeholderId);
       if (placeholder) placeholder.style.display = 'none';
+
+      if (typeof updateAdminCardLivePreview === 'function') {
+        updateAdminCardLivePreview();
+      }
     }
     reader.readAsDataURL(file);
   }
