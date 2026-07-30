@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { db } = require('../db');
+const { db, logEvent } = require('../db');
 const ldap = require('../ldap');
 
 /**
@@ -320,6 +320,13 @@ router.get('/sso/:id', (req, res) => {
       const separator = redirectUrl.includes('?') ? '&' : '?';
       redirectUrl = `${redirectUrl}${separator}sso_user=${username}&sso_email=${email}&sso_time=${timestamp}&sso_sig=${signature}`;
 
+      if (typeof logEvent === 'function') {
+        const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
+          ? `127.0.0.1 (${tile.title})` 
+          : `${req.ip} (${tile.title})`;
+        logEvent('info', 'sso_query_claims', `SSO Query Parameter für User: ${user.username} (Dienst: ${tile.title})`, { username: user.username, email: user.email, timestamp, signature }, clientIpDisplay);
+      }
+
     } else if (tile.sso_type === 'jwt' && user) {
       // SSO Typ B: Signierter JSON Web Token (JWT)
       const secret = tile.sso_key || 'default_secret_key';
@@ -338,6 +345,13 @@ router.get('/sso/:id', (req, res) => {
       
       const separator = redirectUrl.includes('?') ? '&' : '?';
       redirectUrl = `${redirectUrl}${separator}sso_token=${token}`;
+
+      if (typeof logEvent === 'function') {
+        const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
+          ? `127.0.0.1 (${tile.title})` 
+          : `${req.ip} (${tile.title})`;
+        logEvent('info', 'jwt_token_claims', `JWT Token Claims für User: ${user.username} (Dienst: ${tile.title})`, payload, clientIpDisplay);
+      }
     }
 
     // Dynamic Microsoft 365 / Outlook login_hint resolution
@@ -375,6 +389,14 @@ router.get('/sso/:id', (req, res) => {
           redirectUrl = `${redirectUrl}${separator}login_hint=${encodeURIComponent(hint)}`;
         }
       }
+    }
+
+    // Revisionssicheres Log-Event im System-Protokoll ablegen
+    if (typeof logEvent === 'function' && user) {
+      const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
+        ? `127.0.0.1 (${tile.title})` 
+        : `${req.ip} (${tile.title})`;
+      logEvent('info', 'sso_tile_redirect', `SSO Aufruf für User: ${user.username} (Dienst: ${tile.title})`, { tileId: tile.id, title: tile.title, sso_type: tile.sso_type }, clientIpDisplay);
     }
 
     // Redirect ausführen
