@@ -62,37 +62,34 @@
       position: relative;
     }
 
-    /* Background Animation — vivid dual-color orbs, high contrast for sunlight readability */
-    body::before, body::after {
-      content: '';
+    /* Background blob animation — GPU-beschleunigt, kein blur/border-radius */
+    .blob-container {
       position: absolute;
-      border-radius: 50%;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
       pointer-events: none;
       z-index: 1;
     }
-    body::before {
-      width: 90vmax; height: 90vmax;
-      top: -30vmax; left: -20vmax;
-      background: radial-gradient(circle, var(--accent) 0%, transparent 65%);
-      animation: orbFloat 18s ease-in-out infinite alternate;
-      opacity: 0.28;
+
+    .blob {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 120vmin; height: 120vmin;
+      margin-top: -60vmin; margin-left: -60vmin;
+      opacity: 0.65;
+      mix-blend-mode: multiply;
+      will-change: transform;
+      transition: transform 4.8s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    body::after {
-      width: 80vmax; height: 80vmax;
-      bottom: -25vmax; right: -15vmax;
-      background: radial-gradient(circle, var(--secondary) 0%, transparent 65%);
-      animation: orbFloat2 22s ease-in-out infinite alternate;
-      opacity: 0.24;
+
+    .blob-1 {
+      background: radial-gradient(closest-side, rgba(59, 130, 246, 0.85) 0%, rgba(59, 130, 246, 0) 100%);
+      z-index: 2;
     }
-    @keyframes orbFloat {
-      0%   { transform: translate(0,  0)   scale(1); }
-      50%  { transform: translate(10vw, 8vh) scale(1.18); }
-      100% { transform: translate(5vw, 15vh) scale(0.92); }
-    }
-    @keyframes orbFloat2 {
-      0%   { transform: translate(0, 0)    scale(1); }
-      50%  { transform: translate(-8vw,-10vh) scale(1.15); }
-      100% { transform: translate(-4vw,-5vh) scale(1.22); }
+
+    .blob-2 {
+      background: radial-gradient(closest-side, rgba(139, 92, 246, 0.85) 0%, rgba(139, 92, 246, 0) 100%);
+      z-index: 1;
     }
 
     /* Top Bar Controls */
@@ -785,6 +782,12 @@
 </head>
 <body>
 
+  <!-- Background Blob Animation -->
+  <div class="blob-container">
+    <div class="blob blob-1" id="bg-blob-1"></div>
+    <div class="blob blob-2" id="bg-blob-2"></div>
+  </div>
+
   <!-- Top Bar Controls -->
   <div class="top-controls">
     <!-- Language Toggle -->
@@ -1222,6 +1225,68 @@
       }
     }
 
+    // ── Background Blob Animation ─────────────────────────────────────────
+    // Wandelt Hex-Farbe in rgba()-String um, damit CSS radial-gradient mit
+    // dynamischen Farben aus der Konfig befüllt werden kann.
+    function hexToRgba(hex, alpha) {
+      // Unterstützt #rrggbb und #rgb
+      let h = hex.replace('#', '');
+      if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+      const r = parseInt(h.substring(0,2), 16);
+      const g = parseInt(h.substring(2,4), 16);
+      const b = parseInt(h.substring(4,6), 16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function updateBlobColors(primary, secondary) {
+      const b1 = document.getElementById('bg-blob-1');
+      const b2 = document.getElementById('bg-blob-2');
+      if (b1) b1.style.background = `radial-gradient(closest-side, ${hexToRgba(primary, 0.85)} 0%, ${hexToRgba(primary, 0)} 100%)`;
+      if (b2) b2.style.background = `radial-gradient(closest-side, ${hexToRgba(secondary, 0.85)} 0%, ${hexToRgba(secondary, 0)} 100%)`;
+    }
+
+    (function initBlobAnimation() {
+      const blob1 = document.getElementById('bg-blob-1');
+      const blob2 = document.getElementById('bg-blob-2');
+      if (!blob1 || !blob2) return;
+
+      let rot1 = 0, rot2 = 0;
+
+      function moveBlobs() {
+        const isAttracted = Math.random() < 0.4;
+        const maxX = window.innerWidth  * 0.45;
+        const maxY = window.innerHeight * 0.45;
+
+        let x1, y1, x2, y2;
+        if (isAttracted) {
+          const sx = (Math.random() * 2 - 1) * (maxX * 0.5);
+          const sy = (Math.random() * 2 - 1) * (maxY * 0.5);
+          x1 = sx + (Math.random() * 100 - 50);
+          y1 = sy + (Math.random() * 100 - 50);
+          x2 = sx + (Math.random() * 100 - 50);
+          y2 = sy + (Math.random() * 100 - 50);
+        } else {
+          x1 = (Math.random() * 2 - 1) * maxX;
+          y1 = (Math.random() * 2 - 1) * maxY;
+          x2 = (Math.random() * 2 - 1) * maxX;
+          y2 = (Math.random() * 2 - 1) * maxY;
+        }
+
+        const sX1 = 0.6 + Math.random() * 0.6, sY1 = 0.6 + Math.random() * 0.6;
+        const sX2 = 0.6 + Math.random() * 0.6, sY2 = 0.6 + Math.random() * 0.6;
+
+        rot1 += (Math.random() * 90 - 45);
+        rot2 += (Math.random() * 90 - 45);
+
+        blob1.style.transform = `translate3d(${x1}px,${y1}px,0) rotate(${rot1}deg) scale(${sX1},${sY1})`;
+        blob2.style.transform = `translate3d(${x2}px,${y2}px,0) rotate(${rot2}deg) scale(${sX2},${sY2})`;
+      }
+
+      setTimeout(moveBlobs, 50);
+      setInterval(moveBlobs, 4800);
+    })();
+    // ─────────────────────────────────────────────────────────────────────
+
     // Switch Language Handler
     function switchLanguage(lang) {
       currentLang = lang;
@@ -1424,6 +1489,12 @@
         document.documentElement.style.setProperty('--secondary', data.card_secondary_color);
         document.documentElement.style.setProperty('--secondary-glow', data.card_secondary_color + '30');
       }
+
+      // Blob-Farben sofort auf Konfig-Farben aktualisieren
+      updateBlobColors(
+        data.card_primary_color   || '#3b82f6',
+        data.card_secondary_color || '#8b5cf6'
+      );
 
       // 1b. Admin-definierte Installationshinweise in PWA-Modal einfügen
       const adminNotesEl = document.getElementById('pwa-admin-notes');
