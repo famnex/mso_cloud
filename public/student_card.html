@@ -691,116 +691,95 @@
     .admin-install-notes a { color: var(--accent); }
     .admin-install-notes ul { margin-left: 16px; }
 
-    /* Motion permission FULL-SCREEN overlay */
+    /* Motion permission FULL-SCREEN overlay — calm design */
     #motion-permission-overlay {
       position: fixed;
       inset: 0;
-      background: linear-gradient(160deg, var(--accent) 0%, var(--secondary) 100%);
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       z-index: 4000;
       display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 0;
       cursor: pointer;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
       padding: 40px 30px;
       text-align: center;
+      gap: 0;
     }
 
-    /* Tap pulse rings */
+    /* Single calm pulse ring */
     .tap-ring {
       position: absolute;
-      width: 100px;
-      height: 100px;
+      width: 88px;
+      height: 88px;
       border-radius: 50%;
-      border: 3px solid rgba(255,255,255,0.6);
-      animation: tapRingExpand 2s ease-out infinite;
+      border: 2px solid rgba(255,255,255,0.35);
+      animation: tapRingExpand 2.8s ease-out infinite;
       top: 50%; left: 50%;
-      transform: translate(-50%, -50%) scale(0);
     }
-    .tap-ring:nth-child(2) { animation-delay: 0.6s; }
-    .tap-ring:nth-child(3) { animation-delay: 1.2s; }
+    .tap-ring:nth-child(2) { animation-delay: 0.9s; }
+    .tap-ring:nth-child(3) { animation-delay: 1.8s; }
 
     @keyframes tapRingExpand {
-      0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0.9; }
-      100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
+      0%   { transform: translate(-50%, -50%) scale(0.8); opacity: 0.6; }
+      100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
     }
 
     .tap-circle {
-      width: 100px;
-      height: 100px;
+      width: 88px;
+      height: 88px;
       border-radius: 50%;
-      background: rgba(255,255,255,0.2);
-      border: 3px solid rgba(255,255,255,0.9);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2.8rem;
-      margin-bottom: 32px;
-      animation: tapBounce 1.4s ease-in-out infinite;
+      font-size: 2.4rem;
+      margin-bottom: 28px;
       position: relative;
-      box-shadow: 0 0 0 0 rgba(255,255,255,0.5);
+      animation: tapGlow 3s ease-in-out infinite;
     }
 
-    @keyframes tapBounce {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.5); }
-      50%       { transform: scale(1.12); box-shadow: 0 0 0 18px rgba(255,255,255,0); }
+    @keyframes tapGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.3); }
+      50%       { box-shadow: 0 0 0 14px rgba(59,130,246,0); }
     }
 
     .motion-overlay-title {
-      font-size: 1.65rem;
+      font-size: 1.45rem;
       font-weight: 800;
       color: #ffffff;
-      line-height: 1.2;
-      margin-bottom: 12px;
-      letter-spacing: -0.3px;
+      line-height: 1.25;
+      margin-bottom: 10px;
     }
 
     .motion-overlay-sub {
-      font-size: 0.95rem;
-      color: rgba(255,255,255,0.82);
-      line-height: 1.5;
-      max-width: 280px;
-      margin-bottom: 40px;
-    }
-
-    .motion-overlay-hint {
-      font-size: 0.78rem;
-      color: rgba(255,255,255,0.55);
-      margin-top: 8px;
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.65);
+      line-height: 1.55;
+      max-width: 260px;
+      margin-bottom: 32px;
     }
 
     .motion-tap-btn {
-      background: #ffffff;
-      color: var(--accent);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
+      color: #ffffff;
       font-family: 'Outfit', sans-serif;
-      font-size: 1.05rem;
-      font-weight: 800;
+      font-size: 1rem;
+      font-weight: 700;
       border: none;
       border-radius: 50px;
-      padding: 15px 36px;
+      padding: 14px 34px;
       cursor: pointer;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      letter-spacing: 0.3px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+      transition: transform 0.15s ease, opacity 0.15s ease;
     }
     .motion-tap-btn:active {
-      transform: scale(0.96);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.12);
-    }
-
-    .motion-skip-btn {
-      margin-top: 16px;
-      background: none;
-      border: none;
-      color: rgba(255,255,255,0.6);
-      font-size: 0.82rem;
-      font-family: 'Outfit', sans-serif;
-      cursor: pointer;
-      text-decoration: underline;
-      padding: 6px 10px;
+      transform: scale(0.97);
+      opacity: 0.9;
     }
   </style>
 </head>
@@ -823,17 +802,13 @@
 
   <!-- Motion Permission Full-Screen Overlay (iOS only) -->
   <div id="motion-permission-overlay" onclick="requestMotionPermission()">
-    <!-- Expanding tap-ring animations (positioned inside overlay absolutely) -->
     <div class="tap-ring"></div>
     <div class="tap-ring"></div>
     <div class="tap-ring"></div>
-    <!-- Phone icon with bounce animation -->
     <div class="tap-circle">📲</div>
     <h2 class="motion-overlay-title">Bewegungssteuerung<br>aktivieren</h2>
     <p class="motion-overlay-sub">Dein Ausweis reagiert auf Bewegungen deines Handys. Tippe, um das zu erlauben.</p>
     <button class="motion-tap-btn" onclick="requestMotionPermission(); event.stopPropagation();">Jetzt aktivieren</button>
-    <p class="motion-overlay-hint">Du kannst dies jederzeit in den Browser-Einstellungen ändern.</p>
-    <button class="motion-skip-btn" onclick="skipMotionPermission(); event.stopPropagation();">Ohne Bewegung fortfahren</button>
   </div>
 
   <!-- PWA Install Prompt Overlay -->
@@ -1184,6 +1159,13 @@
     function dismissPwaPrompt() {
       document.getElementById('pwa-prompt').style.display = 'none';
       sessionStorage.setItem('pwa_prompt_dismissed', 'true');
+      // Auf iOS: Bewegungserlaubnis-Overlay erst jetzt zeigen
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function' &&
+          sessionStorage.getItem('mso_motion_asked') !== '1') {
+        const overlay = document.getElementById('motion-permission-overlay');
+        if (overlay) overlay.style.display = 'flex';
+      }
     }
 
     // Trigger installation (Android Chrome native prompt)
@@ -1223,20 +1205,19 @@
       }
     }
 
-    function skipMotionPermission() {
-      hideMotionOverlay();
-    }
-
     // Set up gyroscope / device orientation
     if (window.DeviceOrientationEvent) {
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+: show full-screen overlay if not already asked this session
-        if (sessionStorage.getItem('mso_motion_asked') !== '1') {
+        // iOS 13+: Overlay wird NACH dem PWA-Prompt in dismissPwaPrompt() angezeigt.
+        // Falls der PWA-Prompt bereits übersprungen wurde und Gyro noch nicht erlaubt:
+        const pwaDismissed = sessionStorage.getItem('pwa_prompt_dismissed') === 'true';
+        const motionAsked  = sessionStorage.getItem('mso_motion_asked') === '1';
+        if (pwaDismissed && !motionAsked) {
           const overlay = document.getElementById('motion-permission-overlay');
           if (overlay) overlay.style.display = 'flex';
         }
       } else {
-        // Android / Desktop: directly activate without any dialog
+        // Android / Desktop: direkt ohne Dialog aktivieren
         window.addEventListener('deviceorientation', handleOrientation);
       }
     }
