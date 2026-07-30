@@ -156,9 +156,15 @@ router.get('/sso/:id', (req, res) => {
 
     if (!hasAccess) {
       if (!user) {
-        // Nicht angemeldet! Speichere Kachel-Ziel in der Session und leite zum Login weiter
-        req.session.returnTo = `/api/tiles/sso/${tile.id}`;
-        return res.redirect('/?login_required=1');
+        // Nicht angemeldet! Unterverzeichnis (/novus) berücksichtigen
+        const host = req.get('host') || '';
+        const isSubdir = host.includes('cloud.mso-hef.de') || req.originalUrl.startsWith('/novus');
+        const prefix = isSubdir ? '/novus' : '';
+
+        const returnTarget = req.originalUrl.startsWith('/novus') ? req.originalUrl : `${prefix}/api/tiles/sso/${tile.id}`;
+        req.session.returnTo = returnTarget;
+
+        return res.redirect(`${prefix}/index.html?login_required=1`);
       }
       return res.status(403).send('Zugriff verweigert. Sie haben keine Berechtigung für diesen Dienst.');
     }
