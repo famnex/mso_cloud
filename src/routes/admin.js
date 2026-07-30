@@ -65,6 +65,7 @@ router.get('/config', (req, res) => {
        card_guilloche_pattern: getConfig('card_guilloche_pattern', 'waves'),
        card_guilloche_angle: getConfig('card_guilloche_angle', '0'),
        card_guilloche_fineness: getConfig('card_guilloche_fineness', '1.2'),
+       card_guilloche_density: getConfig('card_guilloche_density', '10'),
        card_install_instructions: getConfig('card_install_instructions', ''),
        card_school_name: getConfig('card_school_name', 'Modellschule Obersberg'),
        card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),
@@ -93,7 +94,7 @@ router.post('/config', async (req, res) => {
       'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from',
       'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database',
       'impressum_url', 'disable_student_check', 'platform_name', 'platform_logo',
-      'card_primary_color', 'card_secondary_color', 'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_install_instructions', 'card_school_name', 'card_principal_name', 'card_logo', 'card_signature', 'card_pwa_logging', 'card_pwa_icon', 'card_seal'
+      'card_primary_color', 'card_secondary_color', 'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_guilloche_density', 'card_install_instructions', 'card_school_name', 'card_principal_name', 'card_logo', 'card_signature', 'card_pwa_logging', 'card_pwa_icon', 'card_seal'
     ];
 
     // Standard-Keys sichern

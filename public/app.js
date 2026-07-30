@@ -1178,6 +1178,12 @@ async function loadAdminConfig() {
       const fineValEl = document.getElementById('card_guilloche_fineness_val');
       if (fineValEl) fineValEl.innerText = parseFloat(cfg.card_guilloche_fineness || '1.2').toFixed(1) + ' px';
     }
+    const cardGDensityInput = document.getElementById('card_guilloche_density');
+    if (cardGDensityInput) {
+      cardGDensityInput.value = cfg.card_guilloche_density || '10';
+      const densValEl = document.getElementById('card_guilloche_density_val');
+      if (densValEl) densValEl.innerText = (cfg.card_guilloche_density || '10') + ' Linien';
+    }
     const cardInstrInput = document.getElementById('card_install_instructions');
     if (cardInstrInput) {
       cardInstrInput.value = cfg.card_install_instructions || '';
@@ -1257,51 +1263,50 @@ async function loadAdminConfig() {
 }
 
 // Guillochen SVG Generator für Admin Live-Vorschau
-function generateAdminGuillocheSvg(pattern, fineness) {
+function generateAdminGuillocheSvg(pattern, fineness, density) {
   const w = parseFloat(fineness) || 1.2;
+  const count = parseInt(density, 10) || 10;
   let paths = '';
 
   if (pattern === 'waves_double') {
-    paths = `
-      <path d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 60 Q 30 90, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 30 Q 30 0, 60 30 T 120 30' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 30 Q 30 60, 60 30 T 120 30' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 90 Q 30 60, 60 90 T 120 90' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 90 Q 30 120, 60 90 T 120 90' fill='none' stroke='#000000' stroke-width='${w}'/>
-    `;
+    const step = 120 / (count + 1);
+    for (let i = 1; i <= count; i++) {
+      const y = (i * step).toFixed(1);
+      const amp = 15 + (i % 3) * 5;
+      paths += `<path d='M0 ${y} Q 30 ${(y - amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
+      paths += `<path d='M0 ${y} Q 30 ${(parseFloat(y) + amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>`;
+    }
   } else if (pattern === 'radial') {
-    paths = `
-      <circle cx='60' cy='60' r='12' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <circle cx='60' cy='60' r='25' fill='none' stroke='#000000' stroke-width='${w}' stroke-dasharray='4,2'/>
-      <circle cx='60' cy='60' r='38' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <circle cx='60' cy='60' r='52' fill='none' stroke='#000000' stroke-width='${w}' stroke-dasharray='6,3'/>
-      <path d='M60 0 Q 75 30, 60 60 T 60 120' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>
-      <path d='M0 60 Q 30 75, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>
-    `;
+    const rStep = 56 / count;
+    for (let i = 1; i <= count; i++) {
+      const r = (i * rStep).toFixed(1);
+      const dash = i % 2 === 0 ? " stroke-dasharray='4,2'" : "";
+      paths += `<circle cx='60' cy='60' r='${r}' fill='none' stroke='#000000' stroke-width='${w}'${dash}/>`;
+    }
+    paths += `<path d='M60 0 Q 75 30, 60 60 T 60 120' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
+    paths += `<path d='M0 60 Q 30 75, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.8}'/>`;
   } else if (pattern === 'crosshatch') {
-    paths = `
-      <path d='M0 0 L120 120 M-30 30 L90 150 M30 -30 L150 90' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M120 0 L0 120 M150 30 L30 150 M90 -30 L-30 90' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>
-      <path d='M0 60 Q 30 90, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>
-    `;
+    const step = 120 / count;
+    for (let i = 0; i <= count; i++) {
+      const offset = (i * step).toFixed(1);
+      paths += `<line x1='0' y1='${offset}' x2='${(120 - offset).toFixed(1)}' y2='120' stroke='#000000' stroke-width='${w}'/>`;
+      paths += `<line x1='${offset}' y1='0' x2='120' y2='${(120 - offset).toFixed(1)}' stroke='#000000' stroke-width='${w}'/>`;
+    }
   } else if (pattern === 'spiral') {
-    paths = `
-      <path d='M60 10 C 90 10, 110 30, 110 60 C 110 90, 90 110, 60 110 C 30 110, 10 90, 10 60 C 10 30, 30 10, 60 10 Z' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M60 25 C 80 25, 95 40, 95 60 C 95 80, 80 95, 60 95 C 40 95, 25 80, 25 60 C 25 40, 40 25, 60 25 Z' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 0 Q 60 120, 120 0' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 120 Q 60 0, 120 120' fill='none' stroke='#000000' stroke-width='${w}'/>
-    `;
+    const rStep = 52 / count;
+    for (let i = 1; i <= count; i++) {
+      const r = i * rStep;
+      const rx = (r * 0.5).toFixed(1);
+      paths += `<rect x='${(60 - r).toFixed(1)}' y='${(60 - r).toFixed(1)}' width='${(r * 2).toFixed(1)}' height='${(r * 2).toFixed(1)}' rx='${rx}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
+    }
   } else {
     // Default waves
-    paths = `
-      <path d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 40 Q 30 10, 60 40 T 120 40' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 80 Q 30 50, 60 80 T 120 80' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 100 Q 30 70, 60 100 T 120 100' fill='none' stroke='#000000' stroke-width='${w}'/>
-      <path d='M0 20 Q 30 -10, 60 20 T 120 20' fill='none' stroke='#000000' stroke-width='${w * 0.7}'/>
-    `;
+    const step = 120 / (count + 1);
+    for (let i = 1; i <= count; i++) {
+      const y = (i * step).toFixed(1);
+      const amp = 15 + (i % 2) * 8;
+      paths += `<path d='M0 ${y} Q 30 ${(y - amp).toFixed(1)}, 60 ${y} T 120 ${y}' fill='none' stroke='#000000' stroke-width='${w}'/>`;
+    }
   }
 
   const svgStr = `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>${paths.replace(/\s+/g, ' ').trim()}</svg>`;
@@ -1315,6 +1320,7 @@ function updateAdminCardLivePreview() {
   const pattern = document.getElementById('card_guilloche_pattern')?.value || 'waves';
   const angle = parseInt(document.getElementById('card_guilloche_angle')?.value || '0', 10);
   const fineness = parseFloat(document.getElementById('card_guilloche_fineness')?.value || '1.2');
+  const density = parseInt(document.getElementById('card_guilloche_density')?.value || '10', 10);
 
   const schoolEl = document.getElementById('admin-preview-school-title');
   if (schoolEl) schoolEl.innerText = schoolName;
@@ -1333,7 +1339,7 @@ function updateAdminCardLivePreview() {
 
   const guillocheEl = document.getElementById('admin-card-preview-guilloche');
   if (guillocheEl) {
-    guillocheEl.style.backgroundImage = generateAdminGuillocheSvg(pattern, fineness);
+    guillocheEl.style.backgroundImage = generateAdminGuillocheSvg(pattern, fineness, density);
     guillocheEl.style.transform = `rotate(${angle}deg)`;
   }
 
@@ -1392,8 +1398,16 @@ function attachAdminCardLivePreviewListeners() {
 
   const inputIds = [
     'card_school_name', 'card_principal_name', 'card_primary_color', 'card_secondary_color',
-    'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness'
+    'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_guilloche_density'
   ];
+  inputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', updateAdminCardLivePreview);
+      el.addEventListener('change', updateAdminCardLivePreview);
+    }
+  });
+}
   inputIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -3801,6 +3815,7 @@ async function saveCardConfig(e) {
     card_guilloche_pattern: document.getElementById('card_guilloche_pattern') ? document.getElementById('card_guilloche_pattern').value : 'waves',
     card_guilloche_angle: document.getElementById('card_guilloche_angle') ? document.getElementById('card_guilloche_angle').value : '0',
     card_guilloche_fineness: document.getElementById('card_guilloche_fineness') ? document.getElementById('card_guilloche_fineness').value : '1.2',
+    card_guilloche_density: document.getElementById('card_guilloche_density') ? document.getElementById('card_guilloche_density').value : '10',
     card_install_instructions: document.getElementById('card_install_instructions').value.trim(),
     card_logo: logoImg.src && logoImg.src.startsWith('data:') ? logoImg.src : '',
     card_pwa_icon: pwaIconImg.src && pwaIconImg.src.startsWith('data:') ? pwaIconImg.src : '',

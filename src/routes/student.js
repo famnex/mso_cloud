@@ -170,6 +170,7 @@ router.get('/card', async (req, res) => {
       card_guilloche_pattern: getConfig('card_guilloche_pattern', 'waves'),
       card_guilloche_angle: getConfig('card_guilloche_angle', '0'),
       card_guilloche_fineness: getConfig('card_guilloche_fineness', '1.2'),
+      card_guilloche_density: getConfig('card_guilloche_density', '10'),
       card_install_instructions: getConfig('card_install_instructions', ''),
       card_school_name: getConfig('card_school_name', 'Modellschule Obersberg'),
       card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),

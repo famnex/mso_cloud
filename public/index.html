@@ -620,6 +620,14 @@
                       <span id="card_guilloche_fineness_val" style="min-width: 45px; font-weight: bold; text-align: right;">1.2 px</span>
                     </div>
                   </div>
+
+                  <div class="form-group">
+                    <label for="card_guilloche_density"><i class="fa-solid fa-bars-staggered"></i> Liniendichte (Menge Linien)</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <input type="range" id="card_guilloche_density" min="4" max="30" step="1" value="10" class="form-range" style="flex-grow: 1;" oninput="document.getElementById('card_guilloche_density_val').innerText = this.value + ' Linien'">
+                      <span id="card_guilloche_density_val" style="min-width: 60px; font-weight: bold; text-align: right;">10 Linien</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 15px;">
