@@ -306,6 +306,13 @@ router.post('/token', (req, res) => {
       const { privateKeyPem } = getOrCreateOidcKeys();
       const userRole = determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
 
+      // Client-Name des anfragenenden SSO-Systems auflösen
+      let clientName = clientId;
+      const clientRow = db.prepare('SELECT client_name FROM oauth_clients WHERE client_id = ?').get(clientId);
+      if (clientRow && clientRow.client_name) {
+        clientName = clientRow.client_name;
+      }
+
       const payload = {
         iss: issuer,
         sub: String(user.id),
@@ -322,7 +329,10 @@ router.post('/token', (req, res) => {
 
       console.log('OIDC ID-Token Claims:', JSON.stringify(payload, null, 2));
       if (typeof logEvent === 'function') {
-        logEvent('info', 'oidc_token_claims', `OIDC ID-Token Claims für User: ${user.username}`, payload, req.ip);
+        const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
+          ? `127.0.0.1 (${clientName})` 
+          : `${req.ip} (${clientName})`;
+        logEvent('info', 'oidc_token_claims', `OIDC ID-Token Claims für User: ${user.username} (System: ${clientName})`, payload, clientIpDisplay);
       }
 
       idToken = jwt.sign(payload, privateKeyPem, {
@@ -441,9 +451,23 @@ router.get('/userinfo', (req, res) => {
       user_role: userRole
     };
 
+    // Client-Name des anfragenenden SSO-Systems für das Log auflösen
+    let clientName = 'Unbekanntes SSO-System';
+    if (tokenRow && tokenRow.client_id) {
+      const clientRow = db.prepare('SELECT client_name FROM oauth_clients WHERE client_id = ?').get(tokenRow.client_id);
+      if (clientRow && clientRow.client_name) {
+        clientName = clientRow.client_name;
+      } else {
+        clientName = tokenRow.client_id;
+      }
+    }
+
     console.log('OIDC Userinfo Claims:', JSON.stringify(claims, null, 2));
     if (typeof logEvent === 'function') {
-      logEvent('info', 'oidc_userinfo_claims', `OIDC Userinfo Claims für User: ${user.username}`, claims, req.ip);
+      const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
+        ? `127.0.0.1 (${clientName})` 
+        : `${req.ip} (${clientName})`;
+      logEvent('info', 'oidc_userinfo_claims', `OIDC Userinfo Claims für User: ${user.username} (System: ${clientName})`, claims, clientIpDisplay);
     }
 
     console.log(`OIDC-Userinfo erfolgreich ausgeliefert für User: ${user.username}`);
