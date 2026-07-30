@@ -596,6 +596,9 @@ router.get('/student-profile', async (req, res) => {
     const profile = await studentDb.getStudentProfile(user);
     if (!profile) {
       if (user.role === 'admin') {
+        const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" width="147" height="196" viewBox="0 0 147 196"><rect width="147" height="196" fill="#1e293b"/><path d="M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z" fill="#38bdf8"/><text x="73.5" y="170" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="sans-serif" font-weight="bold">ADMIN VORSCHAU</text></svg>`;
+        const dummyPassphotoBase64 = 'data:image/svg+xml;base64,' + Buffer.from(dummySvg).toString('base64');
+
         return res.json({
           is_preview: true,
           first_name: 'Max (Vorschau)',
@@ -608,7 +611,7 @@ router.get('/student-profile', async (req, res) => {
           sph_password: 'DummySPHPassword!',
           account_status: 'true',
           card_status: 'Bild verifiziert',
-          card_image: 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 147 196\' fill=\'%231e293b\'><rect width=\'147\' height=\'196\' fill=\'%231e293b\'/><path d=\'M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z\' fill=\'%2338bdf8\'/><text x=\'73.5\' y=\'175\' text-anchor=\'middle\' fill=\'%2394a3b8\' font-size=\'11\' font-family=\'sans-serif\' font-weight=\'bold\'>ADMIN VORSCHAU</text></svg>'
+          card_image: dummyPassphotoBase64
         });
       }
       return res.status(404).json({ error: 'Kein Schülerportal-Profil für diesen Account hinterlegt.' });

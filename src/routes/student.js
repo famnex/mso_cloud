@@ -18,15 +18,18 @@ router.get('/card', async (req, res) => {
 
     if (!profile) {
       if (disableCheck || user.role === 'admin') {
-        // Dummy-Profil für Testzwecke / Admin-Vorschau erzeugen
+        // Dummy-Profil für Testzwecke / Admin-Vorschau erzeugen (Base64-kodiertes SVG für volle Canvas-Kompatibilität)
         const nameParts = (user.display_name || user.username).split(' ');
+        const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" width="147" height="196" viewBox="0 0 147 196"><rect width="147" height="196" fill="#1e293b"/><path d="M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z" fill="#38bdf8"/><text x="73.5" y="170" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="sans-serif" font-weight="bold">ADMIN VORSCHAU</text></svg>`;
+        const dummyPassphotoBase64 = 'data:image/svg+xml;base64,' + Buffer.from(dummySvg).toString('base64');
+
         profile = {
           first_name: user.role === 'admin' ? 'Max (Vorschau)' : (nameParts[0] || user.username),
           last_name: user.role === 'admin' ? 'Mustermann' : (nameParts.slice(1).join(' ') || 'Test-Account'),
           birth_date: '2008-05-15',
           birth_place: 'Bad Hersfeld',
           mediothek_number: '123456789',
-          card_image: 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 147 196\' fill=\'%231e293b\'><rect width=\'147\' height=\'196\' fill=\'%231e293b\'/><path d=\'M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z\' fill=\'%2338bdf8\'/><text x=\'73.5\' y=\'175\' text-anchor=\'middle\' fill=\'%2394a3b8\' font-size=\'11\' font-family=\'sans-serif\' font-weight=\'bold\'>ADMIN VORSCHAU</text></svg>',
+          card_image: dummyPassphotoBase64,
           card_status: 'Bild verifiziert'
         };
       } else {
