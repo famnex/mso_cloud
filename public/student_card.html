@@ -62,7 +62,7 @@
       position: relative;
     }
 
-    /* Background Animation — dual color orbs */
+    /* Background Animation — vivid dual-color orbs, high contrast for sunlight readability */
     body::before, body::after {
       content: '';
       position: absolute;
@@ -71,30 +71,28 @@
       z-index: 1;
     }
     body::before {
-      width: 70vmax; height: 70vmax;
-      top: -20vmax; left: -15vmax;
-      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      width: 90vmax; height: 90vmax;
+      top: -30vmax; left: -20vmax;
+      background: radial-gradient(circle, var(--accent) 0%, transparent 65%);
       animation: orbFloat 18s ease-in-out infinite alternate;
-      filter: blur(25px);
-      opacity: 0.95;
+      opacity: 0.28;
     }
     body::after {
-      width: 60vmax; height: 60vmax;
-      bottom: -15vmax; right: -10vmax;
-      background: radial-gradient(circle, var(--secondary-glow) 0%, transparent 70%);
+      width: 80vmax; height: 80vmax;
+      bottom: -25vmax; right: -15vmax;
+      background: radial-gradient(circle, var(--secondary) 0%, transparent 65%);
       animation: orbFloat2 22s ease-in-out infinite alternate;
-      filter: blur(30px);
-      opacity: 0.9;
+      opacity: 0.24;
     }
     @keyframes orbFloat {
       0%   { transform: translate(0,  0)   scale(1); }
-      50%  { transform: translate(8vw, 6vh) scale(1.15); }
-      100% { transform: translate(4vw, 12vh) scale(0.95); }
+      50%  { transform: translate(10vw, 8vh) scale(1.18); }
+      100% { transform: translate(5vw, 15vh) scale(0.92); }
     }
     @keyframes orbFloat2 {
       0%   { transform: translate(0, 0)    scale(1); }
-      50%  { transform: translate(-6vw,-8vh) scale(1.1); }
-      100% { transform: translate(-3vw,-4vh) scale(1.2); }
+      50%  { transform: translate(-8vw,-10vh) scale(1.15); }
+      100% { transform: translate(-4vw,-5vh) scale(1.22); }
     }
 
     /* Top Bar Controls */
@@ -195,8 +193,8 @@
       top: 0; left: 0; right: 0; bottom: 0;
       z-index: 45; /* Liegt über allen Bildelementen zum Schutz vor Screenshots & Kopieren */
       pointer-events: none;
-      opacity: 0.06;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 40 Q 30 10, 60 40 T 120 40' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 80 Q 30 50, 60 80 T 120 80' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3Cpath d='M0 100 Q 30 70, 60 100 T 120 100' fill='none' stroke='%23000000' stroke-width='0.5'/%3E%3C/svg%3E");
+      opacity: 0.14;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath d='M0 60 Q 30 30, 60 60 T 120 60' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 40 Q 30 10, 60 40 T 120 40' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 80 Q 30 50, 60 80 T 120 80' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 100 Q 30 70, 60 100 T 120 100' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M0 20 Q 30 -10, 60 20 T 120 20' fill='none' stroke='%23000000' stroke-width='0.8'/%3E%3C/svg%3E");
     }
 
     /* Logo-Wasserzeichen im Kartenhintergrund (PWA App-Icon) */
@@ -204,9 +202,9 @@
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 190px;
-      height: 190px;
-      opacity: 0.035;
+      width: 200px;
+      height: 200px;
+      opacity: 0.09;
       z-index: 2;
       pointer-events: none;
       display: flex;
@@ -693,42 +691,116 @@
     .admin-install-notes a { color: var(--accent); }
     .admin-install-notes ul { margin-left: 16px; }
 
-    /* Motion permission banner */
-    #motion-permission-banner {
+    /* Motion permission FULL-SCREEN overlay */
+    #motion-permission-overlay {
       position: fixed;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
-      color: #fff;
-      border-radius: 40px;
-      padding: 12px 22px;
-      font-size: 0.85rem;
-      font-weight: 700;
+      inset: 0;
+      background: linear-gradient(160deg, var(--accent) 0%, var(--secondary) 100%);
+      z-index: 4000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      padding: 40px 30px;
+      text-align: center;
+    }
+
+    /* Tap pulse rings */
+    .tap-ring {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.6);
+      animation: tapRingExpand 2s ease-out infinite;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+    }
+    .tap-ring:nth-child(2) { animation-delay: 0.6s; }
+    .tap-ring:nth-child(3) { animation-delay: 1.2s; }
+
+    @keyframes tapRingExpand {
+      0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
+    }
+
+    .tap-circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      border: 3px solid rgba(255,255,255,0.9);
       display: flex;
       align-items: center;
-      gap: 10px;
-      z-index: 3000;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-      animation: bannerPulse 2s ease-in-out infinite;
+      justify-content: center;
+      font-size: 2.8rem;
+      margin-bottom: 32px;
+      animation: tapBounce 1.4s ease-in-out infinite;
+      position: relative;
+      box-shadow: 0 0 0 0 rgba(255,255,255,0.5);
+    }
+
+    @keyframes tapBounce {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.5); }
+      50%       { transform: scale(1.12); box-shadow: 0 0 0 18px rgba(255,255,255,0); }
+    }
+
+    .motion-overlay-title {
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.2;
+      margin-bottom: 12px;
+      letter-spacing: -0.3px;
+    }
+
+    .motion-overlay-sub {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.82);
+      line-height: 1.5;
+      max-width: 280px;
+      margin-bottom: 40px;
+    }
+
+    .motion-overlay-hint {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.55);
+      margin-top: 8px;
+    }
+
+    .motion-tap-btn {
+      background: #ffffff;
+      color: var(--accent);
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      border: none;
+      border-radius: 50px;
+      padding: 15px 36px;
       cursor: pointer;
-      white-space: nowrap;
-      max-width: 90vw;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      letter-spacing: 0.3px;
     }
-    #motion-permission-banner .banner-icon {
-      font-size: 1.4rem;
-      animation: bannerShake 1.5s ease-in-out infinite;
+    .motion-tap-btn:active {
+      transform: scale(0.96);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.12);
     }
-    @keyframes bannerPulse {
-      0%, 100% { box-shadow: 0 8px 24px rgba(0,0,0,0.2), 0 0 0 0 rgba(59,130,246,0.4); }
-      50%       { box-shadow: 0 8px 24px rgba(0,0,0,0.2), 0 0 0 10px rgba(59,130,246,0); }
-    }
-    @keyframes bannerShake {
-      0%, 100% { transform: rotate(0deg); }
-      20%      { transform: rotate(-15deg); }
-      40%      { transform: rotate(15deg); }
-      60%      { transform: rotate(-8deg); }
-      80%      { transform: rotate(8deg); }
+
+    .motion-skip-btn {
+      margin-top: 16px;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.82rem;
+      font-family: 'Outfit', sans-serif;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 6px 10px;
     }
   </style>
 </head>
@@ -749,10 +821,19 @@
     <i class="fa-solid fa-cloud-sun"></i> <span data-i18n="offlineMode">Offline-Modus active</span>
   </div>
 
-  <!-- Motion Permission Banner (iOS only) -->
-  <div id="motion-permission-banner" style="display:none;" onclick="requestMotionPermission()">
-    <span class="banner-icon">📲</span>
-    <span id="motion-banner-text">Tippe hier, um Bewegungsanimation zu aktivieren</span>
+  <!-- Motion Permission Full-Screen Overlay (iOS only) -->
+  <div id="motion-permission-overlay" onclick="requestMotionPermission()">
+    <!-- Expanding tap-ring animations (positioned inside overlay absolutely) -->
+    <div class="tap-ring"></div>
+    <div class="tap-ring"></div>
+    <div class="tap-ring"></div>
+    <!-- Phone icon with bounce animation -->
+    <div class="tap-circle">📲</div>
+    <h2 class="motion-overlay-title">Bewegungssteuerung<br>aktivieren</h2>
+    <p class="motion-overlay-sub">Dein Ausweis reagiert auf Bewegungen deines Handys. Tippe, um das zu erlauben.</p>
+    <button class="motion-tap-btn" onclick="requestMotionPermission(); event.stopPropagation();">Jetzt aktivieren</button>
+    <p class="motion-overlay-hint">Du kannst dies jederzeit in den Browser-Einstellungen ändern.</p>
+    <button class="motion-skip-btn" onclick="skipMotionPermission(); event.stopPropagation();">Ohne Bewegung fortfahren</button>
   </div>
 
   <!-- PWA Install Prompt Overlay -->
@@ -1120,6 +1201,12 @@
     }
 
     // Motion Permission for iOS (Gyroscope)
+    function hideMotionOverlay() {
+      const overlay = document.getElementById('motion-permission-overlay');
+      if (overlay) overlay.style.display = 'none';
+      sessionStorage.setItem('mso_motion_asked', '1');
+    }
+
     function requestMotionPermission() {
       if (typeof DeviceOrientationEvent !== 'undefined' &&
           typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -1130,24 +1217,26 @@
             }
           })
           .catch(err => console.warn('Gyro permission denied:', err))
-          .finally(() => {
-            const banner = document.getElementById('motion-permission-banner');
-            if (banner) banner.style.display = 'none';
-            sessionStorage.setItem('mso_motion_asked', '1');
-          });
+          .finally(() => hideMotionOverlay());
+      } else {
+        hideMotionOverlay();
       }
+    }
+
+    function skipMotionPermission() {
+      hideMotionOverlay();
     }
 
     // Set up gyroscope / device orientation
     if (window.DeviceOrientationEvent) {
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+: show tap-to-enable banner (if not already asked this session)
+        // iOS 13+: show full-screen overlay if not already asked this session
         if (sessionStorage.getItem('mso_motion_asked') !== '1') {
-          const banner = document.getElementById('motion-permission-banner');
-          if (banner) banner.style.display = 'flex';
+          const overlay = document.getElementById('motion-permission-overlay');
+          if (overlay) overlay.style.display = 'flex';
         }
       } else {
-        // Android / Desktop: directly activate without permission dialog
+        // Android / Desktop: directly activate without any dialog
         window.addEventListener('deviceorientation', handleOrientation);
       }
     }
