@@ -739,18 +739,29 @@
                   </div>
                 </div>
 
-                <!-- Schulleiter Bereich -->
-                <div style="margin-top: 8px; z-index: 10; position: relative;">
-                  <div id="admin-preview-sig-box" style="height: 20px; max-width: 95px; display: flex; align-items: center;">
-                    <span id="admin-preview-sig-placeholder" style="font-family: cursive; font-size: 0.7rem; color: #334155;">K. Backhaus</span>
-                    <img id="admin-preview-sig-img" style="max-height: 20px; max-width: 95px; object-fit: contain; display: none;">
+                <!-- Oberhalb der Linie: Schulleiter (links) & Hologramm Badge (rechts) -->
+                <div style="margin-top: 8px; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10; position: relative;">
+                  <div>
+                    <div id="admin-preview-sig-box" style="height: 20px; max-width: 95px; display: flex; align-items: center;">
+                      <span id="admin-preview-sig-placeholder" style="font-family: cursive; font-size: 0.7rem; color: #334155;">K. Backhaus</span>
+                      <img id="admin-preview-sig-img" style="max-height: 20px; max-width: 95px; object-fit: contain; display: none;">
+                    </div>
+                    <div style="font-size: 0.52rem; color: #475569; font-weight: 700; text-transform: uppercase;">Schulleiter/in</div>
+                    <div id="admin-preview-principal-display" style="font-size: 0.65rem; color: #0f172a; font-weight: 600;">OStD Karsten Backhaus</div>
                   </div>
-                  <div style="font-size: 0.52rem; color: #475569; font-weight: 700; text-transform: uppercase;">Schulleiter/in</div>
-                  <div id="admin-preview-principal-display" style="font-size: 0.65rem; color: #0f172a; font-weight: 600;">OStD Karsten Backhaus</div>
+                  
+                  <!-- Hologram PWA Badge OBERHALB der Trennlinie -->
+                  <div style="position: relative; width: 26px; height: 26px; border-radius: 7px; overflow: hidden !important; isolation: isolate; clip-path: inset(0 round 7px); -webkit-clip-path: inset(0 round 7px); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); background: #0f172a; border: 1px solid rgba(255,255,255,0.45); box-shadow: 0 2px 6px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <div style="position: absolute; inset: -50%; background: linear-gradient(115deg, rgba(255,0,128,0) 0%, rgba(255,0,128,0.5) 20%, rgba(0,255,255,0.6) 40%, rgba(255,255,0,0.6) 60%, rgba(0,255,128,0.5) 80%, rgba(0,255,128,0) 100%); mix-blend-mode: color-dodge; opacity: 0.85;"></div>
+                    <img id="admin-preview-hologram-img" src="media/icon-512.png" style="width: 80%; height: 80%; object-fit: contain; z-index: 2;">
+                  </div>
                 </div>
 
-                <!-- Footer: Horizontaler Trennstrich & Gültigkeit / QR -->
-                <div style="margin-top: 6px; border-top: 1.5px solid rgba(15, 23, 42, 0.18); padding-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 6px; z-index: 10; position: relative;">
+                <!-- Horizontaler Trennstrich -->
+                <div style="margin: 6px 0; border-top: 1.5px solid rgba(15, 23, 42, 0.18);"></div>
+
+                <!-- Unterhalb der Linie: Gültigkeit (links) & QR-Code (rechts) -->
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; z-index: 10; position: relative;">
                   <div style="display: flex; flex-direction: column; gap: 2px;">
                     <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid #10b981; border-radius: 5px; padding: 1px 5px; font-size: 0.52rem; font-weight: 700; color: #10b981; display: inline-flex; align-items: center; gap: 3px;">
                       <span style="width: 4px; height: 4px; background: #10b981; border-radius: 50%;"></span> GÜLTIG
@@ -758,15 +769,8 @@
                     <div style="font-size: 0.55rem; color: #475569;">Gültig bis: <strong style="color:#0f172a;">31.07.2026</strong></div>
                     <div style="font-size: 0.55rem; color: #10b981; font-weight: 700;">Status: Online verifiziert</div>
                   </div>
-                  <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0;">
-                    <!-- Hologram PWA Badge in Preview -->
-                    <div style="position: relative; width: 26px; height: 26px; border-radius: 7px; overflow: hidden !important; isolation: isolate; clip-path: inset(0 round 7px); -webkit-clip-path: inset(0 round 7px); transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); background: #0f172a; border: 1px solid rgba(255,255,255,0.45); box-shadow: 0 2px 6px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center;">
-                      <div style="position: absolute; inset: -50%; background: linear-gradient(115deg, rgba(255,0,128,0) 0%, rgba(255,0,128,0.5) 20%, rgba(0,255,255,0.6) 40%, rgba(255,255,0,0.6) 60%, rgba(0,255,128,0.5) 80%, rgba(0,255,128,0) 100%); mix-blend-mode: color-dodge; opacity: 0.85;"></div>
-                      <img id="admin-preview-hologram-img" src="media/icon-512.png" style="width: 80%; height: 80%; object-fit: contain; z-index: 2;">
-                    </div>
-                    <div style="background: #ffffff; padding: 2px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                      <i class="fa-solid fa-qrcode" style="font-size: 1.4rem; color: #0f172a;"></i>
-                    </div>
+                  <div style="background: #ffffff; padding: 2px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fa-solid fa-qrcode" style="font-size: 1.4rem; color: #0f172a;"></i>
                   </div>
                 </div>
               </div>

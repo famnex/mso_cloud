@@ -392,13 +392,22 @@
       line-height: 1.2;
     }
 
-    /* Schulleiter-Unterschrift & Name */
+    /* Schulleiter-Unterschrift, Name & Hologramm Badge (Oberhalb der Trennlinie) */
+    .signature-hologram-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      width: 100%;
+      z-index: 20;
+      margin-top: 4px;
+      position: relative;
+    }
+
     .signature-seal-area {
       position: relative;
       width: 200px;
       height: 70px;
       z-index: 20;
-      margin-top: 6px;
     }
 
     .principal-container {
@@ -406,15 +415,24 @@
       height: 100%;
     }
 
-    /* QR-Code & Validity Zone (Horizontaler Trennstrich liegt genau unter dem Schulleiter-Namen) */
+    /* Horizontaler Trennstrich zwischen Schulleiter/Hologramm (oben) und Gültigkeit/QR-Code (unten) */
+    .card-footer-divider {
+      width: 100%;
+      height: 1.5px;
+      background: rgba(15, 23, 42, 0.18);
+      margin: 6px 0;
+      z-index: 15;
+    }
+
+    /* QR-Code & Validity Zone (Unterhalb der Trennlinie) */
     .card-footer {
-      border-top: 1.5px solid rgba(15, 23, 42, 0.18);
-      padding-top: 8px;
+      border-top: none;
+      padding-top: 0;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       z-index: 10;
-      margin-top: 4px;
+      margin-top: 0;
     }
 
     /* Footer-Spalten getauscht, damit QR-Code rechts und Gültigkeit links ist */
@@ -1074,14 +1092,25 @@
         </div>
       </div>
 
-      <!-- Schulleiter-Unterschrift & Name (Prerendered auf Canvas) -->
-      <div class="signature-seal-area">
-        <div class="principal-container" id="signature-container">
-          <span class="signature-placeholder">Unterschrift</span>
+      <!-- Schulleiter-Unterschrift, Name & Hologramm Badge (OBERHALB DER LINIE) -->
+      <div class="signature-hologram-row">
+        <div class="signature-seal-area">
+          <div class="principal-container" id="signature-container">
+            <span class="signature-placeholder">Unterschrift</span>
+          </div>
+        </div>
+
+        <!-- Hologram PWA App-Icon Badge (Rechtsbündig OBERHALB der Trennlinie) -->
+        <div class="hologram-pwa-icon-box" id="hologram-pwa-box" title="MSO Hologramm-Authentifizierung">
+          <div class="hologram-shine" id="hologram-shine-el"></div>
+          <img id="card-hologram-icon" src="media/icon-512.png" alt="Hologram Icon">
         </div>
       </div>
 
-      <!-- Card Footer - QR & Live Validation -->
+      <!-- HORIZONTALE TRENNLINIE -->
+      <div class="card-footer-divider"></div>
+
+      <!-- Card Footer - QR & Live Validation (UNTERHALB DER LINIE) -->
       <div class="card-footer">
         <div class="qr-container-wrapper">
           
@@ -1099,12 +1128,8 @@
             </div>
           </div>
 
-          <!-- QR Code Container (mit Hologramm App-Icon darüber & Mediotheksnummer darunter) -->
+          <!-- QR Code Container (UNTERHALB der Trennlinie) -->
           <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; z-index: 10; position: relative;">
-            <div class="hologram-pwa-icon-box" id="hologram-pwa-box" title="MSO Hologramm-Authentifizierung">
-              <div class="hologram-shine" id="hologram-shine-el"></div>
-              <img id="card-hologram-icon" src="media/icon-512.png" alt="Hologram Icon">
-            </div>
             <div class="qr-code-box" id="qrcode-box" title="Scan Mediotheksnummer"></div>
             <span style="font-family: monospace; font-size: 0.7rem; font-weight: 700; color: var(--text);" id="card-mediothek-number-display">-</span>
           </div>
