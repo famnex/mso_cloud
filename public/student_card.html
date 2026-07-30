@@ -2138,12 +2138,12 @@
         sigCtx.font = '700 9.5px "Outfit", sans-serif';
         sigCtx.textAlign = 'left';
         sigCtx.textBaseline = 'top';
-        sigCtx.fillText(labelText.toUpperCase(), 2, 76);
+        sigCtx.fillText(labelText.toUpperCase(), 2, 38);
 
         const principalName = data.card_principal_name || 'OStD Karsten Backhaus';
         sigCtx.fillStyle = '#0f172a';
         sigCtx.font = '600 12.5px "Outfit", sans-serif';
-        sigCtx.fillText(principalName, 2, 90);
+        sigCtx.fillText(principalName, 2, 52);
       } else {
         // Bei Sperrung: Leeres Canvas zeichnen (keine Unterschrift, kein Schulleitername!)
         sigCtx.fillStyle = '#ef4444';
