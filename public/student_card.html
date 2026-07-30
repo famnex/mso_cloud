@@ -407,18 +407,19 @@
        herausragen kann. Ankerpunkt oben links bleibt via position:relative fixiert. */
     .signature-seal-area {
       position: relative;
-      /* Breite = halbe Canvas-Breite: so bleibt rechts Platz fürs Hologramm */
+      /* Breite des sichtbaren Reservierungsbereichs, Canvas ragt nach rechts über */
       width: 200px;
-      /* Höhe explizit auf auto → Canvas bestimmt die Höhe */
-      height: auto;
+      /* Höhe FEST auf Original-70px: Canvas ist position:absolute → nimmt keinen Layoutraum */
+      height: 70px;
       z-index: 20;
       overflow: visible;
     }
 
     .principal-container {
       width: 100%;
-      height: auto;
+      height: 70px;   /* Original-Höhe, unverandert */
       overflow: visible;
+      position: relative;
     }
 
     /* Horizontaler Trennstrich zwischen Schulleiter/Hologramm (oben) und Gültigkeit/QR-Code (unten) */
@@ -2152,11 +2153,14 @@
         sigCtx.fillText('AUSWEIS UNGÜLTIG', 4, 76);
       }
 
-      // Unterschriften-Container befüllen
-      // CSS-Größe: 400×140px, aber position: absolute + top:0 left:0
-      // hält den Ankerpunkt oben links identisch zum alten 200×70px Block.
+      // Unterschriften-Container befüllen.
+      // Canvas ist position:absolute → ragt visuell über den Container hinaus,
+      // beeinflusst aber den Dokumentenfluss NICHT → keine Verschiebung der Elemente darunter.
       const sigContainer = document.getElementById('signature-container');
       sigContainer.innerHTML = '';
+      sigCanvas.style.position = 'absolute';
+      sigCanvas.style.top = '0';
+      sigCanvas.style.left = '0';
       sigCanvas.style.width = `${SIG_W}px`;
       sigCanvas.style.height = `${SIG_H}px`;
       sigCanvas.style.pointerEvents = 'none';
