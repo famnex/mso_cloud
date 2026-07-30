@@ -644,7 +644,7 @@
             </button>
           </div>
 
-          <div class="glass-panel" style="padding:15px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; background:rgba(0,0,0,0.15);">
+          <div class="glass-panel" style="padding:15px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; background:rgba(0,0,0,0.15);">
             <div style="display:flex; align-items:center; gap:10px;">
               <span style="color:var(--text-secondary); font-size:0.9rem;">Level:</span>
               <select id="log-filter-level" class="form-control" style="width:160px; height: 38px; padding: 6px 12px;" onchange="filterAdminLogs()">
@@ -659,6 +659,9 @@
               <input type="text" id="log-search" class="form-control" placeholder="Aktion, Meldung, IP..." oninput="filterAdminLogs()">
             </div>
           </div>
+
+          <!-- Paginierung Oben -->
+          <div id="logs-pagination-top" style="margin-bottom: 12px;"></div>
 
           <div class="admin-table-container">
             <table class="admin-table">
@@ -677,6 +680,9 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Paginierung Unten -->
+          <div id="logs-pagination-bottom" style="margin-top: 15px;"></div>
         </div>
 
       </div>

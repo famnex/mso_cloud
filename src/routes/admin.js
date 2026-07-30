@@ -783,11 +783,15 @@ router.delete('/messages/:id', (req, res) => {
    ========================================================================== */
 
 /**
- * Holt die neuesten Logs (standardmäßig absteigend sortiert, max. 150 Einträge).
+ * Ruft alle System-Protokolle ab (bereinigt automatisch Einträge älter als 30 Tage).
  */
 router.get('/logs', (req, res) => {
   try {
-    const logs = db.prepare('SELECT * FROM system_logs ORDER BY created_at DESC, id DESC LIMIT 150').all();
+    // 1. Logs älter als 30 Tage automatisch bereinigen
+    db.prepare("DELETE FROM system_logs WHERE datetime(created_at) < datetime('now', '-30 days')").run();
+
+    // 2. Alle verbliebenen Logs zurückgeben
+    const logs = db.prepare('SELECT * FROM system_logs ORDER BY created_at DESC, id DESC').all();
     res.json(logs);
   } catch (error) {
     res.status(500).json({ error: error.message });

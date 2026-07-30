@@ -1868,6 +1868,9 @@ async function triggerSystemUpdate() {
 
 /* --- TAB: System-Protokolle (Audit Log) --- */
 let allAdminLogs = [];
+let filteredAdminLogs = [];
+let currentLogPage = 1;
+let logsPerPage = 50; // Standard 50 Einträge pro Seite
 
 async function loadAdminLogs() {
   const tableBody = document.getElementById('admin-logs-table-body');
@@ -1891,8 +1894,9 @@ async function loadAdminLogs() {
     // Filterwerte zurücksetzen
     document.getElementById('log-filter-level').value = 'all';
     document.getElementById('log-search').value = '';
+    currentLogPage = 1;
     
-    renderAdminLogs(allAdminLogs);
+    filterAdminLogs();
   } catch (err) {
     showAdminAlert(err.message, 'danger');
     tableBody.innerHTML = `
@@ -1904,6 +1908,128 @@ async function loadAdminLogs() {
       </tr>
     `;
   }
+}
+
+function filterAdminLogs() {
+  const levelFilter = document.getElementById('log-filter-level').value;
+  const searchFilter = document.getElementById('log-search').value.toLowerCase().trim();
+
+  filteredAdminLogs = allAdminLogs.filter(log => {
+    // Level match
+    const levelMatch = (levelFilter === 'all' || log.level === levelFilter);
+    
+    // Search match (bezieht sich auf ALLE Daten)
+    const searchMatch = !searchFilter || 
+      log.action.toLowerCase().includes(searchFilter) ||
+      log.message.toLowerCase().includes(searchFilter) ||
+      (log.ip && log.ip.toLowerCase().includes(searchFilter)) ||
+      (log.details && log.details.toLowerCase().includes(searchFilter));
+
+    return levelMatch && searchMatch;
+  });
+
+  currentLogPage = 1;
+  renderAdminLogsPage();
+}
+
+function changeLogsPerPage(val) {
+  logsPerPage = val === 'all' ? 'all' : parseInt(val, 10);
+  currentLogPage = 1;
+  renderAdminLogsPage();
+}
+
+function changeLogPage(page) {
+  const totalEntries = filteredAdminLogs.length;
+  const pageSize = logsPerPage === 'all' ? totalEntries : parseInt(logsPerPage, 10);
+  const totalPages = Math.ceil(totalEntries / (pageSize || 1)) || 1;
+
+  if (page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+
+  currentLogPage = page;
+  renderAdminLogsPage();
+}
+
+function renderAdminLogsPage() {
+  const totalEntries = filteredAdminLogs.length;
+  const isAll = logsPerPage === 'all';
+  const pageSize = isAll ? totalEntries : parseInt(logsPerPage, 10);
+  const totalPages = isAll ? 1 : (Math.ceil(totalEntries / (pageSize || 1)) || 1);
+
+  if (currentLogPage > totalPages) currentLogPage = totalPages;
+  if (currentLogPage < 1) currentLogPage = 1;
+
+  const startIndex = isAll ? 0 : (currentLogPage - 1) * pageSize;
+  const endIndex = isAll ? totalEntries : Math.min(startIndex + pageSize, totalEntries);
+  const pageLogs = filteredAdminLogs.slice(startIndex, endIndex);
+
+  // 1. Tabelle rendern
+  renderAdminLogs(pageLogs);
+
+  // 2. Paginierung Oben & Unten rendern
+  renderPaginationControls('logs-pagination-top', startIndex, endIndex, totalEntries, totalPages);
+  renderPaginationControls('logs-pagination-bottom', startIndex, endIndex, totalEntries, totalPages);
+}
+
+function renderPaginationControls(containerId, startIndex, endIndex, totalEntries, totalPages) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (totalEntries === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const showingStart = totalEntries > 0 ? startIndex + 1 : 0;
+  const showingEnd = endIndex;
+
+  // Seitenzahlen erzeugen (max 5 sichtbare Buttons)
+  let pageButtons = '';
+  const maxButtons = 5;
+  let startPage = Math.max(1, currentLogPage - Math.floor(maxButtons / 2));
+  let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+  if (endPage - startPage + 1 < maxButtons) {
+    startPage = Math.max(1, endPage - maxButtons + 1);
+  }
+
+  for (let p = startPage; p <= endPage; p++) {
+    const isActive = p === currentLogPage;
+    pageButtons += `
+      <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" 
+              style="padding: 4px 10px; font-size: 0.85rem; height: 32px; min-width: 32px;" 
+              onclick="changeLogPage(${p})">${p}</button>
+    `;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; background:rgba(0,0,0,0.12); padding:10px 15px; border-radius:8px; border:1px solid var(--panel-border);">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="color:var(--text-secondary); font-size:0.85rem;">Anzahl:</span>
+        <select class="form-control" style="width:90px; height:32px; padding:2px 8px; font-size:0.85rem;" onchange="changeLogsPerPage(this.value)">
+          <option value="10" ${logsPerPage == 10 ? 'selected' : ''}>10</option>
+          <option value="20" ${logsPerPage == 20 ? 'selected' : ''}>20</option>
+          <option value="50" ${logsPerPage == 50 ? 'selected' : ''}>50</option>
+          <option value="100" ${logsPerPage == 100 ? 'selected' : ''}>100</option>
+          <option value="200" ${logsPerPage == 200 ? 'selected' : ''}>200</option>
+          <option value="all" ${logsPerPage === 'all' ? 'selected' : ''}>Alle</option>
+        </select>
+        <span style="color:var(--text-secondary); font-size:0.85rem; margin-left: 5px;">
+          Einträge ${showingStart}–${showingEnd} von ${totalEntries}
+        </span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:5px;">
+        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(1)" ${currentLogPage === 1 || totalPages <= 1 ? 'disabled' : ''} title="Erste Seite"><i class="fa-solid fa-angles-left"></i></button>
+        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(${currentLogPage - 1})" ${currentLogPage === 1 || totalPages <= 1 ? 'disabled' : ''} title="Vorherige Seite"><i class="fa-solid fa-angle-left"></i></button>
+        
+        ${pageButtons}
+
+        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(${currentLogPage + 1})" ${currentLogPage === totalPages || totalPages <= 1 ? 'disabled' : ''} title="Nächste Seite"><i class="fa-solid fa-angle-right"></i></button>
+        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(${totalPages})" ${currentLogPage === totalPages || totalPages <= 1 ? 'disabled' : ''} title="Letzte Seite"><i class="fa-solid fa-angles-right"></i></button>
+      </div>
+    </div>
+  `;
 }
 
 function renderAdminLogs(logs) {
@@ -1978,27 +2104,6 @@ function renderAdminLogs(logs) {
       </tr>
     `;
   }).join('');
-}
-
-function filterAdminLogs() {
-  const levelFilter = document.getElementById('log-filter-level').value;
-  const searchFilter = document.getElementById('log-search').value.toLowerCase().trim();
-
-  const filtered = allAdminLogs.filter(log => {
-    // Level match
-    const levelMatch = (levelFilter === 'all' || log.level === levelFilter);
-    
-    // Search match
-    const searchMatch = !searchFilter || 
-      log.action.toLowerCase().includes(searchFilter) ||
-      log.message.toLowerCase().includes(searchFilter) ||
-      (log.ip && log.ip.toLowerCase().includes(searchFilter)) ||
-      (log.details && log.details.toLowerCase().includes(searchFilter));
-
-    return levelMatch && searchMatch;
-  });
-
-  renderAdminLogs(filtered);
 }
 
 function openLogDetails(id) {
