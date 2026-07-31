@@ -998,7 +998,9 @@
 
   <!-- PWA Offline Banner -->
   <div id="offline-banner" class="offline-banner">
-    <i class="fa-solid fa-cloud-sun"></i> <span data-i18n="offlineMode">Offline-Modus active</span>
+    <i class="fa-solid fa-cloud-sun"></i> 
+    <span data-i18n="offlineMode">Offline-Modus active</span>
+    <a href="/" id="offline-banner-login-link" style="display: none; color: #b45309; text-decoration: underline; margin-left: 6px; font-weight: 700;">(Anmelden zum Aktualisieren)</a>
   </div>
 
   <!-- Motion Permission Full-Screen Overlay (iOS only) -->
@@ -1771,8 +1773,12 @@
           renderCard(cardData, true);
 
           // Wenn wir online sind (aber z.B. die Session abgelaufen ist), führen wir eine Hintergrund-Prüfung auf LDAP-Status durch
-          if (navigator.onLine && cardData.username) {
-            fetch(`api/student/status-check?username=${encodeURIComponent(cardData.username)}`)
+          if (navigator.onLine) {
+            const loginLink = document.getElementById('offline-banner-login-link');
+            if (loginLink) loginLink.style.display = 'inline';
+
+            if (cardData.username) {
+              fetch(`api/student/status-check?username=${encodeURIComponent(cardData.username)}`)
               .then(checkRes => {
                 if (checkRes.ok) return checkRes.json();
               })
@@ -2081,6 +2087,8 @@
         statusLabel.style.color = 'var(--text-secondary)';
       } else {
         offlineBanner.style.display = 'none';
+        const loginLink = document.getElementById('offline-banner-login-link');
+        if (loginLink) loginLink.style.display = 'none';
         statusLabel.innerText = translations[currentLang].statusOnline;
         statusLabel.style.color = 'var(--success)';
       }
