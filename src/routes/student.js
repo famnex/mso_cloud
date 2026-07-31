@@ -262,4 +262,42 @@ router.get('/pwa-icon', (req, res) => {
   res.send(buffer);
 });
 
+/**
+ * Prüft anonym, ob ein Benutzername im System und im LDAP noch aktiv ist.
+ * Wird von PWAs ohne aktive Session verwendet, um zu prüfen, ob der Ausweis gesperrt werden muss.
+ */
+router.get('/status-check', async (req, res) => {
+  const username = req.query.username;
+  if (!username) {
+    return res.status(400).json({ error: 'Username ist erforderlich.' });
+  }
+
+  try {
+    // 1. Prüfen, ob der Benutzer in der lokalen DB existiert und aktiv ist
+    const dbUser = db.prepare('SELECT id, is_active FROM users WHERE username = ?').get(username);
+    if (!dbUser || dbUser.is_active === 0) {
+      return res.json({ active: false, reason: 'Konto deaktiviert oder gelöscht.' });
+    }
+
+    // 2. Prüfen, ob der Benutzer im LDAP aktiv ist
+    const ldapStatus = await ldap.isUserActiveInLdap(username);
+    if (ldapStatus.error) {
+      // Bei LDAP-Server-Verbindungsfehlern erlauben wir Fallback (active: true)
+      return res.json({ active: true, error: ldapStatus.error });
+    }
+
+    if (!ldapStatus.active) {
+      // Konto im LDAP deaktiviert/gelöscht -> lokal deaktivieren
+      db.prepare('UPDATE users SET is_active = 0 WHERE id = ?').run(dbUser.id);
+      db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(dbUser.id);
+      return res.json({ active: false, reason: 'Konto im LDAP deaktiviert oder gelöscht.' });
+    }
+
+    return res.json({ active: true });
+  } catch (err) {
+    console.error('[Express /status-check] Fehler:', err);
+    return res.json({ active: true, error: err.message });
+  }
+});
+
 module.exports = router;
