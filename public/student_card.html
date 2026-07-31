@@ -1021,11 +1021,14 @@
     <div class="blob blob-2" id="bg-blob-2"></div>
   </div>
 
-  <!-- Top Left Controls (Reload Button) -->
+  <!-- Top Left Controls (Reload Button & Offline Indicator) -->
   <div class="top-left-controls">
-    <button class="control-btn" id="reload-card-btn" onclick="triggerCardReload()" title="Ausweis aktualisieren">
+    <button class="control-btn" id="reload-card-btn" onclick="triggerCardReload()" title="Ausweis aktualisieren" style="display: flex;">
       <i class="fa-solid fa-rotate"></i>
     </button>
+    <div class="control-btn" id="offline-indicator" title="Offline-Modus aktiv" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #f59e0b; cursor: default;">
+      <i class="fa-solid fa-cloud-sun"></i>
+    </div>
   </div>
 
   <!-- Top Bar Controls -->
@@ -1036,11 +1039,6 @@
       <button class="lang-btn" onclick="switchLanguage('en')">EN</button>
       <button class="lang-btn" onclick="switchLanguage('fr')">FR</button>
     </div>
-  </div>
-
-  <!-- PWA Offline Banner -->
-  <div id="offline-banner" class="offline-banner">
-    <i class="fa-solid fa-cloud-sun"></i> <span data-i18n="offlineMode">Offline-Modus active</span>
   </div>
 
   <!-- Login Modal -->
@@ -1759,6 +1757,20 @@
     requestAnimationFrame(updateClock);
 
 
+    // Update top-left buttons visibility based on online/offline state
+    function updateControlsState(isOfflineMode) {
+      const reloadBtn = document.getElementById('reload-card-btn');
+      const offlineInd = document.getElementById('offline-indicator');
+      
+      if (isOfflineMode) {
+        if (reloadBtn) reloadBtn.style.display = 'none';
+        if (offlineInd) offlineInd.style.display = 'flex';
+      } else {
+        if (reloadBtn) reloadBtn.style.display = 'flex';
+        if (offlineInd) offlineInd.style.display = 'none';
+      }
+    }
+
     // Fetch Card Data
 
     async function loadCardData() {
@@ -1789,6 +1801,7 @@
               card_image: null
             };
             renderCard(blockedData, false);
+            updateControlsState(false); // Still online
             return;
           }
           throw new Error(errData.error || 'Nicht autorisiert.');
@@ -1813,6 +1826,7 @@
         localStorage.setItem('mso_cached_card', JSON.stringify(data));
         localStorage.setItem('mso_cached_card_time', Date.now().toString());
         renderCard(data, false);
+        updateControlsState(false); // Successfully loaded online
 
         // Send Logging Config to Service Worker
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -1839,32 +1853,37 @@
           }
           renderCard(cardData, true);
 
-          // Wenn wir online sind (aber z.B. die Session abgelaufen ist), führen wir eine Hintergrund-Prüfung auf LDAP-Status durch
-          if (navigator.onLine && cardData.username) {
-            fetch(`api/student/status-check?username=${encodeURIComponent(cardData.username)}`)
-              .then(checkRes => {
-                if (checkRes.ok) return checkRes.json();
-              })
-              .then(status => {
-                if (status && status.active === false) {
-                  console.log('[PWA Status Check] Benutzerkonto wurde deaktiviert/gelöscht. Sperre Ausweis.');
-                  localStorage.setItem('mso_card_offline_blocked', 'true');
-                  localStorage.removeItem('mso_cached_card');
-                  localStorage.removeItem('mso_cached_card_time');
-                  
-                  const blockedData = {
-                    card_status: 'Ausweis gesperrt',
-                    first_name: '',
-                    last_name: '',
-                    birth_date: null,
-                    birth_place: '',
-                    mediothek_number: '',
-                    card_image: null
-                  };
-                  renderCard(blockedData, false);
-                }
-              })
-              .catch(e => console.warn('Hintergrund-Statusprüfung fehlgeschlagen:', e));
+          if (navigator.onLine) {
+            updateControlsState(false); // Online but no session -> show reload button
+            
+            if (cardData.username) {
+              fetch(`api/student/status-check?username=${encodeURIComponent(cardData.username)}`)
+                .then(checkRes => {
+                  if (checkRes.ok) return checkRes.json();
+                })
+                .then(status => {
+                  if (status && status.active === false) {
+                    console.log('[PWA Status Check] Benutzerkonto wurde deaktiviert/gelöscht. Sperre Ausweis.');
+                    localStorage.setItem('mso_card_offline_blocked', 'true');
+                    localStorage.removeItem('mso_cached_card');
+                    localStorage.removeItem('mso_cached_card_time');
+                    
+                    const blockedData = {
+                      card_status: 'Ausweis gesperrt',
+                      first_name: '',
+                      last_name: '',
+                      birth_date: null,
+                      birth_place: '',
+                      mediothek_number: '',
+                      card_image: null
+                    };
+                    renderCard(blockedData, false);
+                  }
+                })
+                .catch(e => console.warn('Hintergrund-Statusprüfung fehlgeschlagen:', e));
+            }
+          } else {
+            updateControlsState(true); // Truly offline -> show orange offline indicator
           }
         } else {
           localStorage.removeItem('mso_cached_card');
@@ -1883,6 +1902,7 @@
             card_image: null
           };
           renderCard(blockedData, false);
+          updateControlsState(true); // Display offline state
         }
       }
     }
@@ -2140,16 +2160,13 @@
         qrBox.innerHTML = `<i class="fa-solid fa-ban" style="color:var(--danger); font-size:2rem;"></i>`;
       }
 
-      // 7. Status & Offline Banner
-      const offlineBanner = document.getElementById('offline-banner');
+      // 7. Status Label
       const statusLabel = document.getElementById('card-status-label');
       
       if (isOffline) {
-        offlineBanner.style.display = 'flex';
         statusLabel.innerText = translations[currentLang].statusOffline;
         statusLabel.style.color = 'var(--text-secondary)';
       } else {
-        offlineBanner.style.display = 'none';
         statusLabel.innerText = translations[currentLang].statusOnline;
         statusLabel.style.color = 'var(--success)';
       }
@@ -2546,6 +2563,7 @@
       if (!navigator.onLine) {
         alert('Keine Internetverbindung vorhanden. Aktualisierung nicht möglich.');
         if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
+        updateControlsState(true);
         return;
       }
 
@@ -2574,6 +2592,7 @@
               card_image: null
             };
             renderCard(blockedData, false);
+            updateControlsState(false);
             if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
             return;
           }
@@ -2604,6 +2623,7 @@
         localStorage.setItem('mso_cached_card', JSON.stringify(data));
         localStorage.setItem('mso_cached_card_time', Date.now().toString());
         renderCard(data, false);
+        updateControlsState(false);
         
         alert('Schülerausweis erfolgreich aktualisiert!');
 
