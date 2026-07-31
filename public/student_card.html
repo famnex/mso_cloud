@@ -1697,7 +1697,26 @@
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         const sourceParam = isStandalone ? 'pwa' : 'web';
         const res = await fetch(`api/student/card?source=${sourceParam}`);
-        if (!res.ok) throw new Error('Nicht autorisiert.');
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            // Expliziter Ausschluss: Benutzer gelöscht / gesperrt
+            localStorage.setItem('mso_card_offline_blocked', 'true');
+            localStorage.removeItem('mso_cached_card');
+            
+            const blockedData = {
+              card_status: 'Ausweis gesperrt',
+              first_name: '',
+              last_name: '',
+              birth_date: null,
+              birth_place: '',
+              mediothek_number: '',
+              card_image: null
+            };
+            renderCard(blockedData, false);
+            return;
+          }
+          throw new Error('Nicht autorisiert.');
+        }
         
         const data = await res.json();
         cardData = data;

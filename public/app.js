@@ -188,14 +188,23 @@ function renderAuthenticatedHeader() {
   if (headerAnon) headerAnon.style.display = 'none';
   if (headerAuth) headerAuth.style.display = 'flex';
 
+  const isAdmin = currentUser.role === 'admin';
+  const isTeacher = !isStudent && !isAdmin;
+
   // Fallback initial
   document.getElementById('header-full-name').innerText = currentUser.display_name || currentUser.username;
-  document.getElementById('header-user-avatar').src = 'media/user.png';
+  
+  const headerAvatar = document.getElementById('header-user-avatar');
+  if (headerAvatar) {
+    if (!isAdmin && !isTeacher && currentUser.card_image) {
+      headerAvatar.src = currentUser.card_image;
+    } else {
+      headerAvatar.src = 'media/user.png';
+    }
+  }
 
   // Render Admin Button right container if admin
   renderAdminButton();
-
-  const isAdmin = currentUser.role === 'admin';
 
   // Toggle student card visibility in dropdown
   const cardLink = document.getElementById('header-card-link');
@@ -3475,14 +3484,6 @@ function clearStudentViewDOM() {
     cardStatusLabel.style.color = 'var(--warn-color)';
   }
 
-  const headerName = document.getElementById('header-full-name');
-  if (headerName) {
-    headerName.innerText = '-';
-  }
-  const headerAvatar = document.getElementById('header-user-avatar');
-  if (headerAvatar) {
-    headerAvatar.src = 'media/user.png';
-  }
 }
 
 async function loadStudentProfile() {

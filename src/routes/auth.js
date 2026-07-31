@@ -60,13 +60,14 @@ router.get('/me', async (req, res) => {
         req.session.user.lastLdapCheck = now;
       }
     }
-    const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
+    const isStudentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
     const disableCheck = getConfig('disable_student_check', '0') === '1';
     const isStudent = disableCheck || !!isStudentRow || req.session.user.role === 'schueler';
     
     const userPayload = {
       ...req.session.user,
-      isStudent: isStudent
+      isStudent: isStudent,
+      card_image: isStudentRow ? isStudentRow.card_image : null
     };
     res.json({ logged_in: true, user: userPayload, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
   } else {
