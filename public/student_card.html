@@ -454,10 +454,12 @@
     /* Horizontaler Trennstrich zwischen Schulleiter/Hologramm (oben) und Gültigkeit/QR-Code (unten) */
     .card-footer-divider {
       width: 100%;
-      height: 1.5px;
-      background: rgba(15, 23, 42, 0.18);
-      margin: 6px 0;
-      z-index: 15;
+      height: 2px;
+      background: var(--accent, #3b82f6);
+      opacity: 0.65;
+      margin: 8px 0;
+      z-index: 25;
+      position: relative;
     }
 
     /* QR-Code & Validity Zone (Unterhalb der Trennlinie) */
@@ -2297,8 +2299,29 @@
     }
 
     // ── KOPERSCHUTZ, RECHTSKLICK & DEVTOOLS SPUR ──────────────────────────
-    // 1. Tastatur-Shortcuts für Entwicklertools (F12, Strg+Shift+I/J/C/K/E, Strg+U/S/P) abfangen & blockieren
+    // 1. Tastatur-Shortcuts für Entwicklertools & Screenshot-Tools (F12, Win+Shift+S, PrtScn, Strg+Shift+I/J/C/K/E, Strg+U/S/P) abfangen & blockieren
     window.addEventListener('keydown', (e) => {
+      // Windows Snipping Tool (Win + Shift + S) / macOS Screenshot (Cmd + Shift + 3 / 4 / 5)
+      if ((e.metaKey || e.key === 'Meta' || e.code === 'OSLeft' || e.code === 'OSRight') && e.shiftKey && (
+        e.key === 'S' || e.key === 's' || e.keyCode === 83 || e.code === 'KeyS' ||
+        e.key === '3' || e.key === '4' || e.key === '5'
+      )) {
+        applyScreenProtection();
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(removeScreenProtection, 3000);
+        return false;
+      }
+
+      // PrintScreen Taste (alle Kombinationen: PrtScn, Win+PrtScn, Alt+PrtScn, Shift+PrtScn)
+      if (e.key === 'PrintScreen' || e.keyCode === 44 || e.code === 'PrintScreen') {
+        applyScreenProtection();
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(removeScreenProtection, 3000);
+        return false;
+      }
+
       // F12 Taste
       if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault();
@@ -2361,9 +2384,11 @@
     });
 
     window.addEventListener('keyup', (e) => {
-      if (e.key === 'PrintScreen' || e.keyCode === 44) {
-        applyScreenProtection();
-        setTimeout(removeScreenProtection, 2500);
+      if (e.key === 'PrintScreen' || e.keyCode === 44 || e.key === 'Meta' || e.key === 'OS' || e.code === 'OSLeft' || e.code === 'OSRight') {
+        if (e.shiftKey || e.key === 'PrintScreen') {
+          applyScreenProtection();
+          setTimeout(removeScreenProtection, 2500);
+        }
       }
     });
 
