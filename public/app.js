@@ -1154,6 +1154,10 @@ async function loadAdminConfig() {
     if (cardPrincipalInput) {
       cardPrincipalInput.value = cfg.card_principal_name || 'OStD Karsten Backhaus';
     }
+    const cardPrincipalGenderInput = document.getElementById('card_principal_gender');
+    if (cardPrincipalGenderInput) {
+      cardPrincipalGenderInput.value = cfg.card_principal_gender || 'male';
+    }
     const cardColorInput = document.getElementById('card_primary_color');
     if (cardColorInput) {
       cardColorInput.value = cfg.card_primary_color || '#3b82f6';
@@ -1316,6 +1320,7 @@ function generateAdminGuillocheSvg(pattern, fineness, density) {
 function updateAdminCardLivePreview() {
   const schoolName = document.getElementById('card_school_name')?.value || 'Modellschule Obersberg';
   const principalName = document.getElementById('card_principal_name')?.value || 'OStD Karsten Backhaus';
+  const principalGender = document.getElementById('card_principal_gender')?.value || 'male';
   const primaryColor = document.getElementById('card_primary_color')?.value || '#3b82f6';
   const pattern = document.getElementById('card_guilloche_pattern')?.value || 'waves';
   const angle = parseInt(document.getElementById('card_guilloche_angle')?.value || '0', 10);
@@ -1327,6 +1332,11 @@ function updateAdminCardLivePreview() {
 
   const principalEl = document.getElementById('admin-preview-principal-display');
   if (principalEl) principalEl.innerText = principalName;
+
+  const titleEl = document.getElementById('admin-preview-principal-title');
+  if (titleEl) {
+    titleEl.innerText = principalGender === 'female' ? 'Schulleiterin' : 'Schulleiter';
+  }
 
   const badgeEl = document.getElementById('admin-preview-badge');
   if (badgeEl) {
@@ -1399,7 +1409,7 @@ function attachAdminCardLivePreviewListeners() {
   adminCardListenersAttached = true;
 
   const inputIds = [
-    'card_school_name', 'card_principal_name', 'card_primary_color', 'card_secondary_color',
+    'card_school_name', 'card_principal_name', 'card_principal_gender', 'card_primary_color', 'card_secondary_color',
     'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_guilloche_density'
   ];
   inputIds.forEach(id => {
@@ -3804,6 +3814,7 @@ async function saveCardConfig(e) {
   const body = {
     card_school_name: document.getElementById('card_school_name').value.trim(),
     card_principal_name: document.getElementById('card_principal_name').value.trim(),
+    card_principal_gender: document.getElementById('card_principal_gender') ? document.getElementById('card_principal_gender').value : 'male',
     card_primary_color: document.getElementById('card_primary_color').value,
     card_secondary_color: document.getElementById('card_secondary_color').value,
     card_guilloche_pattern: document.getElementById('card_guilloche_pattern') ? document.getElementById('card_guilloche_pattern').value : 'waves',

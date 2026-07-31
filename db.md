@@ -27,6 +27,7 @@ Speichert alle globalen Konfigurationswerte der Anwendung (LDAP, SMTP, Setup-Sta
 * `ldap_enabled`: `'0'` (standardmäßig deaktiviert)
 * `smtp_from`: `'no-reply@mso-hef.de'`
 * `impressum_url`: `'https://www.mso-hef.de/impressum'` (Standardwert, vom Admin konfigurierbar)
+* `card_principal_gender`: `'male'` (Schulleiter) oder `'female'` (Schulleiterin)
 
 ---
 

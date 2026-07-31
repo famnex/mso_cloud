@@ -174,6 +174,7 @@ router.get('/card', async (req, res) => {
       card_install_instructions: getConfig('card_install_instructions', ''),
       card_school_name: getConfig('card_school_name', 'Modellschule Obersberg'),
       card_principal_name: getConfig('card_principal_name', 'OStD Karsten Backhaus'),
+      card_principal_gender: getConfig('card_principal_gender', 'male'),
       card_logo: getConfig('card_logo', ''),
       card_signature: getConfig('card_signature', ''),
       card_pwa_logging: getConfig('card_pwa_logging', '0'),

@@ -1165,7 +1165,9 @@
         labelName: "Name, Vorname",
         labelBirth: "Geburtsdatum",
         labelBirthplace: "Geburtsort",
-        labelPrincipal: "Schulleiter/in",
+        labelPrincipal: "Schulleiter",
+        labelPrincipalMale: "Schulleiter",
+        labelPrincipalFemale: "Schulleiterin",
         labelValid: "Gültig",
         labelExpiry: "Gültig bis:",
         statusOnline: "Online verifiziert",
@@ -1196,6 +1198,8 @@
         labelBirth: "Date of Birth",
         labelBirthplace: "Place of Birth",
         labelPrincipal: "Principal",
+        labelPrincipalMale: "Principal",
+        labelPrincipalFemale: "Principal",
         labelValid: "Valid",
         labelExpiry: "Valid until:",
         statusOnline: "Online Verified",
@@ -1226,6 +1230,8 @@
         labelBirth: "Date de naissance",
         labelBirthplace: "Lieu de naissance",
         labelPrincipal: "Directeur",
+        labelPrincipalMale: "Directeur",
+        labelPrincipalFemale: "Directrice",
         labelValid: "Valide",
         labelExpiry: "Valable jusqu'au:",
         statusOnline: "Vérifié en ligne",
@@ -1646,7 +1652,7 @@
         // Prüfen, ob der Server den Ausweis gesperrt hat
         const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
         const now = new Date();
-        const expiry = new Date(data.expires_at);
+        const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59') : '2099-12-31T23:59:59');
         const isExpired = now > expiry;
 
         if (isRevoked || isExpired) {
@@ -1833,7 +1839,7 @@
 
       // Check Expiry
       const now = new Date();
-      const expiry = new Date(data.expires_at);
+      const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59') : '2099-12-31T23:59:59');
       const isExpired = now > expiry;
 
       const shouldBlockContent = isRevoked || isExpired || hasNoImage || isNotVerified;
@@ -2132,8 +2138,14 @@
 
         await sigLoaded;
 
-        // 2. Bezeichnungen auf Canvas zeichnen (originale Schriftgrößen, unverändertt)
-        const labelText = translations[currentLang].labelPrincipal || 'Schulleiter/in';
+        // 2. Bezeichnungen auf Canvas zeichnen
+        const gender = data.card_principal_gender || 'male';
+        let labelText = '';
+        if (gender === 'female') {
+          labelText = translations[currentLang].labelPrincipalFemale || translations[currentLang].labelPrincipal || 'Schulleiterin';
+        } else {
+          labelText = translations[currentLang].labelPrincipalMale || translations[currentLang].labelPrincipal || 'Schulleiter';
+        }
         sigCtx.fillStyle = '#475569';
         sigCtx.font = '700 9.5px "Outfit", sans-serif';
         sigCtx.textAlign = 'left';
