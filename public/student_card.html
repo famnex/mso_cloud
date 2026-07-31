@@ -145,6 +145,41 @@
       gap: 8px;
     }
 
+    .top-left-controls {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 50;
+      display: flex;
+      gap: 8px;
+    }
+
+    .control-btn {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--card-border);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.05);
+    }
+
+    .control-btn:active {
+      transform: scale(0.95);
+    }
+
     .lang-switcher {
       display: flex;
       background: rgba(255, 255, 255, 0.1);
@@ -986,6 +1021,13 @@
     <div class="blob blob-2" id="bg-blob-2"></div>
   </div>
 
+  <!-- Top Left Controls (Reload Button) -->
+  <div class="top-left-controls">
+    <button class="control-btn" id="reload-card-btn" onclick="triggerCardReload()" title="Ausweis aktualisieren">
+      <i class="fa-solid fa-rotate"></i>
+    </button>
+  </div>
+
   <!-- Top Bar Controls -->
   <div class="top-controls">
     <!-- Language Toggle -->
@@ -998,9 +1040,34 @@
 
   <!-- PWA Offline Banner -->
   <div id="offline-banner" class="offline-banner">
-    <i class="fa-solid fa-cloud-sun"></i> 
-    <span data-i18n="offlineMode">Offline-Modus active</span>
-    <a href="/" id="offline-banner-login-link" style="display: none; color: #b45309; text-decoration: underline; margin-left: 6px; font-weight: 700;">(Anmelden zum Aktualisieren)</a>
+    <i class="fa-solid fa-cloud-sun"></i> <span data-i18n="offlineMode">Offline-Modus active</span>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="pwa-prompt-overlay" style="display: none; justify-content: center; align-items: center; z-index: 2100;">
+    <div class="pwa-prompt-card" style="max-width: 340px; padding: 25px;">
+      <button class="pwa-close-btn" onclick="closeLoginModal()"><i class="fa-solid fa-xmark"></i></button>
+      <div class="pwa-icon-logo" style="margin-bottom: 15px;"><i class="fa-solid fa-user-lock"></i></div>
+      
+      <h3 style="color: var(--text); font-weight: 700; margin-bottom: 5px; font-size: 1.15rem; text-align: center;">Anmeldung erforderlich</h3>
+      <p style="color: var(--text-secondary); font-size: 0.82rem; margin-bottom: 20px; text-align: center; line-height: 1.4;">
+        Bitte melden Sie sich mit Ihren MSO-Zugangsdaten an, um Ihren Schülerausweis zu aktualisieren.
+      </p>
+
+      <div id="login-modal-alert" class="alert alert-danger" style="display: none; padding: 10px; font-size: 0.8rem; margin-bottom: 15px; border-radius: 8px; text-align: center; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5;"></div>
+
+      <form id="login-modal-form" onsubmit="handleModalLogin(event)" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+        <div style="display: flex; flex-direction: column; gap: 5px; text-align: left;">
+          <label style="color: var(--text-secondary); font-size: 0.75rem; font-weight: 600;">Benutzername</label>
+          <input type="text" id="modal-username" required style="background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; color: var(--text); font-size: 0.9rem; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--card-border)'">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px; text-align: left; position: relative;">
+          <label style="color: var(--text-secondary); font-size: 0.75rem; font-weight: 600;">Passwort</label>
+          <input type="password" id="modal-password" required style="background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; color: var(--text); font-size: 0.9rem; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--card-border)'">
+        </div>
+        <button type="submit" id="modal-login-btn" class="motion-tap-btn" style="width: 100%; padding: 12px; border-radius: 8px; margin-top: 10px; font-weight: 700;">Anmelden</button>
+      </form>
+    </div>
   </div>
 
   <!-- Motion Permission Full-Screen Overlay (iOS only) -->
@@ -1773,12 +1840,8 @@
           renderCard(cardData, true);
 
           // Wenn wir online sind (aber z.B. die Session abgelaufen ist), führen wir eine Hintergrund-Prüfung auf LDAP-Status durch
-          if (navigator.onLine) {
-            const loginLink = document.getElementById('offline-banner-login-link');
-            if (loginLink) loginLink.style.display = 'inline';
-
-            if (cardData.username) {
-              fetch(`api/student/status-check?username=${encodeURIComponent(cardData.username)}`)
+          if (navigator.onLine && cardData.username) {
+            fetch(`api/student/status-check?username=${encodeURIComponent(cardData.username)}`)
               .then(checkRes => {
                 if (checkRes.ok) return checkRes.json();
               })
@@ -1802,7 +1865,6 @@
                 }
               })
               .catch(e => console.warn('Hintergrund-Statusprüfung fehlgeschlagen:', e));
-            }
           }
         } else {
           localStorage.removeItem('mso_cached_card');
@@ -2088,8 +2150,6 @@
         statusLabel.style.color = 'var(--text-secondary)';
       } else {
         offlineBanner.style.display = 'none';
-        const loginLink = document.getElementById('offline-banner-login-link');
-        if (loginLink) loginLink.style.display = 'none';
         statusLabel.innerText = translations[currentLang].statusOnline;
         statusLabel.style.color = 'var(--success)';
       }
@@ -2475,6 +2535,149 @@
         }
       }
     });
+
+    // ── AUSWEIS MANUELL AKTUALISIEREN & MODAL LOGIN ───────────────────────
+    async function triggerCardReload() {
+      const reloadBtn = document.getElementById('reload-card-btn');
+      if (reloadBtn) {
+        reloadBtn.querySelector('i').classList.add('fa-spin');
+      }
+
+      if (!navigator.onLine) {
+        alert('Keine Internetverbindung vorhanden. Aktualisierung nicht möglich.');
+        if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
+        return;
+      }
+
+      try {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const sourceParam = isStandalone ? 'pwa' : 'web';
+        const res = await fetch(`api/student/card?source=${sourceParam}`);
+        
+        if (!res.ok) {
+          let errData = {};
+          try {
+            errData = await res.json();
+          } catch (e) {}
+
+          if (errData.account_deleted === true) {
+            localStorage.setItem('mso_card_offline_blocked', 'true');
+            localStorage.removeItem('mso_cached_card');
+            localStorage.removeItem('mso_cached_card_time');
+            const blockedData = {
+              card_status: 'Ausweis gesperrt',
+              first_name: '',
+              last_name: '',
+              birth_date: null,
+              birth_place: '',
+              mediothek_number: '',
+              card_image: null
+            };
+            renderCard(blockedData, false);
+            if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
+            return;
+          }
+
+          if (res.status === 401 || res.status === 403) {
+            openLoginModal();
+          } else {
+            alert('Aktualisierung fehlgeschlagen: ' + (errData.error || 'Serverfehler'));
+          }
+          if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
+          return;
+        }
+
+        const data = await res.json();
+        cardData = data;
+        
+        const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
+        const now = new Date();
+        const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59') : '2099-12-31T23:59:59');
+        const isExpired = now > expiry;
+
+        if (isRevoked || isExpired) {
+          localStorage.setItem('mso_card_offline_blocked', 'true');
+        } else {
+          localStorage.setItem('mso_card_offline_blocked', 'false');
+        }
+
+        localStorage.setItem('mso_cached_card', JSON.stringify(data));
+        localStorage.setItem('mso_cached_card_time', Date.now().toString());
+        renderCard(data, false);
+        
+        alert('Schülerausweis erfolgreich aktualisiert!');
+
+      } catch (err) {
+        console.error('Fehler bei manueller Aktualisierung:', err);
+        alert('Verbindung zum Server fehlgeschlagen. Bitte versuchen Sie es später erneut.');
+      } finally {
+        if (reloadBtn) {
+          reloadBtn.querySelector('i').classList.remove('fa-spin');
+        }
+      }
+    }
+
+    function openLoginModal() {
+      const modal = document.getElementById('login-modal');
+      const alertBox = document.getElementById('login-modal-alert');
+      if (alertBox) alertBox.style.display = 'none';
+      
+      const userForm = document.getElementById('login-modal-form');
+      if (userForm) userForm.reset();
+      
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeLoginModal() {
+      const modal = document.getElementById('login-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function handleModalLogin(event) {
+      event.preventDefault();
+      
+      const usernameInput = document.getElementById('modal-username');
+      const passwordInput = document.getElementById('modal-password');
+      const alertBox = document.getElementById('login-modal-alert');
+      const loginBtn = document.getElementById('modal-login-btn');
+      
+      const originalBtnHtml = loginBtn.innerHTML;
+      loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Anmeldung...';
+      loginBtn.disabled = true;
+      if (alertBox) alertBox.style.display = 'none';
+
+      try {
+        const res = await fetch('api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: usernameInput.value.trim(),
+            password: passwordInput.value
+          })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          closeLoginModal();
+          await triggerCardReload();
+        } else {
+          if (alertBox) {
+            alertBox.innerText = data.error || 'Ungültiger Benutzername oder Passwort.';
+            alertBox.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        console.error('Modal login failed:', err);
+        if (alertBox) {
+          alertBox.innerText = 'Verbindung fehlgeschlagen.';
+          alertBox.style.display = 'block';
+        }
+      } finally {
+        loginBtn.innerHTML = originalBtnHtml;
+        loginBtn.disabled = false;
+      }
+    }
 
     // Start
     switchLanguage(currentLang);
