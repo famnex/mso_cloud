@@ -91,9 +91,21 @@ function setTheme(theme) {
    2. Auth Status & Session Handling
    ========================================================================== */
 async function checkAuthStatus() {
+  console.log('[MSO Auth] Prüfe Authentifizierungsstatus...');
   try {
     const res = await fetch('api/auth/me');
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[MSO Auth Error] HTTP ${res.status} von /api/auth/me:`, errText);
+      renderAnonymousHeader();
+      return;
+    }
     const data = await res.json();
+    console.log('[MSO Auth Data] Empfangener Status:', data);
+
+    if (data.error) {
+      console.warn('[MSO Auth Warning] Server lieferte Hinweis/Fehler:', data.error);
+    }
 
     // 1. Plattformname & Logo auf die Oberfläche anwenden
     const platformName = data.platform_name || 'MSO Cloud';
@@ -148,15 +160,17 @@ async function checkAuthStatus() {
     }
 
     if (data.logged_in) {
+      console.log(`[MSO Auth] Angemeldet als: ${data.user ? data.user.username : 'unbekannt'}`);
       currentUser = data.user;
       renderAuthenticatedHeader();
     } else {
+      console.log('[MSO Auth] Nicht angemeldet (Gast-Modus aktiv).');
       currentUser = null;
       clearStudentViewDOM();
       renderAnonymousHeader();
     }
   } catch (err) {
-    console.error('Fehler bei der Authentifizierungsprüfung:', err);
+    console.error('[MSO Auth Exception] Netzwerkausnahme bei checkAuthStatus:', err);
     renderAnonymousHeader();
   }
 }
@@ -239,6 +253,7 @@ async function handleLogin(e) {
   const alertBox = document.getElementById('login-alert');
 
   alertBox.style.display = 'none';
+  console.log(`[MSO Login] Sende Login-Anfrage für Benutzer: "${user}"...`);
 
   try {
     const res = await fetch('api/auth/login', {
@@ -247,9 +262,19 @@ async function handleLogin(e) {
       body: JSON.stringify({ username: user, password: pass })
     });
 
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      const rawText = await res.text();
+      console.error(`[MSO Login Error] Server antwortete nicht mit JSON (Status ${res.status}):`, rawText);
+      throw new Error(`Server-Fehler (Status ${res.status}): ${rawText || 'Ungültige Antwort'}`);
+    }
+
+    console.log(`[MSO Login Response] Status ${res.status}:`, data);
 
     if (res.ok) {
+      console.log('[MSO Login] Anmeldevorgang erfolgreich!');
       closeModal('login-modal');
       // Login-Formular leeren
       document.getElementById('login-form').reset();
@@ -268,13 +293,15 @@ async function handleLogin(e) {
       await loadTiles();
       await loadActiveMessages();
     } else {
-      let errorMsg = data.error || 'Fehler beim Anmelden.';
+      let errorMsg = data.error || `Fehler beim Anmelden (HTTP ${res.status}).`;
+      console.warn(`[MSO Login Fehlschlag] ${errorMsg}`);
       if (res.status === 401) {
         errorMsg += '\nHinweis: m.mustermann = Lehrer, mustermann.max = Schüler';
       }
       throw new Error(errorMsg);
     }
   } catch (err) {
+    console.error('[MSO Login Exception]:', err);
     alertBox.innerText = err.message;
     alertBox.style.display = 'block';
   }
@@ -302,6 +329,7 @@ async function handleLogout() {
    3. Kacheln laden & rendern
    ========================================================================== */
 async function loadTiles() {
+  console.log('[MSO Tiles] Starte Abruf von api/tiles...');
   tilesContainer.innerHTML = `
     <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
       <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: var(--accent-color);"></i>
@@ -311,9 +339,23 @@ async function loadTiles() {
 
   try {
     const res = await fetch('api/tiles');
-    const tiles = await res.json();
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[MSO Tiles Error] HTTP ${res.status} beim Kachel-Abruf:`, errText);
+      tilesContainer.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--danger-color);">
+          <i class="fa-solid fa-triangle-exclamation fa-2xl" style="margin-bottom: 10px;"></i>
+          <p style="font-size: 1.1rem; font-weight: bold;">Fehler beim Laden der Dienste (HTTP ${res.status})</p>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">${errText}</p>
+        </div>
+      `;
+      return;
+    }
 
-    if (tiles.length === 0) {
+    const tiles = await res.json();
+    console.log(`[MSO Tiles] ${tiles.length} Dienste erfolgreich geladen.`);
+
+    if (!Array.isArray(tiles) || tiles.length === 0) {
       tilesContainer.innerHTML = `
         <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
           <i class="fa-solid fa-circle-question fa-2xl"></i>

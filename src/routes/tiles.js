@@ -32,6 +32,7 @@ function isTileTimeLocked(tile) {
 router.get('/', (req, res) => {
   try {
     const user = req.session.user;
+    console.log(`[MSO Server Tiles] Abruf /api/tiles für Benutzer: ${user ? user.username : 'Gästemodus (unangemeldet)'}`);
     
     // Alle Kacheln aus der Datenbank holen
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
