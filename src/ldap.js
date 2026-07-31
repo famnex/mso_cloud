@@ -519,11 +519,167 @@ async function changePassword(userDn, newPassword) {
   });
 }
 
+async function isUserActiveInLdap(username) {
+  console.log(`[LDAP-Live-Prüfung] Starte Prüfung für Benutzer: ${username}`);
+  
+  if (process.env.MOCK_LDAP === '1') {
+    console.log(`[LDAP-Live-Prüfung] Mock-Modus aktiv. Benutzer ${username} wird als AKTIV gewertet.`);
+    if (username === 'inactive_ldap_user') {
+      return { active: false, error: null };
+    }
+    return { active: true, error: null };
+  }
+
+  const enabled = getConfig('ldap_enabled') === '1';
+  if (!enabled) {
+    console.log(`[LDAP-Live-Prüfung] LDAP-Authentifizierung ist in Einstellungen deaktiviert. Überspringe.`);
+    return { active: true, error: null };
+  }
+
+  const bindDn = getConfig('ldap_bind_dn');
+  const bindPassword = getConfig('ldap_bind_password');
+  const baseDn = getConfig('ldap_base_dn');
+  const userAttr = getConfig('ldap_user_attribute', 'sAMAccountName');
+
+  if (!bindDn || !baseDn) {
+    console.warn(`[LDAP-Live-Prüfung] Warnung: ldap_bind_dn oder ldap_base_dn ist nicht konfiguriert. Überspringe.`);
+    return { active: true, error: 'LDAP-Zugangsdaten (Bind DN/Base DN) unvollständig konfiguriert.' };
+  }
+
+  const userFilter = `(&(objectClass=user)(${userAttr}=${username}))`;
+
+  return new Promise((resolve) => {
+    let client;
+    let completed = false;
+    let timeoutId;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      if (client) {
+        try {
+          client.destroy();
+        } catch (e) {
+          console.error('[LDAP-Live-Prüfung] Fehler beim Zerstören des Clients:', e.message);
+        }
+        client = null;
+      }
+    };
+
+    // Timeout nach 3 Sekunden
+    timeoutId = setTimeout(() => {
+      if (!completed) {
+        completed = true;
+        console.error(`[LDAP-Live-Prüfung] Timeout: Verbindung zu LDAP überschritt 3s bei Benutzer ${username}`);
+        cleanup();
+        resolve({ active: true, error: 'LDAP-Verbindungstimeout (3 Sekunden überschritten)' });
+      }
+    }, 3000);
+
+    try {
+      client = createLdapClient();
+
+      client.on('error', (err) => {
+        console.error(`[LDAP-Live-Prüfung] Client-Verbindungsfehler für ${username}:`, err.message);
+        if (!completed) {
+          completed = true;
+          cleanup();
+          resolve({ active: true, error: 'Verbindungsfehler: ' + err.message });
+        }
+      });
+
+      console.log(`[LDAP-Live-Prüfung] Führe Admin-Bind durch für: ${bindDn}`);
+      client.bind(bindDn, bindPassword, (err) => {
+        if (err) {
+          console.error(`[LDAP-Live-Prüfung] Admin-Bind fehlgeschlagen für ${username}:`, err.message);
+          if (!completed) {
+            completed = true;
+            cleanup();
+            resolve({ active: true, error: 'Admin-Bind fehlgeschlagen: ' + err.message });
+          }
+          return;
+        }
+
+        const opts = {
+          filter: userFilter,
+          scope: 'sub',
+          attributes: ['dn', 'userAccountControl', 'useraccountcontrol']
+        };
+
+        let userEntry = null;
+
+        console.log(`[LDAP-Live-Prüfung] Suche Benutzer mit Filter: ${userFilter}`);
+        client.search(baseDn, opts, (err, res) => {
+          if (err) {
+            console.error(`[LDAP-Live-Prüfung] Suche fehlgeschlagen für ${username}:`, err.message);
+            if (!completed) {
+              completed = true;
+              cleanup();
+              resolve({ active: true, error: 'Suche fehlgeschlagen: ' + err.message });
+            }
+            return;
+          }
+
+          res.on('searchEntry', (entry) => {
+            const obj = {};
+            for (const attr of entry.attributes || []) {
+              obj[attr.type] = attr.values.length === 1 ? attr.values[0] : attr.values;
+              obj[attr.type.toLowerCase()] = obj[attr.type];
+            }
+            userEntry = obj;
+          });
+
+          res.on('error', (err) => {
+            console.error(`[LDAP-Live-Prüfung] Fehler im Such-Stream für ${username}:`, err.message);
+            if (!completed) {
+              completed = true;
+              cleanup();
+              resolve({ active: true, error: 'Suchstrom-Fehler: ' + err.message });
+            }
+          });
+
+          res.on('end', () => {
+            if (!completed) {
+              completed = true;
+              cleanup();
+
+              if (!userEntry) {
+                console.log(`[LDAP-Live-Prüfung] Benutzer ${username} existiert nicht im LDAP.`);
+                return resolve({ active: false, error: null });
+              }
+
+              const uac = parseInt(userEntry.useraccountcontrol || userEntry.userAccountControl || '0', 10);
+              console.log(`[LDAP-Live-Prüfung] Benutzer ${username} gefunden. UAC = ${uac}`);
+              if ((uac & 2) !== 0) {
+                console.log(`[LDAP-Live-Prüfung] Benutzer ${username} ist deaktiviert.`);
+                return resolve({ active: false, error: null });
+              }
+
+              console.log(`[LDAP-Live-Prüfung] Benutzer ${username} ist aktiv.`);
+              resolve({ active: true, error: null });
+            }
+          });
+        });
+      });
+    } catch (err) {
+      console.error(`[LDAP-Live-Prüfung] Unerwarteter synchroner Fehler für ${username}:`, err.message);
+      if (!completed) {
+        completed = true;
+        cleanup();
+        resolve({ active: true, error: 'Unerwarteter Fehler: ' + err.message });
+      }
+    }
+  });
+}
+
 module.exports = {
   authenticate,
   testConnection,
   syncUserGroups,
   findUserByEmail,
   changePassword,
-  mapLdapGroupsToLocal
+  mapLdapGroupsToLocal,
+  isUserActiveInLdap
 };

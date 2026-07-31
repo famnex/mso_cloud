@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db, getConfig, logEvent } = require('../db');
 const studentDb = require('../student_db');
+const ldap = require('../ldap');
 
 /**
  * Holt die Ausweis-Daten des aktuell eingeloggten Schülers und protokolliert den Zugriff.
@@ -15,6 +16,42 @@ router.get('/card', async (req, res) => {
       logEvent('warn', 'student_card_unauthorized', 'Schülerausweis-Abruf fehlgeschlagen: Nicht angemeldet', null, clientIp);
     }
     return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  // 1. Prüfen, ob der Benutzer noch in der lokalen Datenbank existiert und aktiv ist
+  const dbUser = db.prepare('SELECT id, is_active FROM users WHERE id = ?').get(user.id);
+  if (!dbUser || dbUser.is_active === 0) {
+    console.log(`[Express /card] Lokales Konto für Benutzer ${user.username} ist inaktiv oder existiert nicht mehr.`);
+    req.session.destroy();
+    db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+    if (typeof logEvent === 'function') {
+      logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} existiert nicht mehr oder wurde deaktiviert`, { userId: user.id }, clientIp);
+    }
+    return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im System deaktiviert.', account_deleted: true });
+  }
+
+  // 2. LDAP-Live-Prüfung ausführen
+  let ldapStatus = { active: true, error: null };
+  try {
+    ldapStatus = await ldap.isUserActiveInLdap(user.username);
+  } catch (err) {
+    console.error(`[Express /card] Kritischer Fehler bei LDAP-Live-Prüfung für ${user.username}:`, err);
+    ldapStatus = { active: true, error: 'Routenfehler: ' + err.message };
+  }
+
+  if (ldapStatus.error) {
+    console.warn(`[Express /card] LDAP-Live-Prüfung fehlgeschlagen: ${ldapStatus.error}. Verwende Fallback.`);
+    if (typeof logEvent === 'function') {
+      logEvent('error', 'ldap_live_check_failed', `LDAP-Verbindung fehlgeschlagen bei Ausweis-Prüfung für Benutzer ${user.username}: ${ldapStatus.error}`, { userId: user.id }, clientIp);
+    }
+  } else if (!ldapStatus.active) {
+    console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
+    req.session.destroy();
+    db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+    if (typeof logEvent === 'function') {
+      logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
+    }
+    return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
   }
 
   try {
