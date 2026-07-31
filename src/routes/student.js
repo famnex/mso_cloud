@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { db, getConfig, logEvent } = require('../db');
 const studentDb = require('../student_db');
-const ldap = require('../ldap');
 
 /**
  * Holt die Ausweis-Daten des aktuell eingeloggten Schülers und protokolliert den Zugriff.
@@ -16,18 +15,6 @@ router.get('/card', async (req, res) => {
       logEvent('warn', 'student_card_unauthorized', 'Schülerausweis-Abruf fehlgeschlagen: Nicht angemeldet', null, clientIp);
     }
     return res.status(401).json({ error: 'Nicht angemeldet.' });
-  }
-
-  // 1. Prüfen, ob der Benutzer noch in der lokalen Datenbank existiert und im LDAP aktiv ist
-  const dbUser = db.prepare('SELECT id, is_active FROM users WHERE id = ?').get(user.id);
-  const ldapActive = await ldap.isUserActiveInLdap(user.username);
-  if (!dbUser || dbUser.is_active === 0 || !ldapActive) {
-    req.session.destroy();
-    db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
-    if (typeof logEvent === 'function') {
-      logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} existiert nicht mehr oder wurde im LDAP deaktiviert`, { userId: user.id }, clientIp);
-    }
-    return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
   }
 
   try {
@@ -107,9 +94,12 @@ router.get('/card', async (req, res) => {
     const isRevoked = rawStatus === 'Ausweis gesperrt' || rawStatus === 'gesperrt' || rawStatus === 'Ungültig';
     const expiryDate = new Date(expirationYear, 6, 31, 23, 59, 59);
     const isExpired = now > expiryDate;
-    
-    // Gültig NUR bei "Ausweis ausgegeben" oder "Ausweis gedruckt"
-    const isVerified = rawStatus === 'Ausweis gedruckt' || rawStatus === 'Ausweis ausgegeben';
+    const isVerified = rawStatus === 'Bild genehmigt' || 
+                       rawStatus === 'genehmigt' || 
+                       rawStatus === 'Bild verifiziert' ||
+                       rawStatus === 'Bild akzeptiert' ||
+                       rawStatus === 'Ausweis gedruckt' ||
+                       rawStatus === 'Ausweis ausgegeben';
     const hasNoImage = !profile.card_image;
 
     let statusSummary = 'Gültig';
@@ -121,14 +111,11 @@ router.get('/card', async (req, res) => {
     } else if (isExpired) {
       statusSummary = `Abgelaufen (Gültig bis ${expiresAt})`;
       logLevel = 'warn';
-    } else if (rawStatus === 'Bild akzeptiert' || rawStatus === 'Bild genehmigt' || rawStatus === 'genehmigt' || rawStatus === 'Bild verifiziert') {
-      statusSummary = 'Bild muss noch von Klassenleitung bestätigt werden';
+    } else if (hasNoImage) {
+      statusSummary = 'Kein Foto vorhanden';
       logLevel = 'warn';
-    } else if (rawStatus === 'Bild abgelehnt') {
-      statusSummary = 'Bild entspricht nicht unseren Standards. Bitte neues Bild hochladen!';
-      logLevel = 'warn';
-    } else if (!isVerified || hasNoImage) {
-      statusSummary = 'Noch kein Ausweisbild hochgeladen oder Bild noch nicht geprüft.';
+    } else if (!isVerified) {
+      statusSummary = `Foto ungeprüft (${rawStatus})`;
       logLevel = 'warn';
     }
 
