@@ -69,6 +69,11 @@ async function authenticate(username, password) {
   const nameAttr = getConfig('ldap_name_attribute', 'displayName');
   const upnSuffix = getConfig('ldap_upn_suffix', '');
 
+  if (!bindDn || !baseDn) {
+    console.warn('LDAP ist aktiviert, aber Bind DN oder Base DN ist nicht konfiguriert.');
+    return null;
+  }
+
   // Loginname anpassen, falls UPN-Suffix konfiguriert ist
   let loginUser = username;
   if (upnSuffix && !username.includes('@')) {
@@ -78,23 +83,55 @@ async function authenticate(username, password) {
   // Suchfilter zusammensetzen (sucht sowohl nach sAMAccountName als auch nach dem UPN / E-Mail!)
   const userFilter = `(&(objectClass=user)(|(${userAttr}=${username})(userPrincipalName=${loginUser})))`;
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     let client;
+    let completed = false;
+
+    const cleanup = () => {
+      if (client) {
+        try { client.destroy(); } catch (e) {}
+        client = null;
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (!completed) {
+        completed = true;
+        console.error(`LDAP-Authentifizierung für ${username} wegen Timeout (4s) abgebrochen.`);
+        cleanup();
+        resolve(null);
+      }
+    }, 4000);
+
     try {
       client = createLdapClient();
     } catch (err) {
-      return reject(err);
+      console.error('LDAP Client-Erstellungsfehler:', err.message);
+      clearTimeout(timeoutId);
+      return resolve(null);
     }
 
     client.on('error', (err) => {
-      console.error('LDAP Client-Fehler:', err);
+      console.error('LDAP Client-Fehler:', err.message);
+      if (!completed) {
+        completed = true;
+        clearTimeout(timeoutId);
+        cleanup();
+        resolve(null);
+      }
     });
 
     // 1. Mit Service-Account (Reader) binden, um den User zu suchen
     client.bind(bindDn, bindPassword, (err) => {
       if (err) {
-        client.destroy();
-        return reject(new Error('LDAP-Admin-Bind fehlgeschlagen: ' + err.message));
+        console.error('LDAP-Admin-Bind fehlgeschlagen:', err.message);
+        if (!completed) {
+          completed = true;
+          clearTimeout(timeoutId);
+          cleanup();
+          resolve(null);
+        }
+        return;
       }
 
       const opts = {
@@ -108,12 +145,17 @@ async function authenticate(username, password) {
       // 2. Suche nach dem Benutzer
       client.search(baseDn, opts, (err, res) => {
         if (err) {
-          client.destroy();
-          return reject(new Error('LDAP-Suche fehlgeschlagen: ' + err.message));
+          console.error('LDAP-Suche fehlgeschlagen:', err.message);
+          if (!completed) {
+            completed = true;
+            clearTimeout(timeoutId);
+            cleanup();
+            resolve(null);
+          }
+          return;
         }
 
         res.on('searchEntry', (entry) => {
-          // Da ldapjs v3 kein entry.object mehr bereitstellt, extrahieren wir die Attribute manuell
           const obj = {};
           const attributes = entry.attributes || [];
           for (const attr of attributes) {
@@ -125,8 +167,6 @@ async function authenticate(username, password) {
             } else if (values.length > 1) {
               val = values;
             }
-            
-            // Sowohl unter dem Original-Schlüssel als auch in Kleinschreibung ablegen (für Case-Insensitivity)
             obj[type] = val;
             obj[type.toLowerCase()] = val;
           }
@@ -135,54 +175,60 @@ async function authenticate(username, password) {
         });
 
         res.on('error', (err) => {
-          client.destroy();
-          return reject(new Error('LDAP-Suchstrom-Fehler: ' + err.message));
+          console.error('LDAP-Suchstrom-Fehler:', err.message);
+          if (!completed) {
+            completed = true;
+            clearTimeout(timeoutId);
+            cleanup();
+            resolve(null);
+          }
         });
 
-        res.on('end', (result) => {
-          if (!userEntry) {
-            client.destroy();
-            return resolve(null); // Benutzer nicht gefunden im LDAP
-          }
-
-          // 3. User-Bind ausführen (das vom User eingegebene Passwort verifizieren)
-          const userDn = userEntry.dn;
-          
-          client.bind(userDn, password, (err) => {
-            if (err) {
-              client.destroy();
-              return resolve(null); // Passwort falsch oder Bind fehlgeschlagen
+        res.on('end', () => {
+          if (!completed) {
+            if (!userEntry) {
+              completed = true;
+              clearTimeout(timeoutId);
+              cleanup();
+              return resolve(null);
             }
 
-            // Bind war erfolgreich! LDAP-Benutzerdaten sammeln (unterstützt original- und kleingeschriebene Key-Varianten)
-            const email = userEntry[mailAttr] || userEntry[mailAttr.toLowerCase()] || '';
-            const displayName = userEntry[nameAttr] || userEntry[nameAttr.toLowerCase()] || userEntry.cn || userEntry.CN || username;
+            // 3. User-Bind ausführen (das vom User eingegebene Passwort verifizieren)
+            const userDn = userEntry.dn;
             
-            // Gruppen verarbeiten (LDAP gibt Gruppen als String oder Array zurück)
-            let memberOf = userEntry.memberOf || userEntry.memberof || [];
-            if (typeof memberOf === 'string') {
-              memberOf = [memberOf];
-            }
+            client.bind(userDn, password, (err) => {
+              completed = true;
+              clearTimeout(timeoutId);
+              cleanup();
 
-            const givenName = userEntry.givenName || userEntry.givenname || '';
-            const sn = userEntry.sn || userEntry.SN || '';
+              if (err) {
+                return resolve(null);
+              }
 
-            // Lokale Gruppen-Mappings abgleichen
-            const localRoles = mapLdapGroupsToLocal(memberOf);
+              const email = userEntry[mailAttr] || userEntry[mailAttr.toLowerCase()] || '';
+              const displayName = userEntry[nameAttr] || userEntry[nameAttr.toLowerCase()] || userEntry.cn || userEntry.CN || username;
+              let memberOf = userEntry.memberOf || userEntry.memberof || [];
+              if (typeof memberOf === 'string') {
+                memberOf = [memberOf];
+              }
 
-            client.destroy();
-            resolve({
-              username: username,
-              email: email,
-              name: displayName,
-              givenName: givenName,
-              sn: sn,
-              roles: localRoles,
-              rawGroups: memberOf,
-              isLdap: true,
-              dn: userDn
+              const givenName = userEntry.givenName || userEntry.givenname || '';
+              const sn = userEntry.sn || userEntry.SN || '';
+              const localRoles = mapLdapGroupsToLocal(memberOf);
+
+              resolve({
+                username: username,
+                email: email,
+                name: displayName,
+                givenName: givenName,
+                sn: sn,
+                roles: localRoles,
+                rawGroups: memberOf,
+                isLdap: true,
+                dn: userDn
+              });
             });
-          });
+          }
         });
       });
     });
