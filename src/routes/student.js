@@ -12,9 +12,6 @@ router.get('/card', async (req, res) => {
   const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
 
   if (!user) {
-    if (typeof logEvent === 'function') {
-      logEvent('warn', 'student_card_unauthorized', 'Schülerausweis-Abruf fehlgeschlagen: Nicht angemeldet', null, clientIp);
-    }
     return res.status(401).json({ error: 'Nicht angemeldet.' });
   }
 
