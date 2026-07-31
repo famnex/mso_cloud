@@ -27,20 +27,23 @@ class SqliteSessionStore extends session.Store {
   }
 
   get(sid, callback) {
+    const cb = typeof callback === 'function' ? callback : () => {};
     try {
       const row = db.prepare('SELECT sess FROM sessions WHERE sid = ? AND expire > ?').get(sid, Math.floor(Date.now() / 1000));
       if (!row) {
-        return callback(null, null);
+        return cb(null, null);
       }
-      return callback(null, JSON.parse(row.sess));
+      return cb(null, JSON.parse(row.sess));
     } catch (err) {
-      return callback(err);
+      console.error('[SessionStore Error] Fehler in get:', err);
+      return cb(err);
     }
   }
 
   set(sid, sess, callback) {
+    const cb = typeof callback === 'function' ? callback : () => {};
     try {
-      const maxAge = sess.cookie.maxAge || 1000 * 60 * 60 * 24 * 365;
+      const maxAge = (sess && sess.cookie && sess.cookie.maxAge) ? sess.cookie.maxAge : 1000 * 60 * 60 * 24 * 365;
       const expire = Math.floor((Date.now() + maxAge) / 1000);
       const sessStr = JSON.stringify(sess);
       db.prepare(`
@@ -48,18 +51,34 @@ class SqliteSessionStore extends session.Store {
         VALUES (?, ?, ?)
         ON CONFLICT(sid) DO UPDATE SET sess = ?, expire = ?
       `).run(sid, sessStr, expire, sessStr, expire);
-      return callback(null);
+      return cb(null);
     } catch (err) {
-      return callback(err);
+      console.error('[SessionStore Error] Fehler in set:', err);
+      return cb(err);
+    }
+  }
+
+  touch(sid, sess, callback) {
+    const cb = typeof callback === 'function' ? callback : () => {};
+    try {
+      const maxAge = (sess && sess.cookie && sess.cookie.maxAge) ? sess.cookie.maxAge : 1000 * 60 * 60 * 24 * 365;
+      const expire = Math.floor((Date.now() + maxAge) / 1000);
+      db.prepare('UPDATE sessions SET expire = ? WHERE sid = ?').run(expire, sid);
+      return cb(null);
+    } catch (err) {
+      console.error('[SessionStore Error] Fehler in touch:', err);
+      return cb(err);
     }
   }
 
   destroy(sid, callback) {
+    const cb = typeof callback === 'function' ? callback : () => {};
     try {
       db.prepare('DELETE FROM sessions WHERE sid = ?').run(sid);
-      return callback(null);
+      return cb(null);
     } catch (err) {
-      return callback(err);
+      console.error('[SessionStore Error] Fehler in destroy:', err);
+      return cb(err);
     }
   }
 }
