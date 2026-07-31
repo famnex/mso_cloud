@@ -26,9 +26,17 @@ router.get('/me', async (req, res) => {
       return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
     }
 
-    // 2. LDAP-Live-Prüfung nur ausführen, wenn in Einstellungen explizit aktiviert (Standard: 0 für maximale Geschwindigkeit)
+    // 2. LDAP-Live-Prüfung oder periodische tägliche Prüfung
     const liveCheckEnabled = getConfig('ldap_live_check_enabled', '0') === '1';
-    if (liveCheckEnabled) {
+    const ldapEnabled = getConfig('ldap_enabled', '0') === '1';
+    
+    // Prüfen, ob das letzte LDAP-Check-Intervall (24h) abgelaufen ist
+    const now = Date.now();
+    const lastCheck = req.session.user.lastLdapCheck || 0;
+    const checkInterval = 24 * 60 * 60 * 1000; // 24 Stunden in ms
+    const periodicCheckNeeded = ldapEnabled && (now - lastCheck > checkInterval);
+
+    if (liveCheckEnabled || periodicCheckNeeded) {
       let ldapStatus = { active: true, error: null };
       try {
         ldapStatus = await ldap.isUserActiveInLdap(req.session.user.username);
@@ -40,11 +48,16 @@ router.get('/me', async (req, res) => {
       if (ldapStatus.error) {
         console.warn(`[Express /me] LDAP-Prüfung fehlgeschlagen: ${ldapStatus.error}. Verwende Fallback (Konto bleibt aktiv).`);
         logEvent('error', 'ldap_live_check_failed', `LDAP-Verbindung fehlgeschlagen bei Live-Prüfung für Benutzer ${req.session.user.username}: ${ldapStatus.error}`, { userId: req.session.user.id });
+        // Bei Verbindungsfehlern nach 1 Stunde erneut versuchen statt 24 Stunden zu warten
+        req.session.user.lastLdapCheck = now - (23 * 60 * 60 * 1000); 
       } else if (!ldapStatus.active) {
         console.log(`[Express /me] Kicke Benutzer ${req.session.user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
         req.session.destroy();
         logEvent('warn', 'user_deactivated_ldap', `Sitzung beendet: Benutzer ${req.session.user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: req.session.user.id });
         return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
+      } else {
+        // Erfolgreich geprüft und aktiv -> Zeitstempel aktualisieren
+        req.session.user.lastLdapCheck = now;
       }
     }
     const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);

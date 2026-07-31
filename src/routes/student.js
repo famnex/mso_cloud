@@ -30,9 +30,17 @@ router.get('/card', async (req, res) => {
     return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im System deaktiviert.', account_deleted: true });
   }
 
-  // 2. LDAP-Live-Prüfung nur ausführen, wenn in Einstellungen explizit aktiviert
+  // 2. LDAP-Live-Prüfung oder periodische tägliche Prüfung
   const liveCheckEnabled = getConfig('ldap_live_check_enabled', '0') === '1';
-  if (liveCheckEnabled) {
+  const ldapEnabled = getConfig('ldap_enabled', '0') === '1';
+
+  // Prüfen, ob das letzte LDAP-Check-Intervall (24h) abgelaufen ist
+  const now = Date.now();
+  const lastCheck = user.lastLdapCheck || 0;
+  const checkInterval = 24 * 60 * 60 * 1000; // 24 Stunden in ms
+  const periodicCheckNeeded = ldapEnabled && (now - lastCheck > checkInterval);
+
+  if (liveCheckEnabled || periodicCheckNeeded) {
     let ldapStatus = { active: true, error: null };
     try {
       ldapStatus = await ldap.isUserActiveInLdap(user.username);
@@ -46,6 +54,8 @@ router.get('/card', async (req, res) => {
       if (typeof logEvent === 'function') {
         logEvent('error', 'ldap_live_check_failed', `LDAP-Verbindung fehlgeschlagen bei Ausweis-Prüfung für Benutzer ${user.username}: ${ldapStatus.error}`, { userId: user.id }, clientIp);
       }
+      // Bei Verbindungsfehlern nach 1 Stunde erneut versuchen statt 24 Stunden zu warten
+      req.session.user.lastLdapCheck = now - (23 * 60 * 60 * 1000); 
     } else if (!ldapStatus.active) {
       console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
       req.session.destroy();
@@ -54,6 +64,9 @@ router.get('/card', async (req, res) => {
         logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
       }
       return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
+    } else {
+      // Erfolgreich geprüft und aktiv -> Zeitstempel in Session aktualisieren
+      req.session.user.lastLdapCheck = now;
     }
   }
 
