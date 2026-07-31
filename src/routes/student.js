@@ -30,28 +30,31 @@ router.get('/card', async (req, res) => {
     return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im System deaktiviert.', account_deleted: true });
   }
 
-  // 2. LDAP-Live-Prüfung ausführen
-  let ldapStatus = { active: true, error: null };
-  try {
-    ldapStatus = await ldap.isUserActiveInLdap(user.username);
-  } catch (err) {
-    console.error(`[Express /card] Kritischer Fehler bei LDAP-Live-Prüfung für ${user.username}:`, err);
-    ldapStatus = { active: true, error: 'Routenfehler: ' + err.message };
-  }
+  // 2. LDAP-Live-Prüfung nur ausführen, wenn in Einstellungen explizit aktiviert
+  const liveCheckEnabled = getConfig('ldap_live_check_enabled', '0') === '1';
+  if (liveCheckEnabled) {
+    let ldapStatus = { active: true, error: null };
+    try {
+      ldapStatus = await ldap.isUserActiveInLdap(user.username);
+    } catch (err) {
+      console.error(`[Express /card] Kritischer Fehler bei LDAP-Live-Prüfung für ${user.username}:`, err);
+      ldapStatus = { active: true, error: 'Routenfehler: ' + err.message };
+    }
 
-  if (ldapStatus.error) {
-    console.warn(`[Express /card] LDAP-Live-Prüfung fehlgeschlagen: ${ldapStatus.error}. Verwende Fallback.`);
-    if (typeof logEvent === 'function') {
-      logEvent('error', 'ldap_live_check_failed', `LDAP-Verbindung fehlgeschlagen bei Ausweis-Prüfung für Benutzer ${user.username}: ${ldapStatus.error}`, { userId: user.id }, clientIp);
+    if (ldapStatus.error) {
+      console.warn(`[Express /card] LDAP-Live-Prüfung fehlgeschlagen: ${ldapStatus.error}. Verwende Fallback.`);
+      if (typeof logEvent === 'function') {
+        logEvent('error', 'ldap_live_check_failed', `LDAP-Verbindung fehlgeschlagen bei Ausweis-Prüfung für Benutzer ${user.username}: ${ldapStatus.error}`, { userId: user.id }, clientIp);
+      }
+    } else if (!ldapStatus.active) {
+      console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
+      req.session.destroy();
+      db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+      if (typeof logEvent === 'function') {
+        logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
+      }
+      return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
     }
-  } else if (!ldapStatus.active) {
-    console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
-    req.session.destroy();
-    db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
-    if (typeof logEvent === 'function') {
-      logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
-    }
-    return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
   }
 
   try {
