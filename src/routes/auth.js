@@ -10,7 +10,7 @@ const studentDb = require('../student_db');
 /**
  * Holt den aktuellen Benutzer aus der Session.
  */
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const impressumUrl = getConfig('impressum_url', 'https://www.mso-hef.de/impressum');
   const platformName = getConfig('platform_name', 'MSO Cloud');
@@ -18,6 +18,21 @@ router.get('/me', (req, res) => {
   const cardLogo = getConfig('card_logo', '');
 
   if (req.session.user) {
+    const dbUser = db.prepare('SELECT id, is_active FROM users WHERE id = ?').get(req.session.user.id);
+    if (!dbUser || dbUser.is_active === 0) {
+      req.session.destroy();
+      return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
+    }
+
+    const ldapStatus = await ldap.isUserActiveInLdap(req.session.user.username);
+    if (ldapStatus.error) {
+      console.warn(`LDAP-Live-Prüfung fehlgeschlagen: ${ldapStatus.error}. Verwende Fallback (Konto bleibt aktiv).`);
+      logEvent('error', 'ldap_live_check_failed', `LDAP-Verbindung fehlgeschlagen bei Live-Prüfung für Benutzer ${req.session.user.username}: ${ldapStatus.error}`, { userId: req.session.user.id });
+    } else if (!ldapStatus.active) {
+      req.session.destroy();
+      logEvent('warn', 'user_deactivated_ldap', `Sitzung beendet: Benutzer ${req.session.user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: req.session.user.id });
+      return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
+    }
     const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
     const disableCheck = getConfig('disable_student_check', '0') === '1';
     const isStudent = disableCheck || !!isStudentRow || req.session.user.role === 'schueler';

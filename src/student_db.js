@@ -124,22 +124,23 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
       case 150: profile.account_status = val; break;
       case 158: {
         const lowerVal = val.toLowerCase();
-        // ID 1131 (akzeptiert), 1132 (gedruckt), 1133 (ausgegeben)
-        if (lowerVal.includes('akzeptiert') || lowerVal.includes('gedruckt') || lowerVal.includes('ausgegeben') || ['1131', '1132', '1133'].includes(lowerVal)) {
-          profile.card_status = 'Bild genehmigt';
+        // ID 1133 (Ausweis ausgegeben)
+        if (lowerVal.includes('ausgegeben') || lowerVal === '1133') {
+          profile.card_status = 'Ausweis ausgegeben';
         }
-        // ID 1134 (abgelehnt)
+        // ID 1132 (Ausweis gedruckt)
+        else if (lowerVal.includes('gedruckt') || lowerVal === '1132') {
+          profile.card_status = 'Ausweis gedruckt';
+        }
+        // ID 1131 (Bild akzeptiert / genehmigt)
+        else if (lowerVal.includes('akzeptiert') || lowerVal.includes('genehmigt') || lowerVal.includes('verifiziert') || lowerVal === '1131') {
+          profile.card_status = 'Bild akzeptiert';
+        }
+        // ID 1134 (Bild abgelehnt)
         else if (lowerVal.includes('abgelehnt') || lowerVal === '1134') {
           profile.card_status = 'Bild abgelehnt';
         }
-        // ID 1130 (ungeprüft / kein bild)
-        else if (lowerVal.includes('ungeprüft') || lowerVal.includes('kein bild') || lowerVal === '1130') {
-          if (photoFile) {
-            profile.card_status = 'Bild eingereicht';
-          } else {
-            profile.card_status = 'Bild ungeprüft / Kein Bild';
-          }
-        }
+        // ID 1130 (Bild ungeprüft / Kein Bild)
         else {
           profile.card_status = 'Bild ungeprüft / Kein Bild';
         }

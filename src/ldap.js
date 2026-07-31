@@ -519,11 +519,125 @@ async function changePassword(userDn, newPassword) {
   });
 }
 
+async function isUserActiveInLdap(username) {
+  if (process.env.MOCK_LDAP === '1') {
+    if (username === 'inactive_ldap_user') {
+      return { active: false, error: null };
+    }
+    return { active: true, error: null };
+  }
+
+  const enabled = getConfig('ldap_enabled') === '1';
+  if (!enabled) {
+    return { active: true, error: null };
+  }
+
+  const bindDn = getConfig('ldap_bind_dn');
+  const bindPassword = getConfig('ldap_bind_password');
+  const baseDn = getConfig('ldap_base_dn');
+  const userAttr = getConfig('ldap_user_attribute', 'sAMAccountName');
+
+  const userFilter = `(&(objectClass=user)(${userAttr}=${username}))`;
+
+  return new Promise((resolve) => {
+    let client;
+    try {
+      client = createLdapClient();
+    } catch (err) {
+      return resolve({ active: true, error: 'Client-Erstellung fehlgeschlagen: ' + err.message });
+    }
+
+    client.on('error', (err) => {
+      try { client.destroy(); } catch (e) {}
+      return resolve({ active: true, error: err.message });
+    });
+
+    let completed = false;
+    const timeoutId = setTimeout(() => {
+      if (!completed) {
+        completed = true;
+        try { client.destroy(); } catch (e) {}
+        resolve({ active: true, error: 'Verbindungstimeout (3 Sekunden überschritten)' });
+      }
+    }, 3000);
+
+    client.bind(bindDn, bindPassword, (err) => {
+      if (err) {
+        if (!completed) {
+          completed = true;
+          clearTimeout(timeoutId);
+          try { client.destroy(); } catch (e) {}
+          resolve({ active: true, error: 'Admin-Bind fehlgeschlagen: ' + err.message });
+        }
+        return;
+      }
+
+      const opts = {
+        filter: userFilter,
+        scope: 'sub',
+        attributes: ['dn', 'userAccountControl', 'useraccountcontrol']
+      };
+
+      let userEntry = null;
+
+      client.search(baseDn, opts, (err, res) => {
+        if (err) {
+          if (!completed) {
+            completed = true;
+            clearTimeout(timeoutId);
+            try { client.destroy(); } catch (e) {}
+            resolve({ active: true, error: 'Suche fehlgeschlagen: ' + err.message });
+          }
+          return;
+        }
+
+        res.on('searchEntry', (entry) => {
+          const obj = {};
+          for (const attr of entry.attributes || []) {
+            obj[attr.type] = attr.values.length === 1 ? attr.values[0] : attr.values;
+            obj[attr.type.toLowerCase()] = obj[attr.type];
+          }
+          userEntry = obj;
+        });
+
+        res.on('error', (err) => {
+          if (!completed) {
+            completed = true;
+            clearTimeout(timeoutId);
+            try { client.destroy(); } catch (e) {}
+            resolve({ active: true, error: 'Suchstrom-Fehler: ' + err.message });
+          }
+        });
+
+        res.on('end', () => {
+          if (!completed) {
+            completed = true;
+            clearTimeout(timeoutId);
+            try { client.destroy(); } catch (e) {}
+
+            if (!userEntry) {
+              return resolve({ active: false, error: null });
+            }
+
+            const uac = parseInt(userEntry.useraccountcontrol || userEntry.userAccountControl || '0', 10);
+            if ((uac & 2) !== 0) {
+              return resolve({ active: false, error: null });
+            }
+
+            resolve({ active: true, error: null });
+          }
+        });
+      });
+    });
+  });
+}
+
 module.exports = {
   authenticate,
   testConnection,
   syncUserGroups,
   findUserByEmail,
   changePassword,
-  mapLdapGroupsToLocal
+  mapLdapGroupsToLocal,
+  isUserActiveInLdap
 };

@@ -3531,9 +3531,9 @@ async function loadStudentProfile() {
     const cardStatusEl = document.getElementById('student-card-status');
     cardStatusEl.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
     
-    if (profile.card_status === 'Bild genehmigt') {
+    if (profile.card_status === 'Ausweis ausgegeben' || profile.card_status === 'Ausweis gedruckt') {
       cardStatusEl.style.color = 'var(--success-color)';
-    } else if (profile.card_status === 'Bild eingereicht') {
+    } else if (profile.card_status === 'Bild akzeptiert' || profile.card_status === 'Bild genehmigt') {
       cardStatusEl.style.color = 'var(--accent-color)';
     } else if (profile.card_status === 'Bild abgelehnt') {
       cardStatusEl.style.color = 'var(--danger-color)';
@@ -3571,9 +3571,9 @@ async function loadStudentProfile() {
     const cardStatusText = document.getElementById('card-status-text');
     if (cardStatusText) {
       cardStatusText.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
-      if (profile.card_status === 'Bild genehmigt') {
+      if (profile.card_status === 'Ausweis ausgegeben' || profile.card_status === 'Ausweis gedruckt') {
         cardStatusText.style.color = 'var(--success-color)';
-      } else if (profile.card_status === 'Bild eingereicht') {
+      } else if (profile.card_status === 'Bild akzeptiert' || profile.card_status === 'Bild genehmigt') {
         cardStatusText.style.color = 'var(--accent-color)';
       } else if (profile.card_status === 'Bild abgelehnt') {
         cardStatusText.style.color = 'var(--danger-color)';
@@ -3584,10 +3584,10 @@ async function loadStudentProfile() {
 
     const cardStatusLabel = document.getElementById('card-status-label');
     if (cardStatusLabel) {
-      if (profile.card_status === 'Bild genehmigt') {
+      if (profile.card_status === 'Ausweis ausgegeben' || profile.card_status === 'Ausweis gedruckt') {
         cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-check"></i> GÜLTIG';
         cardStatusLabel.style.color = 'var(--success-color)';
-      } else if (profile.card_status === 'Bild eingereicht') {
+      } else if (profile.card_status === 'Bild akzeptiert' || profile.card_status === 'Bild genehmigt') {
         cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> IN PRÜFUNG';
         cardStatusLabel.style.color = 'var(--accent-color)';
       } else if (profile.card_status === 'Bild abgelehnt') {
