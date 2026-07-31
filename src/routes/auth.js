@@ -10,7 +10,7 @@ const studentDb = require('../student_db');
 /**
  * Holt den aktuellen Benutzer aus der Session.
  */
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const impressumUrl = getConfig('impressum_url', 'https://www.mso-hef.de/impressum');
   const platformName = getConfig('platform_name', 'MSO Cloud');
@@ -18,6 +18,13 @@ router.get('/me', (req, res) => {
   const cardLogo = getConfig('card_logo', '');
 
   if (req.session.user) {
+    const dbUser = db.prepare('SELECT id, is_active FROM users WHERE id = ?').get(req.session.user.id);
+    const ldapActive = await ldap.isUserActiveInLdap(req.session.user.username);
+    if (!dbUser || dbUser.is_active === 0 || !ldapActive) {
+      req.session.destroy();
+      return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
+    }
+
     const isStudentRow = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(req.session.user.id);
     const disableCheck = getConfig('disable_student_check', '0') === '1';
     const isStudent = disableCheck || !!isStudentRow || req.session.user.role === 'schueler';

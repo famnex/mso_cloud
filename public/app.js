@@ -3528,23 +3528,26 @@ async function loadStudentProfile() {
       }
     }
 
+    const isCardValid = profile.card_status === 'Ausweis gedruckt' || profile.card_status === 'Ausweis ausgegeben';
+    const isCardPendingTeacher = profile.card_status === 'Bild akzeptiert' || profile.card_status === 'Bild genehmigt' || profile.card_status === 'genehmigt' || profile.card_status === 'Bild verifiziert';
+    const isCardRejected = profile.card_status === 'Bild abgelehnt';
+
     const cardStatusEl = document.getElementById('student-card-status');
-    cardStatusEl.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
-    
-    if (profile.card_status === 'Bild genehmigt') {
-      cardStatusEl.style.color = 'var(--success-color)';
-    } else if (profile.card_status === 'Bild eingereicht') {
-      cardStatusEl.style.color = 'var(--accent-color)';
-    } else if (profile.card_status === 'Bild abgelehnt') {
-      cardStatusEl.style.color = 'var(--danger-color)';
-    } else {
-      cardStatusEl.style.color = 'var(--warn-color)';
+    if (cardStatusEl) {
+      cardStatusEl.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
+      if (isCardValid) {
+        cardStatusEl.style.color = 'var(--success-color)';
+      } else if (isCardRejected) {
+        cardStatusEl.style.color = 'var(--danger-color)';
+      } else {
+        cardStatusEl.style.color = 'var(--warn-color)';
+      }
     }
 
     const previewImg = document.getElementById('student-photo-preview');
-    previewImg.src = profile.card_image || 'media/user.png';
-
-
+    if (previewImg) {
+      previewImg.src = profile.card_image || 'media/user.png';
+    }
 
     // 2. Header Avatar & Anzeigenamen befüllen (Nur wenn es ein echter Schüler ist, nicht bei Admin-Vorschau)
     if (!profile.is_preview) {
@@ -3570,31 +3573,31 @@ async function loadStudentProfile() {
 
     const cardStatusText = document.getElementById('card-status-text');
     if (cardStatusText) {
-      cardStatusText.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
-      if (profile.card_status === 'Bild genehmigt') {
+      if (isCardValid) {
+        cardStatusText.innerText = profile.card_status;
         cardStatusText.style.color = 'var(--success-color)';
-      } else if (profile.card_status === 'Bild eingereicht') {
-        cardStatusText.style.color = 'var(--accent-color)';
-      } else if (profile.card_status === 'Bild abgelehnt') {
+      } else if (isCardPendingTeacher) {
+        cardStatusText.innerText = 'Bild muss noch von Klassenleitung bestätigt werden';
+        cardStatusText.style.color = 'var(--warn-color)';
+      } else if (isCardRejected) {
+        cardStatusText.innerText = 'Bild entspricht nicht unseren Standards. Bitte neues Bild hochladen!';
         cardStatusText.style.color = 'var(--danger-color)';
       } else {
+        cardStatusText.innerText = 'Noch kein Ausweisbild hochgeladen oder Bild noch nicht geprüft.';
         cardStatusText.style.color = 'var(--warn-color)';
       }
     }
 
     const cardStatusLabel = document.getElementById('card-status-label');
     if (cardStatusLabel) {
-      if (profile.card_status === 'Bild genehmigt') {
+      if (isCardValid) {
         cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-check"></i> GÜLTIG';
         cardStatusLabel.style.color = 'var(--success-color)';
-      } else if (profile.card_status === 'Bild eingereicht') {
-        cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> IN PRÜFUNG';
-        cardStatusLabel.style.color = 'var(--accent-color)';
-      } else if (profile.card_status === 'Bild abgelehnt') {
+      } else if (isCardRejected) {
         cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ABGELEHNT';
         cardStatusLabel.style.color = 'var(--danger-color)';
       } else {
-        cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-question"></i> INAKTIV';
+        cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-question"></i> GESPERRT / INAKTIV';
         cardStatusLabel.style.color = 'var(--warn-color)';
       }
     }

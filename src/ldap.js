@@ -7,6 +7,10 @@ if (process.env.MOCK_LDAP === '1') {
     authenticate: async (u, p) => ({ username: u, email: `${u}@mso-hef.de`, roles: [], isLdap: true }),
     testConnection: async () => true,
     syncUserGroups: async () => [],
+    isUserActiveInLdap: async (username) => {
+      if (username === 'deleted_user' || username === 'disabled_user') return false;
+      return true;
+    },
     findUserByEmail: async (email) => {
       if (email.includes('error')) throw new Error('LDAP Connection Timeout');
       if (email === 'max@mso-hef.de' || email === 'ldap@mso-hef.de') {
@@ -519,11 +523,96 @@ async function changePassword(userDn, newPassword) {
   });
 }
 
+/**
+ * Prüft live im LDAP-Verzeichnis, ob der Benutzer noch existiert und aktiv ist.
+ * Erkennt auch das userAccountControl-Flag (ACCOUNTDISABLE = 2).
+ */
+async function isUserActiveInLdap(username) {
+  const enabled = getConfig('ldap_enabled') === '1';
+  if (!enabled || !username) return true; // Wenn LDAP in den Einstellungen nicht aktiv ist, lokale DB verwenden
+
+  const bindDn = getConfig('ldap_bind_dn');
+  const bindPassword = getConfig('ldap_bind_password');
+  const baseDn = getConfig('ldap_base_dn');
+  const userAttr = getConfig('ldap_user_attribute', 'sAMAccountName');
+
+  const filter = `(&(objectClass=user)(${userAttr}=${username}))`;
+
+  return new Promise((resolve) => {
+    let client;
+    try {
+      client = createLdapClient();
+    } catch (err) {
+      console.warn('LDAP-Live-Prüfung konnte Client nicht erstellen:', err.message);
+      return resolve(true);
+    }
+
+    client.on('error', (err) => {
+      console.warn('LDAP Client-Fehler bei Live-Aktivitätsprüfung:', err.message);
+    });
+
+    client.bind(bindDn, bindPassword, (err) => {
+      if (err) {
+        client.destroy();
+        console.warn('LDAP Admin-Bind bei Live-Aktivitätsprüfung fehlgeschlagen:', err.message);
+        return resolve(true);
+      }
+
+      const opts = {
+        filter: filter,
+        scope: 'sub',
+        attributes: ['dn', 'userAccountControl', userAttr]
+      };
+
+      let userEntry = null;
+
+      client.search(baseDn, opts, (err, res) => {
+        if (err) {
+          client.destroy();
+          return resolve(true);
+        }
+
+        res.on('searchEntry', (entry) => {
+          const obj = {};
+          for (const attr of entry.attributes || []) {
+            obj[attr.type] = attr.values.length === 1 ? attr.values[0] : attr.values;
+            obj[attr.type.toLowerCase()] = obj[attr.type];
+          }
+          userEntry = obj;
+        });
+
+        res.on('error', () => {
+          client.destroy();
+          resolve(true);
+        });
+
+        res.on('end', () => {
+          client.destroy();
+          if (!userEntry) {
+            console.log(`LDAP-Live-Prüfung: Benutzer ${username} existiert nicht mehr im LDAP!`);
+            return resolve(false);
+          }
+
+          // Active Directory: userAccountControl (Bit 2 / 0x02 = ACCOUNTDISABLE)
+          const uac = parseInt(userEntry.useraccountcontrol || userEntry.userAccountControl || '0', 10);
+          if ((uac & 2) !== 0) {
+            console.log(`LDAP-Live-Prüfung: Benutzer ${username} ist im LDAP deaktiviert (UAC: ${uac}).`);
+            return resolve(false);
+          }
+
+          resolve(true);
+        });
+      });
+    });
+  });
+}
+
 module.exports = {
   authenticate,
   testConnection,
   syncUserGroups,
   findUserByEmail,
   changePassword,
-  mapLdapGroupsToLocal
+  mapLdapGroupsToLocal,
+  isUserActiveInLdap
 };
