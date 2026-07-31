@@ -260,6 +260,17 @@ Speichert die optionalen, verschlüsselten Zugangsdaten der Benutzer für das sc
 
 ---
 
+### Tabelle: `sessions`
+Speichert die aktiven, verschlüsselten oder unverschlüsselten Sitzungsdaten (Express-Session-Daten) der Benutzer zur Persistierung über Server-Neustarts hinweg.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `sid` (PK) | TEXT | Eindeutige Express-Session-ID |
+| `sess` | TEXT | JSON-serialisierte Session-Daten (Rolle, Gruppen, etc.) |
+| `expire` | INTEGER | UNIX-Zeitstempel (Sekunden) nach dem die Sitzung verfällt |
+
+---
+
 ## 3. Datenbank-Update-Skripte für GitHub
 Bei zukünftigen Updates über GitHub vergleicht der Updater den Ordner `/migrations` und führt neue `.sql`-Dateien automatisch aus.
 Jede neue Migration muss als separate Datei (z.B. `002_add_new_fields.sql`) hinterlegt werden.
