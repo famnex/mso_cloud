@@ -1026,9 +1026,7 @@
     <button class="control-btn" id="reload-card-btn" onclick="triggerCardReload()" title="Ausweis aktualisieren" style="display: flex;">
       <i class="fa-solid fa-rotate"></i>
     </button>
-    <div class="control-btn" id="offline-indicator" title="Offline-Modus aktiv" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #f59e0b; cursor: default;">
-      <i class="fa-solid fa-cloud-sun"></i>
-    </div>
+    <div class="control-btn" id="offline-indicator" title="Offline-Modus aktiv" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #f59e0b; cursor: default; font-weight: 800;"></div>
   </div>
 
   <!-- Top Bar Controls -->
@@ -1278,6 +1276,7 @@
     const translations = {
       de: {
         offlineMode: "Offline-Modus aktiv (Lokaler Ausweis)",
+        offlineDays: "Offline-Modus aktiv - Noch {days} Tage verbleibend bis zur nächsten Online-Prüfung",
         studentBadge: "Schülerausweis",
         labelName: "Name, Vorname",
         labelBirth: "Geburtsdatum",
@@ -1311,6 +1310,7 @@
       },
       en: {
         offlineMode: "Offline Mode Active (Cached Card)",
+        offlineDays: "Offline Mode active - {days} days remaining until next online check",
         studentBadge: "Student ID Card",
         labelName: "Name, Surname",
         labelBirth: "Date of Birth",
@@ -1344,6 +1344,7 @@
       },
       fr: {
         offlineMode: "Mode hors ligne actif (carte mise en cache)",
+        offlineDays: "Mode hors ligne actif - {days} jours restants avant la prochaine vérification en ligne",
         studentBadge: "Carte d'étudiant",
         labelName: "Nom, Prénom",
         labelBirth: "Date de naissance",
@@ -1764,7 +1765,26 @@
       
       if (isOfflineMode) {
         if (reloadBtn) reloadBtn.style.display = 'none';
-        if (offlineInd) offlineInd.style.display = 'flex';
+        if (offlineInd) {
+          // Tage berechnen bis der Cache abläuft (30 Tage Limit)
+          const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
+          const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : Date.now();
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          const timePassed = Date.now() - cachedTime;
+          const timeLeftMs = Math.max(0, thirtyDaysMs - timePassed);
+          const daysLeft = Math.ceil(timeLeftMs / (24 * 60 * 60 * 1000));
+          
+          offlineInd.textContent = daysLeft;
+          
+          // Tooltip mit Übersetzung setzen
+          const lang = typeof currentLang !== 'undefined' ? currentLang : 'de';
+          const msg = translations[lang] && translations[lang].offlineDays
+            ? translations[lang].offlineDays.replace('{days}', daysLeft)
+            : `Offline-Modus aktiv - Noch ${daysLeft} Tage verbleibend bis zur nächsten Online-Prüfung`;
+          offlineInd.title = msg;
+          
+          offlineInd.style.display = 'flex';
+        }
       } else {
         if (reloadBtn) reloadBtn.style.display = 'flex';
         if (offlineInd) offlineInd.style.display = 'none';
@@ -2698,6 +2718,15 @@
         loginBtn.disabled = false;
       }
     }
+
+    // Event Listeners for connection state changes (instant UI reaction)
+    window.addEventListener('online', () => {
+      updateControlsState(false);
+      loadCardData().catch(() => {});
+    });
+    window.addEventListener('offline', () => {
+      updateControlsState(true);
+    });
 
     // Start
     switchLanguage(currentLang);
