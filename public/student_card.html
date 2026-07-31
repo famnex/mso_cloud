@@ -340,16 +340,21 @@
       box-shadow: 0 0 10px var(--accent-glow);
     }
 
-    /* Card Body - Photo & Info */
+    /* Card Body - Photo & Info (FESTE HÖHE: 210px → Verhindert jede Verschiebung des unteren Ausweisbereichs) */
     .card-body {
       display: flex;
       gap: 10px;
       margin: 0;
       z-index: 10;
       position: relative;
+      height: 210px;
+      min-height: 210px;
+      max-height: 210px;
+      flex-shrink: 0;
+      overflow: hidden;
     }
 
-    /* Photo Container: Breiter gemacht auf 170px für vergrößertes Bild (125px) + herausragendes Siegel (45px) */
+    /* Photo Container */
     .photo-container-wrapper {
       width: 170px;
       height: 210px;
@@ -358,18 +363,39 @@
       user-select: none;
     }
 
-    /* Rechtsbündiger Details Wrapper */
+    /* Rechtsbündiger Details Wrapper (FESTE RASTER-POSITIONEN FÜR PERSONENDATEN) */
     .details-wrapper {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      justify-content: space-between;
+      height: 210px;
       flex-grow: 1;
       text-align: right; /* Alle Angaben rechtsbündig */
+      overflow: hidden;
     }
 
     .detail-item {
       display: flex;
       flex-direction: column;
+    }
+
+    .detail-item.name-item {
+      height: 85px;
+      max-height: 85px;
+      overflow: hidden;
+      justify-content: flex-start;
+    }
+
+    .detail-item.birth-item {
+      height: 50px;
+      flex-shrink: 0;
+      justify-content: flex-end;
+    }
+
+    .detail-item.place-item {
+      height: 50px;
+      flex-shrink: 0;
+      justify-content: flex-end;
     }
 
     .detail-label {
@@ -389,7 +415,10 @@
     .detail-value.name {
       font-size: 1.2rem;
       font-weight: 700;
-      line-height: 1.2;
+      line-height: 1.15;
+      max-height: 60px;
+      overflow: hidden;
+      word-break: break-word;
     }
 
     /* Schulleiter-Unterschrift, Name & Hologramm Badge (Oberhalb der Trennlinie) */
@@ -440,6 +469,19 @@
       gap: 6px;
       z-index: 10;
       margin-top: 0;
+    }
+
+    /* Sicherheitshinweis ganz unten auf dem Ausweis */
+    .card-security-notice {
+      margin-top: 6px;
+      border-top: 1px dashed rgba(15, 23, 42, 0.14);
+      padding-top: 6px;
+      font-size: 0.54rem;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.25;
+      z-index: 10;
+      position: relative;
     }
 
     /* Footer-Spalten getauscht, damit QR-Code rechts und Gültigkeit links ist */
@@ -1084,15 +1126,15 @@
 
         <!-- Details (Rechtsbündig) -->
         <div class="details-wrapper">
-          <div class="detail-item">
+          <div class="detail-item name-item">
             <span class="detail-label" data-i18n="labelName">Name, Vorname</span>
             <span class="detail-value name" id="card-name">-</span>
           </div>
-          <div class="detail-item">
+          <div class="detail-item birth-item">
             <span class="detail-label" data-i18n="labelBirth">Geburtsdatum</span>
             <span class="detail-value" id="card-birth">-</span>
           </div>
-          <div class="detail-item">
+          <div class="detail-item place-item">
             <span class="detail-label" data-i18n="labelBirthplace">Geburtsort</span>
             <span class="detail-value" id="card-birthplace">-</span>
           </div>
@@ -1144,6 +1186,12 @@
         </div>
       </div>
 
+      <!-- Sicherheitshinweis ganz unten auf dem Ausweis -->
+      <div class="card-security-notice" id="card-security-notice" data-i18n="securityNotice">
+        <i class="fa-solid fa-circle-info" style="margin-right: 3px; color: var(--accent);"></i>
+        Gültigkeitsprüfung: Beim Neigen des Smartphones bewegen sich Ausweis und Hologramm. Die Uhrzeit läuft im Millisekundentakt.
+      </div>
+
     </div>
   </div>
 
@@ -1180,6 +1228,7 @@
         noPhotoDesc: "Für Ihren Schülerausweis wurde noch kein Passbild hochgeladen. Bitte laden Sie ein Foto im MSO Cloud Profil hoch, um den Ausweis zu aktivieren.",
         photoPendingTitle: "Foto ungeprüft",
         photoPendingDesc: "Ihr hochgeladenes Passbild wird derzeit von der Verwaltung geprüft. Sobald das Foto verifiziert ist, wird Ihr Ausweis freigeschaltet.",
+        securityNotice: "Gültigkeitsprüfung: Beim Neigen des Smartphones bewegen sich Ausweis und Hologramm. Die Uhrzeit läuft im Millisekundentakt.",
         
         // PWA Translation strings
         pwaTitle: "Ausweis installieren",
@@ -1212,6 +1261,7 @@
         noPhotoDesc: "No portrait photo has been uploaded yet. Please upload a photo in your MSO Cloud profile to activate the ID card.",
         photoPendingTitle: "Photo Pending",
         photoPendingDesc: "Your uploaded photo is currently under review by the administration. Your card will be unlocked once approved.",
+        securityNotice: "Validity check: Tilting the smartphone moves the ID card and hologram. The clock runs in milliseconds.",
         
         // PWA Translation strings
         pwaTitle: "Install ID Card",
@@ -1244,6 +1294,7 @@
         noPhotoDesc: "Aucune photo d'identité n'a encore été téléchargée. Veuillez télécharger une photo dans votre profil pour l'activer.",
         photoPendingTitle: "Photo en cours d'examen",
         photoPendingDesc: "Votre photo téléchargée est en cours d'examen par l'administration. La carte sera activée une fois approuvée.",
+        securityNotice: "Vérification de validité : L'inclinaison du smartphone anime la carte et le hologramme. L'horloge tourne en millisecondes.",
         
         // PWA Translation strings
         pwaTitle: "Installer la carte",
@@ -1888,6 +1939,7 @@
         document.getElementById('card-mediothek-number-display').innerText = '—';
       } else {
         document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
+        adjustNameFontSize();
         document.getElementById('card-birthplace').innerText = data.birth_place || '-';
         document.getElementById('card-mediothek-number-display').innerText = data.mediothek_number || '-';
         
@@ -1907,6 +1959,19 @@
         if (data.expires_at) {
           const parts = data.expires_at.split('-');
           document.getElementById('card-expiry').innerText = `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+      }
+
+      // Automatische Skalierung der Namens-Schriftgröße bei langen Namen
+      function adjustNameFontSize() {
+        const nameEl = document.getElementById('card-name');
+        if (!nameEl) return;
+        nameEl.style.fontSize = '1.2rem';
+        nameEl.style.lineHeight = '1.15';
+        let fontSize = 1.2;
+        while (nameEl.scrollHeight > 60 && fontSize > 0.65) {
+          fontSize -= 0.04;
+          nameEl.style.fontSize = `${fontSize.toFixed(2)}rem`;
         }
       }
 

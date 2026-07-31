@@ -719,31 +719,27 @@
                   <div id="admin-preview-badge" style="background: rgba(59, 130, 246, 0.12); border: 1px solid #3b82f6; color: #3b82f6; font-size: 0.55rem; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 8px; white-space: nowrap;">Schülerausweis</div>
                 </div>
 
-                <!-- Body: Foto & Details -->
-                <div style="display: flex; gap: 10px; margin-top: 10px; z-index: 10; position: relative;">
+                <!-- Body: Foto & Details (Feste Höhe 130px → feste Positionen für Vorschau) -->
+                <div style="display: flex; gap: 10px; margin-top: 10px; height: 130px; min-height: 130px; max-height: 130px; overflow: hidden; z-index: 10; position: relative;">
                   <!-- Photo + Seal Box -->
                   <div style="width: 100px; height: 130px; flex-shrink: 0; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); background: #1e293b;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="100" height="130" viewBox="0 0 147 196" style="width: 100%; height: 100%;"><rect width="147" height="196" fill="#1e293b"/><path d="M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z" fill="#38bdf8"/><text x="73.5" y="170" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="sans-serif" font-weight="bold">VORSCHAU</text></svg>
                     <img id="admin-preview-seal-img" style="position: absolute; bottom: 4px; right: 4px; width: 30px; height: 30px; object-fit: contain; display: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">
                   </div>
 
-                  <!-- Details -->
-                  <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1; text-align: right;">
-                    <div>
-                      <div style="font-size: 0.6rem; color: #475569; text-transform: uppercase;">Vorname</div>
-                      <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">Max</div>
+                  <!-- Details (Orangene Box fixiert) -->
+                  <div style="display: flex; flex-direction: column; justify-content: space-between; flex-grow: 1; text-align: right; height: 130px; overflow: hidden;">
+                    <div style="height: 52px; max-height: 52px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start;">
+                      <div style="font-size: 0.58rem; color: #475569; text-transform: uppercase;">Name, Vorname</div>
+                      <div id="admin-preview-name-display" style="font-size: 0.85rem; font-weight: 700; color: #0f172a; line-height: 1.15;">Mustermann, Max</div>
                     </div>
-                    <div>
-                      <div style="font-size: 0.6rem; color: #475569; text-transform: uppercase;">Nachname</div>
-                      <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">Mustermann</div>
+                    <div style="height: 34px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: flex-end;">
+                      <div style="font-size: 0.58rem; color: #475569; text-transform: uppercase;">Geburtsdatum</div>
+                      <div style="font-size: 0.78rem; font-weight: 600; color: #0f172a;">15.05.2008</div>
                     </div>
-                    <div>
-                      <div style="font-size: 0.6rem; color: #475569; text-transform: uppercase;">Geburtsdatum</div>
-                      <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a;">15.05.2008</div>
-                    </div>
-                    <div>
-                      <div style="font-size: 0.6rem; color: #475569; text-transform: uppercase;">Mediothek-Nr.</div>
-                      <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a;">123456789</div>
+                    <div style="height: 34px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: flex-end;">
+                      <div style="font-size: 0.58rem; color: #475569; text-transform: uppercase;">Geburtsort</div>
+                      <div style="font-size: 0.78rem; font-weight: 600; color: #0f172a;">Bad Hersfeld</div>
                     </div>
                   </div>
                 </div>
@@ -782,6 +778,12 @@
                     <i class="fa-solid fa-qrcode" style="font-size: 1.4rem; color: #0f172a;"></i>
                   </div>
                 </div>
+
+                <!-- Sicherheitshinweis ganz unten in Vorschau -->
+                <div style="margin-top: 6px; border-top: 1px dashed rgba(15, 23, 42, 0.12); padding-top: 5px; font-size: 0.48rem; color: #64748b; text-align: center; line-height: 1.25; z-index: 10; position: relative;">
+                  <i class="fa-solid fa-circle-info" style="margin-right: 2px; color: #3b82f6;"></i> Gültigkeitsprüfung: Beim Neigen des Smartphones bewegen sich Ausweis und Hologramm. Die Uhrzeit läuft im Millisekundentakt.
+                </div>
+              </div>
               </div>
 
               <!-- Action Link -->
