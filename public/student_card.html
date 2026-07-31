@@ -1882,7 +1882,12 @@
       // 2. Sperr- & Statusprüfung vornehmen
       const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
       const hasNoImage = !data.card_image;
-      const isVerified = data.card_status === 'Ausweis gedruckt' || data.card_status === 'Ausweis ausgegeben';
+      const isVerified = data.card_status === 'Bild genehmigt' || 
+                         data.card_status === 'genehmigt' || 
+                         data.card_status === 'Bild verifiziert' ||
+                         data.card_status === 'Bild akzeptiert' ||
+                         data.card_status === 'Ausweis gedruckt' ||
+                         data.card_status === 'Ausweis ausgegeben';
       const isNotVerified = !isVerified;
 
       // Check Expiry
@@ -2032,18 +2037,8 @@
       } else if (isNotVerified) {
         overlayIcon.className = "fa-solid fa-user-clock revoked-icon";
         overlayIcon.style.color = "#f59e0b";
-        overlayTitle.innerText = "Ausweis inaktiv";
-        
-        if (data.card_status === 'Bild akzeptiert' || data.card_status === 'Bild genehmigt') {
-          overlayDesc.innerText = "Bild muss noch von Klassenleitung bestätigt werden";
-        } else if (data.card_status === 'Bild abgelehnt') {
-          overlayIcon.className = "fa-solid fa-circle-xmark revoked-icon";
-          overlayIcon.style.color = "var(--danger)";
-          overlayTitle.innerText = "Bild abgelehnt";
-          overlayDesc.innerText = "Bild entspricht nicht unseren Standards. Bitte neues Bild hochladen!";
-        } else {
-          overlayDesc.innerText = "Noch kein Ausweisbild hochgeladen oder Bild noch nicht geprüft.";
-        }
+        overlayTitle.innerText = translations[currentLang].photoPendingTitle;
+        overlayDesc.innerText = translations[currentLang].photoPendingDesc;
         overlay.style.display = 'flex';
       } else {
         overlay.style.display = 'none';
