@@ -354,11 +354,11 @@ async function updateStudentPhoto(userId, email, base64Image) {
         `, [imageToStore, applicationId, imageToStore]);
         debugLog.push("MySQL: INSERT INTO images erfolgreich.");
 
-        debugLog.push(`Führe MySQL aus: INSERT INTO fieldvalues (field = 158, application = ${applicationId}, value = '1131', subset = 0) ON DUPLICATE KEY UPDATE...`);
+        debugLog.push(`Führe MySQL aus: INSERT INTO fieldvalues (field = 158, application = ${applicationId}, value = '1130', subset = 0) ON DUPLICATE KEY UPDATE...`);
         const [result] = await pool.query(`
           INSERT INTO fieldvalues (field, application, value, subset)
-          VALUES (158, ?, '1131', 0)
-          ON DUPLICATE KEY UPDATE value = '1131'
+          VALUES (158, ?, '1130', 0)
+          ON DUPLICATE KEY UPDATE value = '1130'
         `, [applicationId]);
         debugLog.push(`MySQL: INSERT/UPDATE fieldvalues erfolgreich. Betroffene Zeilen: ${result.affectedRows}`);
         
@@ -375,10 +375,10 @@ async function updateStudentPhoto(userId, email, base64Image) {
   }
   
   try {
-    debugLog.push(`Führe SQLite aus: UPDATE student_profiles SET card_status = 'Bild eingereicht' WHERE user_id = ${userId}...`);
+    debugLog.push(`Führe SQLite aus: UPDATE student_profiles SET card_status = 'Bild ungeprüft / Kein Bild' WHERE user_id = ${userId}...`);
     db.prepare(`
       UPDATE student_profiles
-      SET card_image = ?, card_status = 'Bild eingereicht'
+      SET card_image = ?, card_status = 'Bild ungeprüft / Kein Bild'
       WHERE user_id = ?
     `).run(base64Image, userId);
     debugLog.push("SQLite: UPDATE student_profiles erfolgreich.");
