@@ -261,27 +261,30 @@ async function getStudentProfile(user) {
 
 function convertBlobToDataUrl(rawFile) {
   if (!rawFile) return null;
-  if (Buffer.isBuffer(rawFile)) {
-    // Check if the Buffer already contains a UTF-8 string (like "data:image...")
-    const startStr = rawFile.subarray(0, 10).toString('utf-8');
-    if (startStr.startsWith('data:image') || startStr.startsWith('data:video')) {
-      return rawFile.toString('utf-8');
-    }
-    
-    // Otherwise, treat it as raw binary bytes and convert to base64
-    let mime = 'image/png';
-    if (rawFile.length > 4) {
-      if (rawFile[0] === 0xFF && rawFile[1] === 0xD8) {
-        mime = 'image/jpeg';
-      } else if (rawFile[0] === 0x89 && rawFile[1] === 0x50 && rawFile[2] === 0x4E && rawFile[3] === 0x47) {
-        mime = 'image/png';
-      } else if (rawFile[0] === 0x42 && rawFile[1] === 0x4D) {
-        mime = 'image/bmp';
-      }
-    }
-    return `data:${mime};base64,${rawFile.toString('base64')}`;
+
+  // Wenn es ein Buffer ist: zuerst in String umwandeln
+  const str = Buffer.isBuffer(rawFile) ? rawFile.toString('utf-8') : rawFile;
+
+  // Falls bereits eine vollständige Data-URL vorhanden ist
+  if (str.startsWith('data:image') || str.startsWith('data:video')) {
+    return str;
   }
-  return rawFile; // If it's already a string
+
+  // Falls nur der reine Base64-String ohne Präfix gespeichert wurde
+  // (so wie wir es jetzt in MySQL speichern):
+  // Anhand der Base64-Bytes den Bildtyp erkennen
+  try {
+    const header = Buffer.from(str.substring(0, 8), 'base64');
+    let mime = 'image/jpeg'; // Standardannahme: JPEG
+    if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47) {
+      mime = 'image/png';
+    } else if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46) {
+      mime = 'image/gif';
+    }
+    return `data:${mime};base64,${str}`;
+  } catch (e) {
+    return `data:image/jpeg;base64,${str}`;
+  }
 }
 
 /**
@@ -338,23 +341,17 @@ async function updateStudentPhoto(userId, email, base64Image) {
       if (applicationId) {
         debugLog.push(`Application-ID in MySQL ermittelt: ${applicationId}`);
         
-        // Convert base64 data URL to raw binary Buffer
+        // Nur den reinen base64-Teil (ohne Mime-Präfix) extrahieren, so wie andere Apps es erwarten
         const matches = base64Image.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
-        let imageBuffer;
-        if (matches) {
-          imageBuffer = Buffer.from(matches[2], 'base64');
-          debugLog.push(`Base64-Bild geparst. Format: ${matches[1]}, Länge: ${imageBuffer.length} Bytes`);
-        } else {
-          imageBuffer = Buffer.from(base64Image, 'base64');
-          debugLog.push(`Base64-Bild direkt geparst (kein Mime-Prefix). Länge: ${imageBuffer.length} Bytes`);
-        }
+        const imageToStore = matches ? matches[2] : base64Image;
+        debugLog.push(`Base64-Bild für MySQL vorbereitet. Format: ${matches ? matches[1] : 'unbekannt'}, Zeichenlänge: ${imageToStore.length}`);
 
         debugLog.push("Führe MySQL aus: INSERT INTO images (file, application, field = 37) ON DUPLICATE KEY UPDATE...");
         await pool.query(`
           INSERT INTO images (file, application, field)
           VALUES (?, ?, 37)
           ON DUPLICATE KEY UPDATE file = ?
-        `, [imageBuffer, applicationId, imageBuffer]);
+        `, [imageToStore, applicationId, imageToStore]);
         debugLog.push("MySQL: INSERT INTO images erfolgreich.");
 
         debugLog.push(`Führe MySQL aus: INSERT INTO fieldvalues (field = 158, application = ${applicationId}, value = '1131', subset = 0) ON DUPLICATE KEY UPDATE...`);
