@@ -1583,6 +1583,37 @@ html, body {
     text-align: center;
     padding: 10px 15px;
   }
+  .glass-panel {
+    padding: 15px !important;
+  }
+  .student-table, .student-table tbody, .student-table tr, .student-table td {
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .student-table tr {
+    padding: 12px 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    display: block !important;
+  }
+  .student-table tr:last-child {
+    border-bottom: none !important;
+  }
+  .student-table td {
+    padding: 3px 0 !important;
+    border-bottom: none !important;
+    min-width: 0 !important;
+    text-align: left !important;
+  }
+  .student-table td:first-child {
+    color: var(--text-secondary) !important;
+    font-size: 0.8rem !important;
+    font-weight: normal !important;
+  }
+  .student-table td:last-child {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+  }
 }
 
 @media (max-width: 550px) {
