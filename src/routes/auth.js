@@ -253,10 +253,11 @@ router.post('/reset-request', async (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(ldapUser.dn, tokenHash, emailHash, expiresAt, createdAt, ip, userAgent);
 
-      // Reset-URL zusammenbauen
-      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
       const host = req.get('host');
-      const resetUrl = `${protocol}://${host}/index.html?action=reset&token=${token}`;
+      const isSubdir = host.includes('cloud.mso-hef.de') || req.originalUrl.startsWith('/novus');
+      const prefix = isSubdir ? '/novus' : '';
+      const protocol = host.includes('cloud.mso-hef.de') ? 'https' : (req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http');
+      const resetUrl = `${protocol}://${host}${prefix}/index.html?action=reset&token=${token}`;
 
       // Mail senden
       const htmlContent = `
