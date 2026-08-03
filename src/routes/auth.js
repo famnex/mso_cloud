@@ -564,10 +564,12 @@ router.post('/student-link', async (req, res) => {
     // Token in DB speichern (MySQL / SQLite)
     await studentDb.createStudentToken(email, token, req.ip);
 
-    // Anmeldelink generieren (auf Basis der anfragenden Hostadresse)
+    // Anmeldelink generieren (auf Basis der anfragenden Hostadresse unter Berücksichtigung von Unterverzeichnissen)
     const host = req.get('host');
-    const protocol = req.protocol;
-    const loginLink = `${protocol}://${host}/?student_token=${token}`;
+    const isSubdir = host.includes('cloud.mso-hef.de') || req.originalUrl.startsWith('/novus');
+    const prefix = isSubdir ? '/novus' : '';
+    const protocol = host.includes('cloud.mso-hef.de') ? 'https' : req.protocol;
+    const loginLink = `${protocol}://${host}${prefix}/?student_token=${token}`;
 
     const mailHtml = `
       <h2>Guten Tag,</h2>
