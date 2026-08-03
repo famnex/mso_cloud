@@ -305,15 +305,24 @@ async function handleLogin(e) {
       await loadActiveMessages();
     } else {
       let errorMsg = data.error || `Fehler beim Anmelden (HTTP ${res.status}).`;
+      let errorHtml = errorMsg;
       console.warn(`[MSO Login Fehlschlag] ${errorMsg}`);
       if (res.status === 401) {
-        errorMsg += '\nHinweis: m.mustermann = Lehrer, mustermann.max = Schüler';
+        errorHtml = `${errorMsg}<br><br>Die Benutzernamen an unserer Schule sind in der Regel so aufgebaut:<br>
+          <ul style="margin: 6px 0 0 18px; padding: 0; list-style: disc;">
+            <li>Lehrperson: <strong>m.mustermann</strong></li>
+            <li>Lernende: <strong>mustermann.max</strong></li>
+          </ul>`;
       }
-      throw new Error(errorMsg);
+      throw { message: errorMsg, html: errorHtml };
     }
   } catch (err) {
     console.error('[MSO Login Exception]:', err);
-    alertBox.innerText = err.message;
+    if (err.html) {
+      alertBox.innerHTML = err.html;
+    } else {
+      alertBox.innerText = err.message || String(err);
+    }
     alertBox.style.display = 'block';
   }
 }
