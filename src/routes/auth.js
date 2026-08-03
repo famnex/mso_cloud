@@ -766,6 +766,7 @@ router.post('/student-photo', async (req, res) => {
 
   try {
     await studentDb.updateStudentPhoto(user.id, user.email, image);
+    logEvent('info', 'student_photo_uploaded', `Benutzer ${user.username} hat sein Passbild aktualisiert (wartet auf Prüfung)`, null, req.ip);
     res.json({ success: true, message: 'Passbild erfolgreich hochgeladen und zur Prüfung eingereicht.' });
   } catch (error) {
     console.error('Fehler beim Speichern des Passbilds:', error);

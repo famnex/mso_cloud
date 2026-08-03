@@ -972,6 +972,9 @@ html, body {
     word-break: break-word !important;
     overflow-wrap: anywhere !important;
     min-width: 0 !important;
+    font-size: 0.85rem !important;
+    white-space: normal !important;
+    max-width: 100% !important;
   }
 
   .admin-table td:last-child {
@@ -986,6 +989,7 @@ html, body {
     overflow-wrap: anywhere !important;
     max-width: 100% !important;
     white-space: normal !important;
+    font-size: 0.85rem !important;
   }
 
   /* Dynamic CSS data label styling for stacked card rows */
