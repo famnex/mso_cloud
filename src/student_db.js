@@ -607,18 +607,28 @@ async function createStudentToken(email, token, ip) {
           }
 
           try {
-            const info = db.prepare(`
-              INSERT INTO users (username, email, role, groups, is_ldap)
-              VALUES (?, ?, 'user', '["Schueler"]', 0)
-            `).run(username, email.trim());
-            userId = info.lastInsertRowid;
+            // Prüfen, ob bereits ein lokaler Benutzer mit diesem Username existiert
+            let userByUsername = db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').get(username);
+
+            if (userByUsername) {
+              // Aktualisiere die E-Mail-Adresse des existierenden Benutzers
+              db.prepare('UPDATE users SET email = ? WHERE id = ?').run(email.trim(), userByUsername.id);
+              userId = userByUsername.id;
+            } else {
+              // Lege neuen Benutzer an
+              const info = db.prepare(`
+                INSERT INTO users (username, email, role, groups, is_ldap)
+                VALUES (?, ?, 'user', '["Schueler"]', 0)
+              `).run(username, email.trim());
+              userId = info.lastInsertRowid;
+            }
 
             db.prepare(`
               INSERT OR IGNORE INTO student_profiles (user_id, first_name, last_name, card_status)
               VALUES (?, ?, ?, 'Bild ungeprüft / Kein Bild')
             `).run(userId, firstName, lastName);
           } catch (sqliteInsertErr) {
-            console.error('SQLite-Fehler beim Anlegen des neuen Benutzers:', sqliteInsertErr);
+            console.error('SQLite-Fehler beim Anlegen oder Aktualisieren des Benutzers:', sqliteInsertErr);
             return { success: false, error: `Fehler beim lokalen Anlegen des Benutzers: ${sqliteInsertErr.message}` };
           }
         } else {
