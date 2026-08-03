@@ -1296,6 +1296,8 @@
         noPhotoDesc: "Für Ihren Schülerausweis wurde noch kein Passbild hochgeladen. Bitte laden Sie ein Foto im MSO Cloud Profil hoch, um den Ausweis zu aktivieren.",
         photoPendingTitle: "Foto ungeprüft",
         photoPendingDesc: "Ihr hochgeladenes Passbild wird derzeit von der Verwaltung geprüft. Sobald das Foto verifiziert ist, wird Ihr Ausweis freigeschaltet.",
+        photoRejectedTitle: "Foto abgelehnt",
+        photoRejectedDesc: "Ihr hochgeladenes Passbild wurde abgelehnt. Bitte laden Sie in Ihrem Profil in der MSO Cloud ein neues Passbild hoch.",
         securityNotice: "Gültigkeitsprüfung: Beim Neigen des Smartphones bewegen sich Ausweis und Hologramm. Die Uhrzeit läuft im Millisekundentakt.",
         
         // PWA Translation strings
@@ -1330,6 +1332,8 @@
         noPhotoDesc: "No portrait photo has been uploaded yet. Please upload a photo in your MSO Cloud profile to activate the ID card.",
         photoPendingTitle: "Photo Pending",
         photoPendingDesc: "Your uploaded photo is currently under review by the administration. Your card will be unlocked once approved.",
+        photoRejectedTitle: "Photo Rejected",
+        photoRejectedDesc: "Your uploaded portrait photo was rejected. Please upload a new photo in your MSO Cloud profile.",
         securityNotice: "Validity check: Tilting the smartphone moves the ID card and hologram. The clock runs in milliseconds.",
         
         // PWA Translation strings
@@ -1364,6 +1368,8 @@
         noPhotoDesc: "Aucune photo d'identité n'a encore été téléchargée. Veuillez télécharger une photo dans votre profil pour l'activer.",
         photoPendingTitle: "Photo en cours d'examen",
         photoPendingDesc: "Votre photo téléchargée est en cours d'examen par l'administration. La carte sera activée une fois approuvée.",
+        photoRejectedTitle: "Photo refusée",
+        photoRejectedDesc: "La photo d'identité téléchargée a été refusée. Veuillez télécharger une nouvelle photo dans votre profil MSO Cloud.",
         securityNotice: "Vérification de validité : L'inclinaison du smartphone anime la carte et le hologramme. L'horloge tourne en millisecondes.",
         
         // PWA Translation strings
@@ -2066,13 +2072,14 @@
       // 2. Sperr- & Statusprüfung vornehmen
       const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
       const hasNoImage = !data.card_image;
+      const isRejected = data.card_status === 'Bild abgelehnt' || data.card_status_code === '1134';
       const isVerified = data.card_status === 'Bild genehmigt' || 
                          data.card_status === 'genehmigt' || 
                          data.card_status === 'Bild verifiziert' ||
                          data.card_status === 'Bild akzeptiert' ||
                          data.card_status === 'Ausweis gedruckt' ||
                          data.card_status === 'Ausweis ausgegeben';
-      const isNotVerified = !isVerified;
+      const isNotVerified = !isVerified && !isRejected;
 
       // Check Expiry
       const now = new Date();
@@ -2214,6 +2221,12 @@
         overlayIcon.style.color = "var(--accent)";
         overlayTitle.innerText = translations[currentLang].noPhotoTitle;
         overlayDesc.innerText = translations[currentLang].noPhotoDesc;
+        overlay.style.display = 'flex';
+      } else if (isRejected) {
+        overlayIcon.className = "fa-solid fa-circle-xmark revoked-icon";
+        overlayIcon.style.color = "var(--danger)";
+        overlayTitle.innerText = translations[currentLang].photoRejectedTitle;
+        overlayDesc.innerText = translations[currentLang].photoRejectedDesc;
         overlay.style.display = 'flex';
       } else if (isNotVerified) {
         overlayIcon.className = "fa-solid fa-user-clock revoked-icon";
