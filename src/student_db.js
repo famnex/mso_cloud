@@ -519,7 +519,7 @@ async function getStudentByEmail(email) {
         SELECT fv.application AS application_id, app.status AS status
         FROM fieldvalues fv
         JOIN applications app ON fv.application = app.ID
-        WHERE fv.field = 18 AND fv.value = ?
+        WHERE fv.field = 18 AND LOWER(fv.value) = LOWER(?)
       `, [trimmedEmail]);
       
       if (rows.length > 0) {
@@ -563,7 +563,7 @@ async function createStudentToken(email, token, ip) {
   if (pool && trimmedEmail && trimmedEmail.includes('@')) {
     try {
       const [rows] = await pool.query(
-        'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
+        'SELECT application FROM fieldvalues WHERE field = 18 AND LOWER(value) = LOWER(?)',
         [trimmedEmail]
       );
       if (rows.length > 0) {
@@ -586,34 +586,48 @@ async function createStudentToken(email, token, ip) {
         // Lokalen SQLite-Nutzer prüfen/anlegen
         let localUser = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(email.trim());
         if (!localUser) {
-          const [fieldRows] = await pool.query(
-            'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
-            [applicationId]
-          );
-          const firstNameRow = fieldRows.find(r => Number(r.field) === 1);
-          const lastNameRow = fieldRows.find(r => Number(r.field) === 2);
-          const usernameRow = fieldRows.find(r => Number(r.field) === 146);
+          let firstName = '';
+          let lastName = '';
+          let username = email.trim().split('@')[0];
 
-          const firstName = firstNameRow ? firstNameRow.value.trim() : '';
-          const lastName = lastNameRow ? lastNameRow.value.trim() : '';
-          const username = usernameRow ? usernameRow.value.trim() : email.trim().split('@')[0];
+          try {
+            const [fieldRows] = await pool.query(
+              'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
+              [applicationId]
+            );
+            const firstNameRow = fieldRows.find(r => Number(r.field) === 1);
+            const lastNameRow = fieldRows.find(r => Number(r.field) === 2);
+            const usernameRow = fieldRows.find(r => Number(r.field) === 146);
 
-          const info = db.prepare(`
-            INSERT INTO users (username, email, role, groups, is_ldap)
-            VALUES (?, ?, 'user', '["Schueler"]', 0)
-          `).run(username, email.trim());
-          userId = info.lastInsertRowid;
+            firstName = firstNameRow ? firstNameRow.value.trim() : '';
+            lastName = lastNameRow ? lastNameRow.value.trim() : '';
+            username = usernameRow ? usernameRow.value.trim() : username;
+          } catch (mysqlFetchErr) {
+            console.warn('MySQL-Datenabfrage für Profile-Seeding fehlgeschlagen:', mysqlFetchErr.message);
+          }
 
-          db.prepare(`
-            INSERT OR IGNORE INTO student_profiles (user_id, first_name, last_name, card_status)
-            VALUES (?, ?, ?, 'Bild ungeprüft / Kein Bild')
-          `).run(userId, firstName, lastName);
+          try {
+            const info = db.prepare(`
+              INSERT INTO users (username, email, role, groups, is_ldap)
+              VALUES (?, ?, 'user', '["Schueler"]', 0)
+            `).run(username, email.trim());
+            userId = info.lastInsertRowid;
+
+            db.prepare(`
+              INSERT OR IGNORE INTO student_profiles (user_id, first_name, last_name, card_status)
+              VALUES (?, ?, ?, 'Bild ungeprüft / Kein Bild')
+            `).run(userId, firstName, lastName);
+          } catch (sqliteInsertErr) {
+            console.error('SQLite-Fehler beim Anlegen des neuen Benutzers:', sqliteInsertErr);
+            return { success: false, error: `Fehler beim lokalen Anlegen des Benutzers: ${sqliteInsertErr.message}` };
+          }
         } else {
           userId = localUser.id;
         }
       }
     } catch (err) {
       console.error('MySQL Error in createStudentToken:', err);
+      return { success: false, error: `MySQL-Synchronisationsfehler: ${err.message}` };
     }
   }
 
@@ -625,13 +639,18 @@ async function createStudentToken(email, token, ip) {
   }
 
   if (userId) {
-    db.prepare('DELETE FROM student_tokens WHERE user_id = ?').run(userId);
-    const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
-    db.prepare(`
-      INSERT INTO student_tokens (user_id, token, expires_at, used)
-      VALUES (?, ?, ?, 0)
-    `).run(userId, token, expiresAt);
-    return { success: true };
+    try {
+      db.prepare('DELETE FROM student_tokens WHERE user_id = ?').run(userId);
+      const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+      db.prepare(`
+        INSERT INTO student_tokens (user_id, token, expires_at, used)
+        VALUES (?, ?, ?, 0)
+      `).run(userId, token, expiresAt);
+      return { success: true };
+    } catch (sqliteTokenErr) {
+      console.error('SQLite-Fehler beim Speichern des Tokens:', sqliteTokenErr);
+      return { success: false, error: `Datenbankfehler beim Erstellen des Tokens: ${sqliteTokenErr.message}` };
+    }
   }
 
   return { success: false, error: 'Der Benutzer konnte im lokalen Cache nicht gefunden oder synchronisiert werden.' };
