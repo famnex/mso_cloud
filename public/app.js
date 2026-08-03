@@ -3777,6 +3777,21 @@ async function loadStudentProfile() {
       cardStatusEl.style.color = 'var(--warn-color)';
     }
 
+    // Foto-Upload-Buttons steuern: gedruckt/ausgegeben (1132, 1133) -> Buttons ausblenden.
+    // 1130 (kein Bild), 1131 (eingereicht / noch nicht genehmigt geprüft), 1134 (abgelehnt) -> Upload erlaubt.
+    const uploadAllowed = ['1130', '1131', '1134'].includes(profile.card_status_code) || 
+                          (profile.card_status !== 'Bild genehmigt' && profile.card_status !== 'Bild gedruckt' && profile.card_status !== 'Bild ausgegeben');
+    
+    const uploadBtnLobby = document.getElementById('student-photo-upload-btn');
+    const uploadBtnCard = document.getElementById('student-photo-upload-btn-card');
+    
+    if (uploadBtnLobby) {
+      uploadBtnLobby.style.display = uploadAllowed ? 'flex' : 'none';
+    }
+    if (uploadBtnCard) {
+      uploadBtnCard.style.display = uploadAllowed ? 'flex' : 'none';
+    }
+
     const previewImg = document.getElementById('student-photo-preview');
     previewImg.src = profile.card_image || 'media/user.png';
 

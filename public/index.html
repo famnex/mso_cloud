@@ -882,16 +882,16 @@
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">E-Mail-Adresse</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-email-display">-</td></tr>
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--accent-color); font-weight: 600;">MSO-Benutzername</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:700; color: var(--accent-color);" id="student-mso-username">-</td></tr>
               <tr>
-                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">MSO-Startpasswort</td>
-                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:600; font-family:monospace; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                  <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start; width: 100%;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                      <span id="student-mso-password-display-text" style="letter-spacing: 2px;">••••••••</span>
-                      <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('student-mso-password')" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text); display: none; height:24px; cursor:pointer;" id="student-mso-password-toggle">
+                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary); width: 40%; min-width: 140px;">MSO-Startpasswort</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:600; font-family:monospace; vertical-align: middle;">
+                  <div style="display:flex; flex-direction:column; gap:4px; align-items:stretch; width: 100%; box-sizing: border-box;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap: 10px; box-sizing: border-box;">
+                      <span id="student-mso-password-display-text" style="letter-spacing: 2px; word-break: break-all; white-space: normal;">••••••••</span>
+                      <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('student-mso-password')" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text); display: none; height:24px; cursor:pointer; flex-shrink: 0;" id="student-mso-password-toggle">
                         <i class="fa-solid fa-eye" id="student-mso-password-eye"></i>
                       </button>
                     </div>
-                    <a href="#" onclick="openChangePasswordModal(event)" style="font-size:0.75rem; color: var(--accent-color); text-decoration:none; margin-top:2px;" id="change-pwd-link-mso"><i class="fa-solid fa-key"></i> Passwort jetzt ändern</a>
+                    <a href="#" onclick="openChangePasswordModal(event)" style="font-size:0.75rem; color: var(--accent-color); text-decoration:none; margin-top:2px; display: inline-flex; align-items: center; gap: 4px;" id="change-pwd-link-mso"><i class="fa-solid fa-key"></i> Passwort jetzt ändern</a>
                   </div>
                 </td>
               </tr>
@@ -899,11 +899,13 @@
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Benutzername</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-sph-username-display">-</td></tr>
               <tr>
                 <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Startpasswort</td>
-                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-family:monospace; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                  <span id="student-sph-password-display-text" style="letter-spacing: 2px;">••••••••</span>
-                  <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('student-sph-password')" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text); display: none; height:24px; cursor:pointer;" id="student-sph-password-toggle">
-                    <i class="fa-solid fa-eye" id="student-sph-password-eye"></i>
-                  </button>
+                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-family:monospace; vertical-align: middle;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; box-sizing: border-box;">
+                    <span id="student-sph-password-display-text" style="letter-spacing: 2px; word-break: break-all; white-space: normal;">••••••••</span>
+                    <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('student-sph-password')" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text); display: none; height:24px; cursor:pointer; flex-shrink: 0;" id="student-sph-password-toggle">
+                      <i class="fa-solid fa-eye" id="student-sph-password-eye"></i>
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr><td style="padding: 10px 0; color: var(--text-secondary);">Benutzerkonto-Status</td><td style="padding: 10px 0; font-weight: 600;" id="student-account-status">-</td></tr>

@@ -93,6 +93,7 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
     start_password: '',
     account_status: 'false',
     card_status: 'Bild ungeprüft / Kein Bild',
+    card_status_code: '1130',
     card_image: photoFile || null,
     dsgvo_consent: 'Nein',
     publish_consent: 'Nein',
@@ -124,15 +125,17 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
       case 150: profile.account_status = val; break;
       case 158: {
         const lowerVal = val.toLowerCase();
-        // ID 1131 (akzeptiert), 1132 (gedruckt), 1133 (ausgegeben)
-        if (lowerVal.includes('akzeptiert') || lowerVal.includes('gedruckt') || lowerVal.includes('ausgegeben') || ['1131', '1132', '1133'].includes(lowerVal)) {
+        profile.card_status_code = lowerVal;
+        
+        if (lowerVal.includes('gedruckt') || lowerVal.includes('ausgegeben') || ['1132', '1133'].includes(lowerVal)) {
           profile.card_status = 'Bild genehmigt';
         }
-        // ID 1134 (abgelehnt)
         else if (lowerVal.includes('abgelehnt') || lowerVal === '1134') {
           profile.card_status = 'Bild abgelehnt';
         }
-        // ID 1130 (ungeprüft / kein bild)
+        else if (lowerVal.includes('akzeptiert') || lowerVal === '1131') {
+          profile.card_status = 'Bild eingereicht';
+        }
         else if (lowerVal.includes('ungeprüft') || lowerVal.includes('kein bild') || lowerVal === '1130') {
           if (photoFile) {
             profile.card_status = 'Bild eingereicht';
@@ -164,7 +167,19 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
 }
 
 function getLocalProfile(userId) {
-  return db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(userId);
+  const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(userId);
+  if (profile) {
+    if (profile.card_status === 'Bild genehmigt') {
+      profile.card_status_code = '1132';
+    } else if (profile.card_status === 'Bild eingereicht') {
+      profile.card_status_code = '1131';
+    } else if (profile.card_status === 'Bild abgelehnt') {
+      profile.card_status_code = '1134';
+    } else {
+      profile.card_status_code = '1130';
+    }
+  }
+  return profile;
 }
 
 function getLocalAllStudents() {
