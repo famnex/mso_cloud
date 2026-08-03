@@ -325,40 +325,76 @@ async function getApplicationId(userId, email) {
  * Speichert ein Passbild ab.
  */
 async function updateStudentPhoto(userId, email, base64Image) {
+  const debugLog = [];
+  debugLog.push(`Start updateStudentPhoto für userId=${userId}, email=${email}`);
+  
+  let mysqlSuccess = false;
+  let sqliteSuccess = false;
+
   if (pool) {
+    debugLog.push("MySQL-Pool ist aktiv. Versuche, Application-ID zu ermitteln...");
     try {
       const applicationId = await getApplicationId(userId, email);
       if (applicationId) {
+        debugLog.push(`Application-ID in MySQL ermittelt: ${applicationId}`);
+        
         // Convert base64 data URL to raw binary Buffer
         const matches = base64Image.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
         let imageBuffer;
         if (matches) {
           imageBuffer = Buffer.from(matches[2], 'base64');
+          debugLog.push(`Base64-Bild geparst. Format: ${matches[1]}, Länge: ${imageBuffer.length} Bytes`);
         } else {
           imageBuffer = Buffer.from(base64Image, 'base64');
+          debugLog.push(`Base64-Bild direkt geparst (kein Mime-Prefix). Länge: ${imageBuffer.length} Bytes`);
         }
 
+        debugLog.push("Führe MySQL aus: REPLACE INTO images (file, application, field = 37)...");
         await pool.query(
           'REPLACE INTO images (file, application, field) VALUES (?, ?, 37)',
           [imageBuffer, applicationId]
         );
+        debugLog.push("MySQL: REPLACE INTO images erfolgreich ausgeführt.");
 
-        await pool.query(
+        debugLog.push(`Führe MySQL aus: UPDATE fieldvalues SET value = '1131' WHERE application = ${applicationId} AND field = 158...`);
+        const [result] = await pool.query(
           "UPDATE fieldvalues SET value = '1131' WHERE application = ? AND field = 158",
           [applicationId]
         );
+        debugLog.push(`MySQL: UPDATE fieldvalues erfolgreich. Betroffene Zeilen: ${result.affectedRows}`);
+        
+        mysqlSuccess = true;
+      } else {
+        debugLog.push("WARNUNG: Keine Application-ID für diesen Benutzer in MySQL gefunden. MySQL-Update übersprungen.");
       }
     } catch (err) {
+      debugLog.push(`FEHLER bei MySQL-Operationen: ${err.message}`);
       console.error('MySQL Error in updateStudentPhoto:', err);
     }
+  } else {
+    debugLog.push("MySQL ist nicht aktiv (pool ist null).");
   }
   
-  db.prepare(`
-    UPDATE student_profiles
-    SET card_image = ?, card_status = 'Bild eingereicht'
-    WHERE user_id = ?
-  `).run(base64Image, userId);
-  return { success: true };
+  try {
+    debugLog.push(`Führe SQLite aus: UPDATE student_profiles SET card_status = 'Bild eingereicht' WHERE user_id = ${userId}...`);
+    db.prepare(`
+      UPDATE student_profiles
+      SET card_image = ?, card_status = 'Bild eingereicht'
+      WHERE user_id = ?
+    `).run(base64Image, userId);
+    debugLog.push("SQLite: UPDATE student_profiles erfolgreich.");
+    sqliteSuccess = true;
+  } catch (err) {
+    debugLog.push(`FEHLER bei SQLite-Operation: ${err.message}`);
+    console.error('SQLite Error in updateStudentPhoto:', err);
+  }
+  
+  return {
+    success: mysqlSuccess || sqliteSuccess,
+    mysqlSuccess,
+    sqliteSuccess,
+    debugLog
+  };
 }
 
 /**

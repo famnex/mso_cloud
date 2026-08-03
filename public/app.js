@@ -3967,12 +3967,13 @@ async function uploadCroppedPhoto(croppedBase64, originalBtnHtml) {
       body: JSON.stringify({ image: croppedBase64 })
     });
     const data = await res.json();
+    console.log('[MSO Photo Upload Debug Log]:', data.debugLog || 'No debug log returned');
     
-    if (res.ok) {
+    if (res.ok && data.success) {
       alert("Erfolg: Ihr Passbild wurde erfolgreich hochgeladen und zur Prüfung eingereicht.");
       await loadStudentProfile();
     } else {
-      alert("Fehler beim Hochladen: " + (data.error || 'Serverfehler'));
+      alert("Fehler beim Hochladen: " + (data.error || data.message || 'Serverfehler'));
     }
   } catch (err) {
     console.error('Fehler beim Upload:', err);
