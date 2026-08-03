@@ -1,6 +1,8 @@
 // Globaler Anwendungsstatus
 let currentUser = null;
 let activeTheme = 'dark';
+let currentMsoPassword = '';
+let currentSphPassword = '';
 
 /**
  * Hilfsfunktion zum sauberen Rendern von Icons (Bootstrap Icons und FontAwesome).
@@ -646,6 +648,7 @@ async function handlePasswordResetExecute(e) {
       alertBox.classList.add('alert-success');
       alertBox.style.display = 'flex';
       document.getElementById('reset-password-form').reset();
+      validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number');
       
       setTimeout(() => {
         closeModal('reset-password-modal');
@@ -658,6 +661,146 @@ async function handlePasswordResetExecute(e) {
     alertBox.innerText = err.message;
     alertBox.classList.add('alert-danger');
     alertBox.style.display = 'flex';
+  }
+}
+
+// Passwort-Sichtbarkeit umschalten (Benutzerprofil & Zugänge)
+function togglePasswordVisibility(type) {
+  if (type === 'student-mso-password') {
+    const textEl = document.getElementById('student-mso-password-display-text');
+    const eyeEl = document.getElementById('student-mso-password-eye');
+    const isMasked = textEl.textContent === '••••••••';
+    
+    if (isMasked) {
+      textEl.textContent = currentMsoPassword;
+      textEl.style.letterSpacing = 'normal';
+      eyeEl.className = 'fa-solid fa-eye-slash';
+    } else {
+      textEl.textContent = '••••••••';
+      textEl.style.letterSpacing = '2px';
+      eyeEl.className = 'fa-solid fa-eye';
+    }
+  } else if (type === 'student-sph-password') {
+    const textEl = document.getElementById('student-sph-password-display-text');
+    const eyeEl = document.getElementById('student-sph-password-eye');
+    const isMasked = textEl.textContent === '••••••••';
+    
+    if (isMasked) {
+      textEl.textContent = currentSphPassword;
+      textEl.style.letterSpacing = 'normal';
+      eyeEl.className = 'fa-solid fa-eye-slash';
+    } else {
+      textEl.textContent = '••••••••';
+      textEl.style.letterSpacing = '2px';
+      eyeEl.className = 'fa-solid fa-eye';
+    }
+  }
+}
+
+// Echtzeit-Passwortprüfung (Richtlinien)
+function validatePasswordInput(inputId, submitBtnId, reqLengthId, reqLetterId, reqNumberId) {
+  const val = document.getElementById(inputId).value;
+  const submitBtn = document.getElementById(submitBtnId);
+  
+  const isLongEnough = val.length >= 8;
+  const hasLetter = /[a-zA-Z]/.test(val);
+  const hasNumber = /\d/.test(val);
+  
+  const reqs = [
+    { id: reqLengthId, text: 'Mindestens 8 Zeichen', valid: isLongEnough },
+    { id: reqLetterId, text: 'Mindestens 1 Buchstabe (a-z, A-Z)', valid: hasLetter },
+    { id: reqNumberId, text: 'Mindestens 1 Zahl (0-9)', valid: hasNumber }
+  ];
+
+  reqs.forEach(r => {
+    const el = document.getElementById(r.id);
+    if (el) {
+      if (r.valid) {
+        el.style.color = '#86efac';
+        el.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${r.text}`;
+      } else {
+        el.style.color = '#fca5a5';
+        el.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${r.text}`;
+      }
+    }
+  });
+
+  if (submitBtn) {
+    submitBtn.disabled = !(isLongEnough && hasLetter && hasNumber);
+  }
+}
+
+// Modal zum Ändern des Passworts öffnen (angemeldete User)
+function openChangePasswordModal(event) {
+  if (event) event.preventDefault();
+  
+  const form = document.getElementById('change-password-form');
+  if (form) form.reset();
+  
+  // Anforderungen zurücksetzen
+  validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number');
+  
+  const alertBox = document.getElementById('change-password-alert');
+  if (alertBox) {
+    alertBox.style.display = 'none';
+    alertBox.className = 'alert';
+  }
+  
+  openModal('change-password-modal');
+}
+
+// Passwortänderung für angemeldete User ausführen
+async function handleChangePassword(e) {
+  e.preventDefault();
+  const pass = document.getElementById('change-new-password').value;
+  const passConf = document.getElementById('change-new-password-confirm').value;
+  const alertBox = document.getElementById('change-password-alert');
+  const btn = document.getElementById('change-submit-btn');
+
+  alertBox.style.display = 'none';
+  alertBox.className = 'alert';
+
+  if (pass !== passConf) {
+    alertBox.innerText = 'Die Passwörter stimmen nicht überein.';
+    alertBox.classList.add('alert-danger');
+    alertBox.style.display = 'flex';
+    return;
+  }
+
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Speichern...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('api/auth/change-password-logged-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      alertBox.innerText = data.message || 'Passwort erfolgreich geändert.';
+      alertBox.classList.add('alert-success');
+      alertBox.style.display = 'flex';
+      document.getElementById('change-password-form').reset();
+      
+      // Cache aktualisieren und Profil neu laden
+      setTimeout(async () => {
+        closeModal('change-password-modal');
+        await loadStudentProfile();
+      }, 2000);
+    } else {
+      throw new Error(data.error || 'Fehler beim Ändern des Passworts.');
+    }
+  } catch (err) {
+    alertBox.innerText = err.message;
+    alertBox.classList.add('alert-danger');
+    alertBox.style.display = 'flex';
+  } finally {
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
   }
 }
 
@@ -3540,10 +3683,42 @@ async function loadStudentProfile() {
     document.getElementById('student-birth-place').innerText = profile.birth_place || '-';
     document.getElementById('student-email-display').innerText = currentUser.email || '-';
     document.getElementById('student-mso-username').innerText = currentUser.username || '-';
-    document.getElementById('student-mso-password').innerText = profile.start_password || '-';
+    const msoPwdText = document.getElementById('student-mso-password-display-text');
+    const msoPwdToggle = document.getElementById('student-mso-password-toggle');
+    
+    if (msoPwdText && msoPwdToggle) {
+      if (!profile.start_password || profile.start_password === 'geändert' || profile.start_password === '-') {
+        msoPwdText.innerHTML = '<span style="font-size:0.8rem; color:var(--text-secondary); font-family:sans-serif; font-weight:normal;">Bereits geändert</span>';
+        msoPwdText.style.letterSpacing = 'normal';
+        msoPwdToggle.style.display = 'none';
+        currentMsoPassword = '';
+      } else {
+        currentMsoPassword = profile.start_password;
+        msoPwdText.textContent = '••••••••';
+        msoPwdText.style.letterSpacing = '2px';
+        msoPwdToggle.style.display = 'inline-block';
+      }
+    }
+
     document.getElementById('student-mediothek-number').innerText = profile.mediothek_number || '-';
     document.getElementById('student-sph-username-display').innerText = profile.sph_username || '-';
-    document.getElementById('student-sph-password-display').innerText = profile.sph_password || '-';
+
+    const sphPwdText = document.getElementById('student-sph-password-display-text');
+    const sphPwdToggle = document.getElementById('student-sph-password-toggle');
+    
+    if (sphPwdText && sphPwdToggle) {
+      if (!profile.sph_password || profile.sph_password === '-') {
+        sphPwdText.innerHTML = '<span style="font-size:0.8rem; color:var(--text-secondary); font-family:sans-serif; font-weight:normal;">Kein Startpasswort</span>';
+        sphPwdText.style.letterSpacing = 'normal';
+        sphPwdToggle.style.display = 'none';
+        currentSphPassword = '';
+      } else {
+        currentSphPassword = profile.sph_password;
+        sphPwdText.textContent = '••••••••';
+        sphPwdText.style.letterSpacing = '2px';
+        sphPwdToggle.style.display = 'inline-block';
+      }
+    }
 
     const statusEl = document.getElementById('student-account-status');
     if (profile.is_preview) {

@@ -881,10 +881,31 @@
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Geburtsort</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-birth-place">-</td></tr>
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">E-Mail-Adresse</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-email-display">-</td></tr>
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--accent-color); font-weight: 600;">MSO-Benutzername</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:700; color: var(--accent-color);" id="student-mso-username">-</td></tr>
-              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">MSO-Startpasswort</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:600; font-family:monospace;" id="student-mso-password">-</td></tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">MSO-Startpasswort</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight:600; font-family:monospace; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start; width: 100%;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                      <span id="student-mso-password-display-text" style="letter-spacing: 2px;">••••••••</span>
+                      <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('student-mso-password')" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text); display: none; height:24px; cursor:pointer;" id="student-mso-password-toggle">
+                        <i class="fa-solid fa-eye" id="student-mso-password-eye"></i>
+                      </button>
+                    </div>
+                    <a href="#" onclick="openChangePasswordModal(event)" style="font-size:0.75rem; color: var(--accent-color); text-decoration:none; margin-top:2px;" id="change-pwd-link-mso"><i class="fa-solid fa-key"></i> Passwort jetzt ändern</a>
+                  </div>
+                </td>
+              </tr>
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Mediothek Lesenummer</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-mediothek-number">-</td></tr>
               <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Benutzername</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);" id="student-sph-username-display">-</td></tr>
-              <tr><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Startpasswort</td><td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-family:monospace;" id="student-sph-password-display">-</td></tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Startpasswort</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-family:monospace; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <span id="student-sph-password-display-text" style="letter-spacing: 2px;">••••••••</span>
+                  <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('student-sph-password')" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text); display: none; height:24px; cursor:pointer;" id="student-sph-password-toggle">
+                    <i class="fa-solid fa-eye" id="student-sph-password-eye"></i>
+                  </button>
+                </td>
+              </tr>
               <tr><td style="padding: 10px 0; color: var(--text-secondary);">Benutzerkonto-Status</td><td style="padding: 10px 0; font-weight: 600;" id="student-account-status">-</td></tr>
             </tbody>
           </table>
@@ -1155,23 +1176,78 @@
 
   <!-- MODAL: RESET PASSWORD (ACTUAL WORK) -->
   <div class="modal" id="reset-password-modal">
-    <div class="modal-content glass-panel">
+    <div class="modal-content glass-panel" style="max-width: 400px;">
       <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:15px; text-align:center;">Neues Passwort festlegen</h3>
       
-      <div id="reset-password-alert" class="alert" style="display:none;"></div>
+      <div id="reset-password-alert" class="alert" style="display:none; padding: 10px; border-radius: 8px; margin-bottom: 15px;"></div>
 
       <form id="reset-password-form" onsubmit="handlePasswordResetExecute(event)">
         <input type="hidden" id="reset-token-field">
         <div class="form-group">
           <label for="reset-new-password">Neues Passwort</label>
-          <input type="password" id="reset-new-password" class="form-control" placeholder="Minds. 8 Zeichen, Groß/Klein, Zahl, Sonderzeichen" required autocomplete="off">
+          <input type="password" id="reset-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number')">
         </div>
         <div class="form-group">
           <label for="reset-new-password-confirm">Neues Passwort bestätigen</label>
-          <input type="password" id="reset-new-password-confirm" class="form-control" placeholder="Minds. 8 Zeichen, Groß/Klein, Zahl, Sonderzeichen" required autocomplete="off">
+          <input type="password" id="reset-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off">
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:10px;">
+
+        <div class="password-requirements" style="margin-top: 10px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 5px; text-align: left; background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px;">
+          <div style="font-weight: 600; margin-bottom: 5px; color: var(--text-secondary);">Passwort-Anforderungen:</div>
+          <div id="reset-req-length" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Mindestens 8 Zeichen
+          </div>
+          <div id="reset-req-letter" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Mindestens 1 Buchstabe (a-z, A-Z)
+          </div>
+          <div id="reset-req-number" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Mindestens 1 Zahl (0-9)
+          </div>
+        </div>
+
+        <button type="submit" id="reset-submit-btn" class="btn btn-primary" style="width:100%; justify-content:center;" disabled>
           <i class="fa-solid fa-lock-open"></i> Passwort speichern
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHANGE PASSWORD (LOGGED IN) -->
+  <div class="modal" id="change-password-modal">
+    <div class="modal-content glass-panel" style="max-width: 400px;">
+      <span class="close-btn" onclick="closeModal('change-password-modal')"><i class="fa-solid fa-xmark"></i></span>
+      <h3 style="font-weight:700; font-size:1.4rem; margin-bottom:15px; text-align:center;">Passwort ändern</h3>
+      <p style="color:var(--text-secondary); font-size:0.85rem; line-height:1.5; margin-bottom:20px; text-align:center;">
+        Legen Sie ein neues Passwort für Ihren MSO-Account fest.
+      </p>
+
+      <div id="change-password-alert" class="alert" style="display:none; padding: 10px; border-radius: 8px; margin-bottom: 15px;"></div>
+
+      <form id="change-password-form" onsubmit="handleChangePassword(event)">
+        <div class="form-group">
+          <label for="change-new-password">Neues Passwort</label>
+          <input type="password" id="change-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number')">
+        </div>
+        <div class="form-group">
+          <label for="change-new-password-confirm">Passwort bestätigen</label>
+          <input type="password" id="change-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off">
+        </div>
+
+        <div class="password-requirements" style="margin-top: 10px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 5px; text-align: left; background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px;">
+          <div style="font-weight: 600; margin-bottom: 5px; color: var(--text-secondary);">Passwort-Anforderungen:</div>
+          <div id="change-req-length" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Mindestens 8 Zeichen
+          </div>
+          <div id="change-req-letter" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Mindestens 1 Buchstabe (a-z, A-Z)
+          </div>
+          <div id="change-req-number" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Mindestens 1 Zahl (0-9)
+          </div>
+        </div>
+
+        <button type="submit" id="change-submit-btn" class="btn btn-primary" style="width:100%; justify-content:center;" disabled>
+          <i class="fa-solid fa-floppy-disk"></i> Passwort ändern
         </button>
       </form>
     </div>

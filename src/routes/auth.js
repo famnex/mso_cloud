@@ -305,12 +305,15 @@ router.post('/reset-password', async (req, res) => {
 
   const ip = req.ip || req.headers['x-forwarded-for'] || '0.0.0.0';
 
-  // Passwort-Richtlinie prüfen (Mindestens 8 Zeichen, Groß-, Kleinbuchstabe, Zahl, Sonderzeichen)
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
-  if (password.length < 8 || !passwordRegex.test(password)) {
+  // Passwort-Richtlinie prüfen (Mindestens 8 Zeichen, mindestens 1 Buchstabe und mindestens 1 Zahl)
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const isLongEnough = password.length >= 8;
+
+  if (!hasLetter || !hasNumber || !isLongEnough) {
     logEvent('warn', 'password_reset_policy_failed', 'Passwort-Reset abgelehnt: Passwort erfüllt die Richtlinie nicht', null, ip);
     return res.status(400).json({ 
-      error: 'Das Passwort erfüllt die Richtlinie nicht (Minds. 8 Zeichen, Groß-/Kleinbuchstabe, Zahl und Sonderzeichen).' 
+      error: 'Das Passwort erfüllt die Richtlinie nicht (mindestens 8 Zeichen, mindestens 1 Buchstabe und mindestens 1 Zahl).' 
     });
   }
 
@@ -337,12 +340,70 @@ router.post('/reset-password', async (req, res) => {
     const usedAt = new Date().toISOString();
     db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE id = ?').run(usedAt, reset.id);
 
+    // Startpasswort in student_profiles löschen bzw. als geändert markieren
+    const userRow = db.prepare('SELECT id FROM users WHERE dn = ?').get(reset.user_dn);
+    if (userRow) {
+      db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(userRow.id);
+    }
+
     logEvent('info', 'password_reset_success', `Passwort erfolgreich geändert für DN: ${reset.user_dn}`, { userDn: reset.user_dn }, ip);
     res.json({ success: true, message: 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.' });
   } catch (error) {
     console.error('Fehler beim Zurücksetzen des LDAP-Passworts:', error);
     logEvent('error', 'password_reset_failed', `Fehler beim Setzen des Passworts in LDAP`, { error: error.message }, ip);
     res.status(500).json({ error: 'Fehler beim Passwort-Reset: ' + error.message });
+  }
+});
+
+/**
+ * Passwort für angemeldete User ändern
+ */
+router.post('/change-password-logged-in', async (req, res) => {
+  const user = req.session.user;
+  if (!user) {
+    return res.status(401).json({ error: 'Nicht angemeldet.' });
+  }
+
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ error: 'Neues Passwort ist erforderlich.' });
+  }
+
+  const ip = req.ip || req.headers['x-forwarded-for'] || '0.0.0.0';
+
+  // Passwort-Richtlinie prüfen (Mindestens 8 Zeichen, mindestens 1 Buchstabe und mindestens 1 Zahl)
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const isLongEnough = password.length >= 8;
+
+  if (!hasLetter || !hasNumber || !isLongEnough) {
+    return res.status(400).json({ error: 'Das Passwort erfüllt die Richtlinie nicht (mindestens 8 Zeichen, mindestens 1 Buchstabe und mindestens 1 Zahl).' });
+  }
+
+  try {
+    // 1. DN des Users holen (falls nicht in Session)
+    let userDn = user.dn;
+    if (!userDn) {
+      const userRow = db.prepare('SELECT dn FROM users WHERE id = ?').get(user.id);
+      if (userRow) userDn = userRow.dn;
+    }
+
+    if (!userDn) {
+      return res.status(400).json({ error: 'LDAP-DN des Benutzers nicht gefunden.' });
+    }
+
+    // 2. Passwort im LDAP ändern
+    await ldap.changePassword(userDn, password);
+
+    // 3. Startpasswort in student_profiles als geändert markieren
+    db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(user.id);
+
+    logEvent('info', 'password_change_logged_in_success', `Passwort über Portal geändert für Benutzer: ${user.username}`, { userId: user.id }, ip);
+    res.json({ success: true, message: 'Passwort erfolgreich geändert.' });
+  } catch (error) {
+    console.error('Fehler beim Ändern des Passworts:', error);
+    logEvent('error', 'password_change_logged_in_failed', `Fehler beim Ändern des Passworts für Benutzer: ${user.username}`, { error: error.message }, ip);
+    res.status(500).json({ error: 'Fehler beim Ändern des Passworts: ' + error.message });
   }
 });
 
