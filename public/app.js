@@ -578,9 +578,15 @@ async function handleResetRequest(e) {
   e.preventDefault();
   const email = document.getElementById('reset-email').value.trim();
   const alertBox = document.getElementById('reset-request-alert');
+  const form = document.getElementById('reset-request-form');
+  const btn = form.querySelector('button[type="submit"]');
 
   alertBox.style.display = 'none';
   alertBox.className = 'alert';
+
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Bitte warten...';
+  btn.disabled = true;
 
   try {
     const res = await fetch('api/auth/reset-request', {
@@ -595,7 +601,7 @@ async function handleResetRequest(e) {
       alertBox.innerText = data.message;
       alertBox.classList.add('alert-success');
       alertBox.style.display = 'flex';
-      document.getElementById('reset-request-form').reset();
+      form.reset();
     } else {
       throw new Error(data.error || 'Fehler beim Versenden.');
     }
@@ -603,6 +609,9 @@ async function handleResetRequest(e) {
     alertBox.innerText = err.message;
     alertBox.classList.add('alert-danger');
     alertBox.style.display = 'flex';
+  } finally {
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
   }
 }
 
@@ -3306,6 +3315,8 @@ async function handleStudentLinkRequest(event) {
   const email = document.getElementById('student-email').value.trim();
   const privacyChecked = document.getElementById('student-privacy-check').checked;
   const alertBox = document.getElementById('login-alert');
+  const form = document.getElementById('student-email-form');
+  const btn = form.querySelector('button[type="submit"]');
 
   alertBox.style.display = 'none';
   alertBox.className = 'alert alert-danger';
@@ -3322,6 +3333,10 @@ async function handleStudentLinkRequest(event) {
     return;
   }
 
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Bitte warten...';
+  btn.disabled = true;
+
   try {
     const res = await fetch('api/auth/student-link', {
       method: 'POST',
@@ -3334,7 +3349,7 @@ async function handleStudentLinkRequest(event) {
       alertBox.className = 'alert alert-success';
       alertBox.innerText = data.message;
       alertBox.style.display = 'block';
-      document.getElementById('student-email-form').reset();
+      form.reset();
     } else {
       throw new Error(data.error || 'Fehler beim Anfordern des Links.');
     }
@@ -3342,6 +3357,9 @@ async function handleStudentLinkRequest(event) {
     alertBox.className = 'alert alert-danger';
     alertBox.innerText = err.message;
     alertBox.style.display = 'block';
+  } finally {
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
   }
 }
 
