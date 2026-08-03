@@ -354,7 +354,7 @@ async function loadTiles() {
       const errText = await res.text();
       console.error(`[MSO Tiles Error] HTTP ${res.status} beim Kachel-Abruf:`, errText);
       tilesContainer.innerHTML = `
-        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--danger-color);">
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--error-color);">
           <i class="fa-solid fa-triangle-exclamation fa-2xl" style="margin-bottom: 10px;"></i>
           <p style="font-size: 1.1rem; font-weight: bold;">Fehler beim Laden der Dienste (HTTP ${res.status})</p>
           <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">${errText}</p>
@@ -2296,7 +2296,7 @@ async function loadAdminLogs() {
     showAdminAlert(err.message, 'danger');
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center; padding:30px; color:var(--danger-color);">
+        <td colspan="6" style="text-align:center; padding:30px; color:var(--error-color);">
           <i class="fa-solid fa-triangle-exclamation fa-xl" style="margin-bottom:10px; display:block;"></i>
           Fehler beim Laden der Protokolle: ${err.message}
         </td>
@@ -3769,12 +3769,16 @@ async function loadStudentProfile() {
     
     if (profile.card_status === 'Bild genehmigt') {
       cardStatusEl.style.color = 'var(--success-color)';
+      cardStatusEl.style.fontWeight = 'normal';
     } else if (profile.card_status === 'Bild eingereicht') {
       cardStatusEl.style.color = 'var(--accent-color)';
+      cardStatusEl.style.fontWeight = 'normal';
     } else if (profile.card_status === 'Bild abgelehnt') {
-      cardStatusEl.style.color = 'var(--danger-color)';
+      cardStatusEl.style.color = 'var(--error-color)';
+      cardStatusEl.style.fontWeight = 'bold';
     } else {
       cardStatusEl.style.color = 'var(--warn-color)';
+      cardStatusEl.style.fontWeight = 'normal';
     }
 
     // Foto-Upload-Buttons steuern: gedruckt/ausgegeben (1132, 1133) -> Buttons ausblenden.
@@ -3824,12 +3828,16 @@ async function loadStudentProfile() {
       cardStatusText.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
       if (profile.card_status === 'Bild genehmigt') {
         cardStatusText.style.color = 'var(--success-color)';
+        cardStatusText.style.fontWeight = 'normal';
       } else if (profile.card_status === 'Bild eingereicht') {
         cardStatusText.style.color = 'var(--accent-color)';
+        cardStatusText.style.fontWeight = 'normal';
       } else if (profile.card_status === 'Bild abgelehnt') {
-        cardStatusText.style.color = 'var(--danger-color)';
+        cardStatusText.style.color = 'var(--error-color)';
+        cardStatusText.style.fontWeight = 'bold';
       } else {
         cardStatusText.style.color = 'var(--warn-color)';
+        cardStatusText.style.fontWeight = 'normal';
       }
     }
 
@@ -3843,7 +3851,7 @@ async function loadStudentProfile() {
         cardStatusLabel.style.color = 'var(--accent-color)';
       } else if (profile.card_status === 'Bild abgelehnt') {
         cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ABGELEHNT';
-        cardStatusLabel.style.color = 'var(--danger-color)';
+        cardStatusLabel.style.color = 'var(--error-color)';
       } else {
         cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-question"></i> INAKTIV';
         cardStatusLabel.style.color = 'var(--warn-color)';
