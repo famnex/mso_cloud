@@ -563,7 +563,10 @@ router.post('/student-link', async (req, res) => {
     const token = crypto.randomBytes(24).toString('hex');
     
     // Token in DB speichern (MySQL / SQLite)
-    await studentDb.createStudentToken(email, token, req.ip);
+    const result = await studentDb.createStudentToken(email, token, req.ip);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
 
     // Anmeldelink generieren (auf Basis der anfragenden Hostadresse unter Berücksichtigung von Unterverzeichnissen)
     const host = req.get('host');

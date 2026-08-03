@@ -353,7 +353,7 @@ async function getAllStudents() {
 
         if (!email) continue;
 
-        let localUser = db.prepare('SELECT id, username, email FROM users WHERE email = ?').get(email);
+        let localUser = db.prepare('SELECT id, username, email FROM users WHERE LOWER(email) = LOWER(?)').get(email);
         let userId = localUser ? localUser.id : 1000 + appId;
 
         const profile = buildProfileFromMySQL(userId, appId, fieldRows, photoFile);
@@ -540,7 +540,7 @@ async function getStudentByEmail(email) {
     SELECT u.id, sp.account_status 
     FROM users u 
     JOIN student_profiles sp ON u.id = sp.user_id 
-    WHERE u.email = ?
+    WHERE LOWER(u.email) = LOWER(?)
   `).get(email.trim());
 
   if (row) {
@@ -584,7 +584,7 @@ async function createStudentToken(email, token, ip) {
         }
 
         // Lokalen SQLite-Nutzer prüfen/anlegen
-        let localUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
+        let localUser = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(email.trim());
         if (!localUser) {
           const [fieldRows] = await pool.query(
             'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
@@ -618,7 +618,7 @@ async function createStudentToken(email, token, ip) {
   }
 
   if (!userId) {
-    const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
+    const user = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(email.trim());
     if (user) {
       userId = user.id;
     }
@@ -724,7 +724,7 @@ async function verifyStudentToken(token, ip) {
 
         const email = emailRows.length > 0 ? emailRows[0].value.trim() : '';
         if (email) {
-          let localUser = db.prepare('SELECT id, username, email, role, groups FROM users WHERE email = ?').get(email);
+          let localUser = db.prepare('SELECT id, username, email, role, groups FROM users WHERE LOWER(email) = LOWER(?)').get(email);
           let userId;
           let username;
           let role = 'user';
