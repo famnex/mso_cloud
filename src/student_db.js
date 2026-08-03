@@ -261,30 +261,10 @@ async function getStudentProfile(user) {
 
 function convertBlobToDataUrl(rawFile) {
   if (!rawFile) return null;
-
-  // Wenn es ein Buffer ist: zuerst in String umwandeln
+  // Buffer in String umwandeln falls nötig
   const str = Buffer.isBuffer(rawFile) ? rawFile.toString('utf-8') : rawFile;
-
-  // Falls bereits eine vollständige Data-URL vorhanden ist
-  if (str.startsWith('data:image') || str.startsWith('data:video')) {
-    return str;
-  }
-
-  // Falls nur der reine Base64-String ohne Präfix gespeichert wurde
-  // (so wie wir es jetzt in MySQL speichern):
-  // Anhand der Base64-Bytes den Bildtyp erkennen
-  try {
-    const header = Buffer.from(str.substring(0, 8), 'base64');
-    let mime = 'image/jpeg'; // Standardannahme: JPEG
-    if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47) {
-      mime = 'image/png';
-    } else if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46) {
-      mime = 'image/gif';
-    }
-    return `data:${mime};base64,${str}`;
-  } catch (e) {
-    return `data:image/jpeg;base64,${str}`;
-  }
+  // Vollständige Data-URL zurückgeben (enthält data:image/...;base64,... Präfix)
+  return str;
 }
 
 /**
@@ -341,10 +321,9 @@ async function updateStudentPhoto(userId, email, base64Image) {
       if (applicationId) {
         debugLog.push(`Application-ID in MySQL ermittelt: ${applicationId}`);
         
-        // Nur den reinen base64-Teil (ohne Mime-Präfix) extrahieren, so wie andere Apps es erwarten
-        const matches = base64Image.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
-        const imageToStore = matches ? matches[2] : base64Image;
-        debugLog.push(`Base64-Bild für MySQL vorbereitet. Format: ${matches ? matches[1] : 'unbekannt'}, Zeichenlänge: ${imageToStore.length}`);
+        // Den vollständigen data:image/...;base64,... String speichern (so wie andere Apps es erwarten)
+        const imageToStore = base64Image;
+        debugLog.push(`Bild für MySQL vorbereitet. Zeichenlänge: ${imageToStore.length}, Präfix: ${imageToStore.substring(0, 30)}...`);
 
         debugLog.push("Führe MySQL aus: INSERT INTO images (file, application, field = 37) ON DUPLICATE KEY UPDATE...");
         await pool.query(`
