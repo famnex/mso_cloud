@@ -246,8 +246,7 @@ async function getStudentProfile(user) {
       );
       let photoFile = null;
       if (photoRows.length > 0) {
-        const rawFile = photoRows[0].file;
-        photoFile = Buffer.isBuffer(rawFile) ? rawFile.toString('utf-8') : rawFile;
+        photoFile = convertBlobToDataUrl(photoRows[0].file);
       }
 
       return buildProfileFromMySQL(user.id, applicationId, fieldRows, photoFile);
@@ -258,6 +257,31 @@ async function getStudentProfile(user) {
   } else {
     return getLocalProfile(user.id);
   }
+}
+
+function convertBlobToDataUrl(rawFile) {
+  if (!rawFile) return null;
+  if (Buffer.isBuffer(rawFile)) {
+    // Check if the Buffer already contains a UTF-8 string (like "data:image...")
+    const startStr = rawFile.subarray(0, 10).toString('utf-8');
+    if (startStr.startsWith('data:image') || startStr.startsWith('data:video')) {
+      return rawFile.toString('utf-8');
+    }
+    
+    // Otherwise, treat it as raw binary bytes and convert to base64
+    let mime = 'image/png';
+    if (rawFile.length > 4) {
+      if (rawFile[0] === 0xFF && rawFile[1] === 0xD8) {
+        mime = 'image/jpeg';
+      } else if (rawFile[0] === 0x89 && rawFile[1] === 0x50 && rawFile[2] === 0x4E && rawFile[3] === 0x47) {
+        mime = 'image/png';
+      } else if (rawFile[0] === 0x42 && rawFile[1] === 0x4D) {
+        mime = 'image/bmp';
+      }
+    }
+    return `data:${mime};base64,${rawFile.toString('base64')}`;
+  }
+  return rawFile; // If it's already a string
 }
 
 /**
@@ -305,9 +329,18 @@ async function updateStudentPhoto(userId, email, base64Image) {
     try {
       const applicationId = await getApplicationId(userId, email);
       if (applicationId) {
+        // Convert base64 data URL to raw binary Buffer
+        const matches = base64Image.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+        let imageBuffer;
+        if (matches) {
+          imageBuffer = Buffer.from(matches[2], 'base64');
+        } else {
+          imageBuffer = Buffer.from(base64Image, 'base64');
+        }
+
         await pool.query(
           'REPLACE INTO images (file, application, field) VALUES (?, ?, 37)',
-          [base64Image, applicationId]
+          [imageBuffer, applicationId]
         );
 
         await pool.query(
@@ -358,8 +391,7 @@ async function getAllStudents() {
         );
         let photoFile = null;
         if (photoRows.length > 0) {
-          const rawFile = photoRows[0].file;
-          photoFile = Buffer.isBuffer(rawFile) ? rawFile.toString('utf-8') : rawFile;
+          photoFile = convertBlobToDataUrl(photoRows[0].file);
         }
 
         const emailRow = fieldRows.find(r => Number(r.field) === 18);
