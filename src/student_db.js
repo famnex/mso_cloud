@@ -311,10 +311,9 @@ async function updateStudentPhoto(userId, email, base64Image) {
         );
 
         await pool.query(
-          "UPDATE fieldvalues SET value = '1130' WHERE application = ? AND field = 158",
+          "UPDATE fieldvalues SET value = '1131' WHERE application = ? AND field = 158",
           [applicationId]
         );
-        return { success: true };
       }
     } catch (err) {
       console.error('MySQL Error in updateStudentPhoto:', err);
@@ -397,10 +396,9 @@ async function approvePhoto(userId, email) {
       const applicationId = await getApplicationId(userId, email);
       if (applicationId) {
         await pool.query(
-          "UPDATE fieldvalues SET value = '1131' WHERE application = ? AND field = 158",
+          "UPDATE fieldvalues SET value = '1132' WHERE application = ? AND field = 158",
           [applicationId]
         );
-        return { success: true };
       }
     } catch (err) {
       console.error('MySQL Error in approvePhoto:', err);
@@ -424,10 +422,9 @@ async function rejectPhoto(userId, email) {
       const applicationId = await getApplicationId(userId, email);
       if (applicationId) {
         await pool.query(
-          "UPDATE fieldvalues SET value = '1132' WHERE application = ? AND field = 158",
+          "UPDATE fieldvalues SET value = '1134' WHERE application = ? AND field = 158",
           [applicationId]
         );
-        return { success: true };
       }
     } catch (err) {
       console.error('MySQL Error in rejectPhoto:', err);
@@ -456,10 +453,9 @@ async function deletePhoto(userId, email) {
         );
 
         await pool.query(
-          "UPDATE fieldvalues SET value = '1129' WHERE application = ? AND field = 158",
+          "UPDATE fieldvalues SET value = '1130' WHERE application = ? AND field = 158",
           [applicationId]
         );
-        return { success: true };
       }
     } catch (err) {
       console.error('MySQL Error in deletePhoto:', err);
