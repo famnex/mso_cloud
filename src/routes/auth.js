@@ -568,6 +568,8 @@ router.post('/student-link', async (req, res) => {
       return res.status(400).json({ error: result.error });
     }
 
+    logEvent('info', 'student_link_requested', `Schüler-Anmeldelink angefordert für: ${email.trim()}`, null, req.ip);
+
     // Anmeldelink generieren (auf Basis der anfragenden Hostadresse unter Berücksichtigung von Unterverzeichnissen)
     const host = req.get('host');
     const isSubdir = host.includes('cloud.mso-hef.de') || req.originalUrl.startsWith('/novus');
@@ -627,6 +629,8 @@ router.post('/student-token-login', async (req, res) => {
 
     // Express-Sitzung erstellen
     req.session.user = result.user;
+
+    logEvent('info', 'student_token_login_success', `Schüler-Login via E-Mail-Link erfolgreich für: ${result.user.username}`, { userId: result.user.id, email: result.user.email }, req.ip);
 
     res.json({ 
       success: true, 
