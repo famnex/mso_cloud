@@ -349,19 +349,21 @@ async function updateStudentPhoto(userId, email, base64Image) {
           debugLog.push(`Base64-Bild direkt geparst (kein Mime-Prefix). Länge: ${imageBuffer.length} Bytes`);
         }
 
-        debugLog.push("Führe MySQL aus: REPLACE INTO images (file, application, field = 37)...");
-        await pool.query(
-          'REPLACE INTO images (file, application, field) VALUES (?, ?, 37)',
-          [imageBuffer, applicationId]
-        );
-        debugLog.push("MySQL: REPLACE INTO images erfolgreich ausgeführt.");
+        debugLog.push("Führe MySQL aus: INSERT INTO images (file, application, field = 37) ON DUPLICATE KEY UPDATE...");
+        await pool.query(`
+          INSERT INTO images (file, application, field)
+          VALUES (?, ?, 37)
+          ON DUPLICATE KEY UPDATE file = ?
+        `, [imageBuffer, applicationId, imageBuffer]);
+        debugLog.push("MySQL: INSERT INTO images erfolgreich.");
 
-        debugLog.push(`Führe MySQL aus: UPDATE fieldvalues SET value = '1131' WHERE application = ${applicationId} AND field = 158...`);
-        const [result] = await pool.query(
-          "UPDATE fieldvalues SET value = '1131' WHERE application = ? AND field = 158",
-          [applicationId]
-        );
-        debugLog.push(`MySQL: UPDATE fieldvalues erfolgreich. Betroffene Zeilen: ${result.affectedRows}`);
+        debugLog.push(`Führe MySQL aus: INSERT INTO fieldvalues (field = 158, application = ${applicationId}, value = '1131', subset = 0) ON DUPLICATE KEY UPDATE...`);
+        const [result] = await pool.query(`
+          INSERT INTO fieldvalues (field, application, value, subset)
+          VALUES (158, ?, '1131', 0)
+          ON DUPLICATE KEY UPDATE value = '1131'
+        `, [applicationId]);
+        debugLog.push(`MySQL: INSERT/UPDATE fieldvalues erfolgreich. Betroffene Zeilen: ${result.affectedRows}`);
         
         mysqlSuccess = true;
       } else {
@@ -463,10 +465,11 @@ async function approvePhoto(userId, email) {
     try {
       const applicationId = await getApplicationId(userId, email);
       if (applicationId) {
-        await pool.query(
-          "UPDATE fieldvalues SET value = '1132' WHERE application = ? AND field = 158",
-          [applicationId]
-        );
+        await pool.query(`
+          INSERT INTO fieldvalues (field, application, value, subset)
+          VALUES (158, ?, '1132', 0)
+          ON DUPLICATE KEY UPDATE value = '1132'
+        `, [applicationId]);
       }
     } catch (err) {
       console.error('MySQL Error in approvePhoto:', err);
@@ -489,10 +492,11 @@ async function rejectPhoto(userId, email) {
     try {
       const applicationId = await getApplicationId(userId, email);
       if (applicationId) {
-        await pool.query(
-          "UPDATE fieldvalues SET value = '1134' WHERE application = ? AND field = 158",
-          [applicationId]
-        );
+        await pool.query(`
+          INSERT INTO fieldvalues (field, application, value, subset)
+          VALUES (158, ?, '1134', 0)
+          ON DUPLICATE KEY UPDATE value = '1134'
+        `, [applicationId]);
       }
     } catch (err) {
       console.error('MySQL Error in rejectPhoto:', err);
@@ -516,14 +520,15 @@ async function deletePhoto(userId, email) {
       const applicationId = await getApplicationId(userId, email);
       if (applicationId) {
         await pool.query(
-          'DELETE FROM images WHERE application = ? AND field = 37',
+          'UPDATE images SET file = NULL WHERE application = ? AND field = 37',
           [applicationId]
         );
 
-        await pool.query(
-          "UPDATE fieldvalues SET value = '1130' WHERE application = ? AND field = 158",
-          [applicationId]
-        );
+        await pool.query(`
+          INSERT INTO fieldvalues (field, application, value, subset)
+          VALUES (158, ?, '1130', 0)
+          ON DUPLICATE KEY UPDATE value = '1130'
+        `, [applicationId]);
       }
     } catch (err) {
       console.error('MySQL Error in deletePhoto:', err);
