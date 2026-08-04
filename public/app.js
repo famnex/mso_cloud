@@ -2444,9 +2444,8 @@ function renderPaginationControls(containerId, startIndex, endIndex, totalEntrie
   const showingStart = totalEntries > 0 ? startIndex + 1 : 0;
   const showingEnd = endIndex;
 
-  // Seitenzahlen erzeugen (max 5 sichtbare Buttons)
-  let pageButtons = '';
-  const maxButtons = 5;
+  const isSmallMobile = window.innerWidth <= 480;
+  const maxButtons = isSmallMobile ? 3 : 5;
   let startPage = Math.max(1, currentLogPage - Math.floor(maxButtons / 2));
   let endPage = Math.min(totalPages, startPage + maxButtons - 1);
 
@@ -2454,20 +2453,23 @@ function renderPaginationControls(containerId, startIndex, endIndex, totalEntrie
     startPage = Math.max(1, endPage - maxButtons + 1);
   }
 
+  let pageButtons = '';
   for (let p = startPage; p <= endPage; p++) {
     const isActive = p === currentLogPage;
     pageButtons += `
       <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" 
-              style="padding: 4px 10px; font-size: 0.85rem; height: 32px; min-width: 32px;" 
+              style="padding: ${isSmallMobile ? '2px 6px' : '4px 8px'}; font-size: ${isSmallMobile ? '0.8rem' : '0.85rem'}; height: 30px; min-width: ${isSmallMobile ? '26px' : '30px'};" 
               onclick="changeLogPage(${p})">${p}</button>
     `;
   }
 
+  const hideFirstLast = isSmallMobile ? 'display: none !important;' : '';
+
   container.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; background:rgba(0,0,0,0.12); padding:10px 15px; border-radius:8px; border:1px solid var(--panel-border);">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="color:var(--text-secondary); font-size:0.85rem;">Anzahl:</span>
-        <select class="form-control" style="width:90px; height:32px; padding:2px 8px; font-size:0.85rem;" onchange="changeLogsPerPage(this.value)">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(0,0,0,0.12); padding:10px 12px; border-radius:8px; border:1px solid var(--panel-border); max-width:100%; box-sizing:border-box; overflow:hidden;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; max-width:100%;">
+        <span style="color:var(--text-secondary); font-size:0.82rem;">Anzahl:</span>
+        <select class="form-control" style="width:75px; height:30px; padding:2px 6px; font-size:0.82rem;" onchange="changeLogsPerPage(this.value)">
           <option value="10" ${logsPerPage == 10 ? 'selected' : ''}>10</option>
           <option value="20" ${logsPerPage == 20 ? 'selected' : ''}>20</option>
           <option value="50" ${logsPerPage == 50 ? 'selected' : ''}>50</option>
@@ -2475,19 +2477,19 @@ function renderPaginationControls(containerId, startIndex, endIndex, totalEntrie
           <option value="200" ${logsPerPage == 200 ? 'selected' : ''}>200</option>
           <option value="all" ${logsPerPage === 'all' ? 'selected' : ''}>Alle</option>
         </select>
-        <span style="color:var(--text-secondary); font-size:0.85rem; margin-left: 5px;">
+        <span style="color:var(--text-secondary); font-size:0.82rem;">
           Einträge ${showingStart}–${showingEnd} von ${totalEntries}
         </span>
       </div>
 
-      <div style="display:flex; align-items:center; gap:5px;">
-        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(1)" ${currentLogPage === 1 || totalPages <= 1 ? 'disabled' : ''} title="Erste Seite"><i class="fa-solid fa-angles-left"></i></button>
-        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(${currentLogPage - 1})" ${currentLogPage === 1 || totalPages <= 1 ? 'disabled' : ''} title="Vorherige Seite"><i class="fa-solid fa-angle-left"></i></button>
+      <div style="display:flex; align-items:center; justify-content:center; gap:3px; flex-wrap:wrap; max-width:100%;">
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; height:30px; ${hideFirstLast}" onclick="changeLogPage(1)" ${currentLogPage === 1 || totalPages <= 1 ? 'disabled' : ''} title="Erste Seite"><i class="fa-solid fa-angles-left"></i></button>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; height:30px;" onclick="changeLogPage(${currentLogPage - 1})" ${currentLogPage === 1 || totalPages <= 1 ? 'disabled' : ''} title="Vorherige Seite"><i class="fa-solid fa-angle-left"></i></button>
         
         ${pageButtons}
 
-        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(${currentLogPage + 1})" ${currentLogPage === totalPages || totalPages <= 1 ? 'disabled' : ''} title="Nächste Seite"><i class="fa-solid fa-angle-right"></i></button>
-        <button class="btn btn-secondary btn-sm" style="padding:4px 8px; height:32px;" onclick="changeLogPage(${totalPages})" ${currentLogPage === totalPages || totalPages <= 1 ? 'disabled' : ''} title="Letzte Seite"><i class="fa-solid fa-angles-right"></i></button>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; height:30px;" onclick="changeLogPage(${currentLogPage + 1})" ${currentLogPage === totalPages || totalPages <= 1 ? 'disabled' : ''} title="Nächste Seite"><i class="fa-solid fa-angle-right"></i></button>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; height:30px; ${hideFirstLast}" onclick="changeLogPage(${totalPages})" ${currentLogPage === totalPages || totalPages <= 1 ? 'disabled' : ''} title="Letzte Seite"><i class="fa-solid fa-angles-right"></i></button>
       </div>
     </div>
   `;
