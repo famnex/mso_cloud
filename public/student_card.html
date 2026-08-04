@@ -2712,8 +2712,23 @@
       const statusLabel = document.getElementById('card-status-label');
       
       if (isOffline) {
-        statusLabel.innerText = translations[currentLang].statusOffline;
-        statusLabel.style.color = 'var(--text-secondary)';
+        const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
+        const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : Date.now();
+        const daysAgo = Math.max(0, Math.floor((Date.now() - cachedTime) / (24 * 60 * 60 * 1000)));
+        
+        let offlineText = '';
+        const lang = typeof currentLang !== 'undefined' ? currentLang : 'de';
+        
+        if (lang === 'en') {
+          offlineText = daysAgo === 0 ? 'Online Verified' : (daysAgo === 1 ? 'Online Verified 1 day ago' : `Online Verified ${daysAgo} days ago`);
+        } else if (lang === 'fr') {
+          offlineText = daysAgo === 0 ? 'Vérifié en ligne' : (daysAgo === 1 ? 'Vérifié en ligne il y a 1 jour' : `Vérifié en ligne il y a ${daysAgo} jours`);
+        } else {
+          offlineText = daysAgo === 0 ? 'Online verifiziert' : (daysAgo === 1 ? 'Online verifiziert vor 1 Tag' : `Online verifiziert vor ${daysAgo} Tagen`);
+        }
+        
+        statusLabel.innerText = offlineText;
+        statusLabel.style.color = 'var(--success)';
       } else {
         statusLabel.innerText = translations[currentLang].statusOnline;
         statusLabel.style.color = 'var(--success)';
