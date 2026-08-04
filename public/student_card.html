@@ -2285,15 +2285,15 @@
 
       let cacheRendered = false;
 
-      // 1. Instant Cache Load: Falls ein gültiger Cache existiert, diesen sofort anzeigen (0ms Wartezeit)
+      // 1. Instant Cache Load: Falls ein gültiger Cache existiert, diesen sofort als Cache-Ausweis anzeigen (0ms Wartezeit)
       if (cached && !isCacheExpired) {
         try {
           cardData = JSON.parse(cached);
           if (isOfflineBlocked) {
             cardData.card_status = 'Ausweis gesperrt';
           }
-          renderCard(cardData, !navigator.onLine);
-          updateControlsState(!navigator.onLine);
+          renderCard(cardData, true);
+          updateControlsState(true);
           cacheRendered = true;
         } catch (e) {}
       }
