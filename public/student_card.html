@@ -208,6 +208,119 @@
       box-shadow: 0 0 10px var(--accent-glow);
     }
 
+    /* ── Sonder-Design-Buttons (nur für Admin) ─────────────────────── */
+    .special-design-btns {
+      display: none; /* wird per JS eingeblendet */
+      gap: 6px;
+    }
+    .special-btn {
+      background: rgba(255,255,255,0.12);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--card-border);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+      line-height: 1;
+    }
+    .special-btn:hover { background: rgba(255,255,255,0.25); transform: scale(1.08); }
+    .special-btn.active-snow { background: rgba(147,210,255,0.35); border-color: #7ecfff; box-shadow: 0 0 8px rgba(126,207,255,0.5); }
+    .special-btn.active-birthday { background: rgba(255,200,100,0.35); border-color: #ffcc55; box-shadow: 0 0 8px rgba(255,200,100,0.5); }
+
+    /* ── Schneeflocken ─────────────────────────────────────────────── */
+    .snowflake-layer {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 999;
+      overflow: hidden;
+    }
+    .snowflake {
+      position: absolute;
+      top: -30px;
+      color: #c8e6ff;
+      font-size: 1em;
+      opacity: 0;
+      animation: snowfall linear infinite;
+      user-select: none;
+    }
+    @keyframes snowfall {
+      0%   { transform: translateY(0) rotate(0deg);   opacity: 0.9; }
+      100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+    }
+
+    /* ── Konfetti ──────────────────────────────────────────────────── */
+    .confetti-layer {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 999;
+      overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute;
+      top: -20px;
+      width: 8px;
+      height: 12px;
+      opacity: 0;
+      border-radius: 2px;
+      animation: confettiFall linear infinite;
+    }
+    @keyframes confettiFall {
+      0%   { transform: translateY(0) rotate(0deg) scaleX(1);  opacity: 1; }
+      50%  { transform: translateY(50vh) rotate(180deg) scaleX(-1); opacity: 0.8; }
+      100% { transform: translateY(110vh) rotate(360deg) scaleX(1); opacity: 0; }
+    }
+
+    /* ── Unter-18-Symbol ───────────────────────────────────────────── */
+    .under18-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      font-size: 0.52rem;
+      font-weight: 800;
+      line-height: 1;
+      position: relative;
+      vertical-align: middle;
+      margin-left: 4px;
+      opacity: 0.75;
+      flex-shrink: 0;
+    }
+    .under18-badge::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: -2px;
+      right: -2px;
+      height: 2px;
+      background: currentColor;
+      transform: translateY(-50%) rotate(-40deg);
+      border-radius: 1px;
+    }
+
+    /* ── Geburtstagstoast (kleine Anzeige auf dem Ausweis) ─────────── */
+    .birthday-cake-icon {
+      display: none;
+      font-size: 0.9rem;
+      margin-left: 5px;
+      vertical-align: middle;
+      animation: cakePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes cakePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
     /* Card Perspective Frame — Versteckt bis alle Daten geladen sind */
     .card-container {
       perspective: 1000px;
@@ -1029,6 +1142,17 @@
     <div class="control-btn" id="offline-indicator" title="Offline-Modus aktiv" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #f59e0b; cursor: default; font-weight: 800;"></div>
   </div>
 
+  <!-- Sonder-Design-Buttons (nur für Admin sichtbar) -->
+  <div class="special-design-btns" id="special-design-btns">
+    <button class="special-btn" id="btn-snow" onclick="toggleSpecialDesign('snow')" title="Schneedesign Vorschau">❄️</button>
+    <button class="special-btn" id="btn-birthday" onclick="toggleSpecialDesign('birthday')" title="Geburtstagsdesign Vorschau">🎂</button>
+  </div>
+
+  <!-- Schneeflocken-Ebene -->
+  <div class="snowflake-layer" id="snowflake-layer" style="display:none;"></div>
+  <!-- Konfetti-Ebene -->
+  <div class="confetti-layer" id="confetti-layer" style="display:none;"></div>
+
   <!-- Top Bar Controls -->
   <div class="top-controls">
     <!-- Language Toggle -->
@@ -1199,7 +1323,11 @@
           </div>
           <div class="detail-item birth-item">
             <span class="detail-label" data-i18n="labelBirth">Geburtsdatum</span>
-            <span class="detail-value" id="card-birth">-</span>
+            <span class="detail-value" id="card-birth" style="display:inline-flex; align-items:center; gap:2px;">
+              <span id="card-birth-text">-</span>
+              <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
+              <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
+            </span>
           </div>
           <div class="detail-item place-item">
             <span class="detail-label" data-i18n="labelBirthplace">Geburtsort</span>
@@ -1626,6 +1754,95 @@
       // Re-trigger layout checks for error messages if data is loaded
       if (cardData) {
         renderCard(cardData, !navigator.onLine);
+      }
+    }
+
+    // ── Sonder-Design-System ──────────────────────────────────────────────
+    let activeDesign = null; // 'snow' | 'birthday' | null
+
+    function activateSpecialDesign(type) {
+      if (activeDesign === type) return; // Bereits aktiv
+      deactivateAllDesigns();
+      activeDesign = type;
+
+      if (type === 'snow') {
+        buildSnow();
+        const btn = document.getElementById('btn-snow');
+        if (btn) btn.classList.add('active-snow');
+      } else if (type === 'birthday') {
+        buildConfetti();
+        const cake = document.getElementById('birthday-cake-icon');
+        if (cake) cake.style.display = 'inline';
+        const btn = document.getElementById('btn-birthday');
+        if (btn) btn.classList.add('active-birthday');
+      }
+    }
+
+    function deactivateAllDesigns() {
+      // Schneeflocken stoppen
+      const snowLayer = document.getElementById('snowflake-layer');
+      if (snowLayer) { snowLayer.style.display = 'none'; snowLayer.innerHTML = ''; }
+      const btnSnow = document.getElementById('btn-snow');
+      if (btnSnow) btnSnow.classList.remove('active-snow');
+
+      // Konfetti stoppen
+      const confLayer = document.getElementById('confetti-layer');
+      if (confLayer) { confLayer.style.display = 'none'; confLayer.innerHTML = ''; }
+      const cakeIcon = document.getElementById('birthday-cake-icon');
+      if (cakeIcon) cakeIcon.style.display = 'none';
+      const btnBday = document.getElementById('btn-birthday');
+      if (btnBday) btnBday.classList.remove('active-birthday');
+
+      activeDesign = null;
+    }
+
+    function toggleSpecialDesign(type) {
+      if (activeDesign === type) {
+        deactivateAllDesigns();
+      } else {
+        activateSpecialDesign(type);
+      }
+    }
+
+    function buildSnow() {
+      const layer = document.getElementById('snowflake-layer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      layer.style.display = 'block';
+      const symbols = ['❄','❅','❆','✦','·'];
+      const count = 40;
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('span');
+        el.className = 'snowflake';
+        el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        const size = 0.7 + Math.random() * 1.2;
+        el.style.fontSize = size + 'rem';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.animationDuration = (4 + Math.random() * 7) + 's';
+        el.style.animationDelay = -(Math.random() * 10) + 's';
+        el.style.opacity = (0.4 + Math.random() * 0.6).toString();
+        layer.appendChild(el);
+      }
+    }
+
+    function buildConfetti() {
+      const layer = document.getElementById('confetti-layer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      layer.style.display = 'block';
+      const colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff9f43','#c44dff','#ff6eb4','#00c9a7'];
+      const count = 60;
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti-piece';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        el.style.width = (6 + Math.random() * 6) + 'px';
+        el.style.height = (10 + Math.random() * 8) + 'px';
+        el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        el.style.animationDuration = (3 + Math.random() * 5) + 's';
+        el.style.animationDelay = -(Math.random() * 8) + 's';
+        layer.appendChild(el);
       }
     }
 
@@ -2125,29 +2342,72 @@
 
       // 4. Personendaten befüllen (Bei Sperrung anonymisieren/leeren)
       if (shouldBlockContent) {
-        document.getElementById('card-name').innerText = '—';
-        document.getElementById('card-birth').innerText = '—';
+        document.getElementById('card-birth-text').textContent = '—';
         document.getElementById('card-birthplace').innerText = '—';
         document.getElementById('card-expiry').innerText = '—';
         document.getElementById('card-mediothek-number-display').innerText = '—';
+        document.getElementById('card-name').innerText = '—';
       } else {
         document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
         adjustNameFontSize();
         document.getElementById('card-birthplace').innerText = data.birth_place || '-';
         document.getElementById('card-mediothek-number-display').innerText = data.mediothek_number || '-';
-        
-        // Geburtsdatum
+
+        // ── Geburtsdatum: Gekürzter Monat im Landesformat ─────────────
         let birthStr = '-';
+        let birthDateObj = null;
+        const MONTHS_SHORT = {
+          de: ['JAN','FEB','MÄR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DEZ'],
+          en: ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],
+          fr: ['JAN','FÉV','MAR','AVR','MAI','JUN','JUL','AOÛ','SEP','OCT','NOV','DÉC']
+        };
         if (data.birth_date) {
           const parts = data.birth_date.split('-');
           if (parts.length === 3) {
-            birthStr = `${parts[2]}.${parts[1]}.${parts[0]}`;
+            birthDateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            const lang = document.documentElement.lang || 'de';
+            const months = MONTHS_SHORT[lang] || MONTHS_SHORT.de;
+            const monthName = months[birthDateObj.getMonth()];
+            birthStr = `${parseInt(parts[2])}. ${monthName} ${parts[0]}`;
           } else {
             birthStr = data.birth_date;
           }
         }
-        document.getElementById('card-birth').innerText = birthStr;
-        
+        document.getElementById('card-birth-text').textContent = birthStr;
+
+        // ── Unter-18-Badge ─────────────────────────────────────────────
+        const under18Badge = document.getElementById('under18-badge');
+        if (birthDateObj) {
+          const today = new Date();
+          const age = today.getFullYear() - birthDateObj.getFullYear() -
+            ((today.getMonth() < birthDateObj.getMonth() ||
+             (today.getMonth() === birthDateObj.getMonth() && today.getDate() < birthDateObj.getDate())) ? 1 : 0);
+          under18Badge.style.display = age < 18 ? 'inline-flex' : 'none';
+        } else {
+          under18Badge.style.display = 'none';
+        }
+
+        // ── Automatisch Sonderdesign aktivieren (nicht Admin-Vorschau) ─
+        if (!data.is_admin_preview) {
+          const now = new Date();
+          const month = now.getMonth() + 1; // 1-12
+          // Geburtstag?
+          const isBirthday = birthDateObj &&
+            birthDateObj.getDate() === now.getDate() &&
+            birthDateObj.getMonth() === now.getMonth();
+          // Winter (Dez oder Jan)?
+          const isWinter = month === 12 || month === 1;
+
+          if (isBirthday) activateSpecialDesign('birthday');
+          else if (isWinter) activateSpecialDesign('snow');
+        }
+
+        // ── Admin-Buttons einblenden ───────────────────────────────────
+        if (data.is_admin_preview) {
+          const btnRow = document.getElementById('special-design-btns');
+          if (btnRow) btnRow.style.display = 'flex';
+        }
+
         // Ablaufdatum
         if (data.expires_at) {
           const parts = data.expires_at.split('-');
