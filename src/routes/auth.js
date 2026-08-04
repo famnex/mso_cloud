@@ -168,6 +168,7 @@ router.post('/login', async (req, res) => {
         // Lokaler Login erfolgreich!
         resetFailedLogin(clientIp);
         const groups = JSON.parse(localUser.groups || '[]');
+        const studentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(localUser.id);
         req.session.user = {
           id: localUser.id,
           username: localUser.username,
@@ -175,7 +176,8 @@ router.post('/login', async (req, res) => {
           role: localUser.role,
           groups: groups,
           isLdap: false,
-          display_name: localUser.display_name || ''
+          display_name: localUser.display_name || '',
+          card_image: studentRow ? studentRow.card_image : null
         };
         req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
         const returnTo = req.session.returnTo || null;
@@ -230,6 +232,8 @@ router.post('/login', async (req, res) => {
           userId = info.lastInsertRowid;
         }
 
+        const ldapStudentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(userId);
+
         req.session.user = {
           id: userId,
           username: username,
@@ -240,7 +244,8 @@ router.post('/login', async (req, res) => {
           display_name: ldapUser.name,
           dn: ldapUser.dn,
           givenName: ldapUser.givenName,
-          sn: ldapUser.sn
+          sn: ldapUser.sn,
+          card_image: ldapStudentRow ? ldapStudentRow.card_image : null
         };
         const returnTo = req.session.returnTo || null;
         if (returnTo) {

@@ -198,10 +198,22 @@ function renderAuthenticatedHeader() {
   
   const headerAvatar = document.getElementById('header-user-avatar');
   if (headerAvatar) {
-    if (!isAdmin && !isTeacher && currentUser.card_image) {
+    if (currentUser.card_image) {
       headerAvatar.src = currentUser.card_image;
     } else {
-      headerAvatar.src = 'media/user.png';
+      fetch('api/auth/student-profile')
+        .then(r => r.ok ? r.json() : null)
+        .then(p => {
+          if (p && p.card_image) {
+            currentUser.card_image = p.card_image;
+            headerAvatar.src = p.card_image;
+          } else {
+            headerAvatar.src = 'media/user.png';
+          }
+        })
+        .catch(() => {
+          headerAvatar.src = 'media/user.png';
+        });
     }
   }
 
