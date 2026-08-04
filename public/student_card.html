@@ -280,7 +280,23 @@
       100% { transform: translateY(110vh) rotate(360deg) scaleX(1); opacity: 0; }
     }
 
-    /* ── Unter-18-Symbol ───────────────────────────────────────────── */
+    /* ── Unter-18-Symbol & Geburtstagstorte (Positionierung links ohne Textverschiebung) ─ */
+    .card-birth-container {
+      position: relative;
+      display: inline-block;
+    }
+    .card-birth-badges {
+      position: absolute;
+      right: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-right: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
     .under18-badge {
       display: inline-flex;
       align-items: center;
@@ -293,9 +309,7 @@
       font-weight: 800;
       line-height: 1;
       position: relative;
-      vertical-align: middle;
-      margin-left: 4px;
-      opacity: 0.75;
+      opacity: 0.85;
       flex-shrink: 0;
     }
     .under18-badge::after {
@@ -313,14 +327,13 @@
     /* ── Geburtstagstoast (kleine Anzeige auf dem Ausweis) ─────────── */
     .birthday-cake-icon {
       display: none;
-      font-size: 0.9rem;
-      margin-left: 5px;
-      vertical-align: middle;
+      font-size: 0.95rem;
+      line-height: 1;
       animation: cakePulse 1.5s ease-in-out infinite;
     }
     @keyframes cakePulse {
       0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.2); }
+      50% { transform: scale(1.25); }
     }
 
     /* ── Feuerwerk ─────────────────────────────────────────────────── */
@@ -1391,10 +1404,12 @@
           </div>
           <div class="detail-item birth-item">
             <span class="detail-label" data-i18n="labelBirth">Geburtsdatum</span>
-            <span class="detail-value" id="card-birth" style="display:inline-flex; align-items:center; gap:2px;">
+            <span class="detail-value card-birth-container" id="card-birth">
+              <span class="card-birth-badges">
+                <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
+                <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
+              </span>
               <span id="card-birth-text">-</span>
-              <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
-              <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
             </span>
           </div>
           <div class="detail-item place-item">
