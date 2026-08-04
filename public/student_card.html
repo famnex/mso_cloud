@@ -2406,6 +2406,17 @@
     }
 
     async function renderCard(data, isOffline) {
+      // 0. Ausweis-Rahmen sofort sichtbar schalten & Loader ausblenden (0ms Wartezeit)
+      const cardFrame = document.getElementById('card-frame');
+      if (cardFrame) {
+        cardFrame.classList.add('ready');
+      }
+      const skeletonLoader = document.getElementById('card-skeleton-loader');
+      if (skeletonLoader) {
+        skeletonLoader.style.opacity = '0';
+        skeletonLoader.style.display = 'none';
+      }
+
       // 1. Primär- und Sekundärfarbe anwenden
       if (data.card_primary_color) {
         document.documentElement.style.setProperty('--accent', data.card_primary_color);
@@ -2721,34 +2732,51 @@
         photoCtx.textBaseline = 'middle';
         photoCtx.fillText('🔒', 62.5, 82.5);
       } else {
-        // 1. Passbild laden und auf Canvas zeichnen
+        // 1. Passbild laden und auf Canvas zeichnen (mit 600ms Fast-Timeout)
         const photoImg = new Image();
         photoImg.crossOrigin = "anonymous";
         
         const photoLoaded = new Promise((resolve) => {
           if (data.card_image) {
-            photoImg.onload = () => {
-              const hRatio = 125 / photoImg.width;
-              const vRatio = 165 / photoImg.height;
-              const ratio = Math.max(hRatio, vRatio);
-              const shiftX = (125 - photoImg.width * ratio) / 2;
-              const shiftY = (165 - photoImg.height * ratio) / 2;
+            let done = false;
+            const finish = (isFallback) => {
+              if (done) return;
+              done = true;
+              if (isFallback) drawFallbackAvatar(photoCtx);
+              resolve();
+            };
 
-              photoCtx.save();
-              roundRect(photoCtx, 0, 0, 125, 165, 12);
-              photoCtx.clip();
-              photoCtx.drawImage(photoImg, 0, 0, photoImg.width, photoImg.height, 
-                                 shiftX, shiftY, photoImg.width * ratio, photoImg.height * ratio);
-              photoCtx.restore();
-              
-              photoCtx.strokeStyle = 'rgba(0,0,0,0.08)';
-              photoCtx.lineWidth = 2;
-              photoCtx.stroke();
+            const imgTimeout = setTimeout(() => finish(true), 600);
+
+            photoImg.onload = () => {
+              clearTimeout(imgTimeout);
+              if (done) return;
+              done = true;
+              try {
+                const hRatio = 125 / photoImg.width;
+                const vRatio = 165 / photoImg.height;
+                const ratio = Math.max(hRatio, vRatio);
+                const shiftX = (125 - photoImg.width * ratio) / 2;
+                const shiftY = (165 - photoImg.height * ratio) / 2;
+
+                photoCtx.save();
+                roundRect(photoCtx, 0, 0, 125, 165, 12);
+                photoCtx.clip();
+                photoCtx.drawImage(photoImg, 0, 0, photoImg.width, photoImg.height, 
+                                   shiftX, shiftY, photoImg.width * ratio, photoImg.height * ratio);
+                photoCtx.restore();
+                
+                photoCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+                photoCtx.lineWidth = 2;
+                photoCtx.stroke();
+              } catch (e) {
+                drawFallbackAvatar(photoCtx);
+              }
               resolve();
             };
             photoImg.onerror = () => {
-              drawFallbackAvatar(photoCtx);
-              resolve();
+              clearTimeout(imgTimeout);
+              finish(true);
             };
             photoImg.src = data.card_image;
           } else {
@@ -2759,19 +2787,35 @@
 
         await photoLoaded;
 
-        // 2. Siegel laden und über dem Foto unten rechts platzieren (Stempel-Effekt)
+        // 2. Siegel laden (mit 600ms Fast-Timeout)
         const sealImg = new Image();
         sealImg.crossOrigin = "anonymous";
         
         const sealLoaded = new Promise((resolve) => {
           if (data.card_seal) {
+            let done = false;
+            const finish = (isFallback) => {
+              if (done) return;
+              done = true;
+              if (isFallback) drawFallbackSeal(photoCtx, 80, 120, 90);
+              resolve();
+            };
+            const sealTimeout = setTimeout(() => finish(true), 600);
+
             sealImg.onload = () => {
-              photoCtx.drawImage(sealImg, 80, 120, 90, 90);
+              clearTimeout(sealTimeout);
+              if (done) return;
+              done = true;
+              try {
+                photoCtx.drawImage(sealImg, 80, 120, 90, 90);
+              } catch (e) {
+                drawFallbackSeal(photoCtx, 80, 120, 90);
+              }
               resolve();
             };
             sealImg.onerror = () => {
-              drawFallbackSeal(photoCtx, 80, 120, 90);
-              resolve();
+              clearTimeout(sealTimeout);
+              finish(true);
             };
             sealImg.src = data.card_seal;
           } else {
@@ -2806,9 +2850,6 @@
 
 
       // --- CANVAS 2: Unterschrift + Text (Schulleiter/in & Name) ---
-      // Unterschrift: 200% Skalierung, Ankerpunkt oben links bleibt fixiert.
-      // Canvas-Koordinatensystem: 400px × 140px (Anzeigegröße),
-      // interner DPR-Faktor wie gehabt für Retina-Schärfe.
       const SIG_W = 400;  // 200% von 200px
       const SIG_H = 140;  // 200% von 70px
       const sigCanvas = document.createElement('canvas');
@@ -2818,24 +2859,35 @@
       sigCtx.scale(dpr, dpr);
 
       if (!shouldBlockContent) {
-        // 1. Unterschriften-Grafik laden & zeichnen (NUR wenn aktiv!)
-        // Maximalbreite/höhe ist jetzt doppelt so groß → 200% Skalierung.
+        // 1. Unterschriften-Grafik laden & zeichnen (mit 600ms Fast-Timeout)
         const sigImg = new Image();
         sigImg.crossOrigin = "anonymous";
         
         const sigLoaded = new Promise((resolve) => {
           if (data.card_signature) {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              resolve();
+            };
+            const sigTimeout = setTimeout(finish, 600);
+
             sigImg.onload = () => {
-              // Bild skalieren auf max 380px breit / 72px hoch (= 200% der alten 190×36)
-              const ratio = Math.min(380 / sigImg.width, 72 / sigImg.height);
-              const w = sigImg.width * ratio;
-              const h = sigImg.height * ratio;
-              // Ankerpunkt oben links = (0, 0) → fixiert!
-              sigCtx.drawImage(sigImg, 0, 0, w, h);
+              clearTimeout(sigTimeout);
+              if (done) return;
+              done = true;
+              try {
+                const ratio = Math.min(380 / sigImg.width, 72 / sigImg.height);
+                const w = sigImg.width * ratio;
+                const h = sigImg.height * ratio;
+                sigCtx.drawImage(sigImg, 0, 0, w, h);
+              } catch(e) {}
               resolve();
             };
             sigImg.onerror = () => {
-              resolve();
+              clearTimeout(sigTimeout);
+              finish();
             };
             sigImg.src = data.card_signature;
           } else {

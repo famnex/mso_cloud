@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mso-student-card-v3';
+const CACHE_NAME = 'mso-student-card-v4';
 const ASSETS = [
   'student_card.html',
   'style.css',
@@ -49,31 +49,57 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Network First strategy for all requests to ensure updates are instant while online
+// Network First strategy with 1200ms Timeout Fallback to Cache for bad cell reception
 self.addEventListener('fetch', (e) => {
-  // Nur http/https GET-Anfragen cachen (Browser-Erweiterungen wie chrome-extension:// ignorieren)
   if (e.request.method !== 'GET' || (!e.request.url.startsWith('http://') && !e.request.url.startsWith('https://'))) {
     e.respondWith(fetch(e.request));
     return;
   }
 
   e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        // Nur erfolgreiche Anfragen in den Cache schreiben
-        if (res.status === 200) {
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            log('Aktualisiere Cache für:', e.request.url);
-            cache.put(e.request, resClone);
+    new Promise((resolve) => {
+      let isResolved = false;
+
+      // 1200ms Timeout: Bei lahmem Empfang sofort auf den PWA-Cache zurückgreifen
+      const timeoutId = setTimeout(() => {
+        if (!isResolved) {
+          caches.match(e.request).then((cachedRes) => {
+            if (cachedRes && !isResolved) {
+              isResolved = true;
+              log('Netzwerk zu langsam (>1.2s). Antworte sofort aus PWA-Cache:', e.request.url);
+              resolve(cachedRes);
+            }
           });
         }
-        return res;
-      })
-      .catch((err) => {
-        log('Netzwerk-Abruf fehlgeschlagen. Lade aus Cache:', e.request.url);
-        // Offline-Fallback aus dem Cache
-        return caches.match(e.request);
-      })
+      }, 1200);
+
+      fetch(e.request)
+        .then((res) => {
+          clearTimeout(timeoutId);
+          if (!isResolved) {
+            isResolved = true;
+            if (res.status === 200) {
+              const resClone = res.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(e.request, resClone);
+              });
+            }
+            resolve(res);
+          }
+        })
+        .catch(() => {
+          clearTimeout(timeoutId);
+          if (!isResolved) {
+            isResolved = true;
+            caches.match(e.request).then((cachedRes) => {
+              if (cachedRes) {
+                resolve(cachedRes);
+              } else {
+                resolve(new Response('Offline', { status: 503 }));
+              }
+            });
+          }
+        });
+    })
   );
 });
