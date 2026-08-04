@@ -2222,9 +2222,60 @@
       }
     }
 
+    // ── AKTUALLISIERUNGS-STATUS & AUTO-RETRY LOGIK ──────────────────────
+    let isFreshOnlineLoaded = false;
+    let autoRetryTimer = null;
+    let isFetchInProgress = false;
+
+    function setReloadingState(isReloading) {
+      const reloadBtn = document.getElementById('reload-card-btn');
+      if (!reloadBtn) return;
+      const icon = reloadBtn.querySelector('i');
+      if (isReloading) {
+        reloadBtn.disabled = true;
+        reloadBtn.style.pointerEvents = 'none';
+        reloadBtn.style.opacity = '0.6';
+        if (icon) icon.classList.add('fa-spin');
+      } else {
+        reloadBtn.disabled = false;
+        reloadBtn.style.pointerEvents = 'auto';
+        reloadBtn.style.opacity = '1';
+        if (icon) icon.classList.remove('fa-spin');
+      }
+    }
+
+    function startAutoRetry() {
+      if (autoRetryTimer || isFreshOnlineLoaded) return;
+      console.log('[PWA Card] Schlechter Empfang / Offline: Starte automatischen 10s-Wiederholungs-Loop im Hintergrund...');
+      autoRetryTimer = setInterval(async () => {
+        if (!isFreshOnlineLoaded && !isFetchInProgress) {
+          await loadCardData(true);
+        }
+      }, 10000);
+    }
+
+    function stopAutoRetry() {
+      if (autoRetryTimer) {
+        clearInterval(autoRetryTimer);
+        autoRetryTimer = null;
+        console.log('[PWA Card] Online-Daten erfolgreich geladen. Auto-Retry gestoppt.');
+      }
+    }
+
+    window.addEventListener('online', () => {
+      console.log('[PWA Card] Netzverbindung wiederhergestellt! Triggere Sofort-Nachladen...');
+      if (!isFreshOnlineLoaded) {
+        loadCardData(true);
+      }
+    });
+
     // Fetch Card Data
 
-    async function loadCardData() {
+    async function loadCardData(isBackgroundRetry = false) {
+      if (isFetchInProgress) return;
+      isFetchInProgress = true;
+      setReloadingState(true);
+
       const cached = localStorage.getItem('mso_cached_card');
       const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
       const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : 0;
@@ -2274,6 +2325,8 @@
             };
             renderCard(blockedData, false);
             updateControlsState(false);
+            isFreshOnlineLoaded = true;
+            stopAutoRetry();
             return;
           }
           throw new Error(errData.error || 'Nicht autorisiert.');
@@ -2299,6 +2352,8 @@
         // Frischen Ausweis ausgeben
         renderCard(data, false);
         updateControlsState(false);
+        isFreshOnlineLoaded = true;
+        stopAutoRetry();
 
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
@@ -2308,6 +2363,8 @@
         }
       } catch (err) {
         console.warn('[PWA Card] Online-Abruf fehlgeschlagen oder verlangsamt:', err);
+        isFreshOnlineLoaded = false;
+
         if (!cacheRendered) {
           if (cached && !isCacheExpired) {
             cardData = JSON.parse(cached);
@@ -2330,6 +2387,12 @@
             updateControlsState(true);
           }
         }
+
+        // Starte automatische Wiederholungsversuche im Hintergrund!
+        startAutoRetry();
+      } finally {
+        setReloadingState(false);
+        isFetchInProgress = false;
       }
     }
 
@@ -3076,86 +3139,9 @@
 
     // ── AUSWEIS MANUELL AKTUALISIEREN & MODAL LOGIN ───────────────────────
     async function triggerCardReload() {
-      const reloadBtn = document.getElementById('reload-card-btn');
-      if (reloadBtn) {
-        reloadBtn.querySelector('i').classList.add('fa-spin');
-      }
-
-      if (!navigator.onLine) {
-        alert('Keine Internetverbindung vorhanden. Aktualisierung nicht möglich.');
-        if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
-        updateControlsState(true);
-        return;
-      }
-
-      try {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        const sourceParam = isStandalone ? 'pwa' : 'web';
-        const res = await fetch(`api/student/card?source=${sourceParam}`);
-        
-        if (!res.ok) {
-          let errData = {};
-          try {
-            errData = await res.json();
-          } catch (e) {}
-
-          if (errData.account_deleted === true) {
-            localStorage.setItem('mso_card_offline_blocked', 'true');
-            localStorage.removeItem('mso_cached_card');
-            localStorage.removeItem('mso_cached_card_time');
-            const blockedData = {
-              card_status: 'Ausweis gesperrt',
-              first_name: '',
-              last_name: '',
-              birth_date: null,
-              birth_place: '',
-              mediothek_number: '',
-              card_image: null
-            };
-            renderCard(blockedData, false);
-            updateControlsState(false);
-            if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
-            return;
-          }
-
-          if (res.status === 401 || res.status === 403) {
-            openLoginModal();
-          } else {
-            alert('Aktualisierung fehlgeschlagen: ' + (errData.error || 'Serverfehler'));
-          }
-          if (reloadBtn) reloadBtn.querySelector('i').classList.remove('fa-spin');
-          return;
-        }
-
-        const data = await res.json();
-        cardData = data;
-        
-        const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
-        const now = new Date();
-        const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59') : '2099-12-31T23:59:59');
-        const isExpired = now > expiry;
-
-        if (isRevoked || isExpired) {
-          localStorage.setItem('mso_card_offline_blocked', 'true');
-        } else {
-          localStorage.setItem('mso_card_offline_blocked', 'false');
-        }
-
-        localStorage.setItem('mso_cached_card', JSON.stringify(data));
-        localStorage.setItem('mso_cached_card_time', Date.now().toString());
-        renderCard(data, false);
-        updateControlsState(false);
-        
-        alert('Schülerausweis erfolgreich aktualisiert!');
-
-      } catch (err) {
-        console.error('Fehler bei manueller Aktualisierung:', err);
-        alert('Verbindung zum Server fehlgeschlagen. Bitte versuchen Sie es später erneut.');
-      } finally {
-        if (reloadBtn) {
-          reloadBtn.querySelector('i').classList.remove('fa-spin');
-        }
-      }
+      if (isFetchInProgress) return;
+      isFreshOnlineLoaded = false;
+      await loadCardData(false);
     }
 
     async function checkCardLoginLockStatus() {
