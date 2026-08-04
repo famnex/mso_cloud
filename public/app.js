@@ -427,16 +427,10 @@ async function loadTiles() {
           </div>
           <div style="display: flex; align-items: center; gap: 10px; z-index: 5;">
             ${keyBtnHtml}
-            <div class="status-dot" id="status-dot-${tile.id}" data-toggle="tooltip" title="Wird geprüft..."></div>
           </div>
         </div>
         <div class="tile-body">
           <h4 class="tile-title">${tile.title}</h4>
-          <div class="tile-bottom-content">
-            <p class="tile-description">${tile.description || ''}</p>
-            <div class="unavailable-label"><i class="fa-solid fa-circle-exclamation"></i> Dienst momentan nicht verfügbar.</div>
-            <div class="time-locked-label"><i class="fa-solid fa-lock"></i> Aktiv von ${tile.time_limit_start || '08:00'} bis ${tile.time_limit_end || '16:00'} Uhr</div>
-          </div>
         </div>
         <div class="tile-bg-glow"></div>
       `;
@@ -1067,7 +1061,7 @@ async function loadAdminTiles() {
         <td class="acc-cell-main mobile-only">
           <div class="acc-header-bar" onclick="toggleAccRow(this.closest('tr'))">
             <div class="acc-header-left">
-              <strong>${tile.title}</strong>${timeLockBadge}${newTabBadge}${noCheckBadge}
+              <strong>${tile.title}</strong>
             </div>
             <div class="acc-header-right">
               <span class="user-badge" style="font-size:0.75rem;">${visLabel}</span>
@@ -1092,7 +1086,7 @@ async function loadAdminTiles() {
 
         <!-- Desktop Columns -->
         <td class="desktop-only" style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
-        <td class="desktop-only"><strong>${tile.title}</strong>${timeLockBadge}${newTabBadge}${noCheckBadge}</td>
+        <td class="desktop-only"><strong>${tile.title}</strong></td>
         <td class="desktop-only" style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
         <td class="desktop-only" style="font-size: 1.25rem;">${renderIcon(tile.icon)}</td>
         <td class="desktop-only"><span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></td>
