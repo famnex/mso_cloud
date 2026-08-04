@@ -1058,11 +1058,12 @@ html, body {
 
 /* Responsive Accordion Table Rows (Mobile <= 768px) */
 @media (max-width: 768px) {
-  .desktop-only {
+  .desktop-only,
+  .admin-table td.desktop-only {
     display: none !important;
   }
   .mobile-only {
-    display: block;
+    display: block !important;
   }
 
   .admin-table.accordion-table thead {
@@ -1175,8 +1176,12 @@ html, body {
   .mobile-only {
     display: none !important;
   }
-  .acc-cell-main {
+  .acc-cell-main,
+  .admin-table td.acc-cell-main {
     display: none !important;
+  }
+  .admin-table.accordion-table td.desktop-only {
+    display: table-cell !important;
   }
 }
 
