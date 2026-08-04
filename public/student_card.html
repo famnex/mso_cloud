@@ -2725,11 +2725,11 @@
         const lang = typeof currentLang !== 'undefined' ? currentLang : 'de';
         
         if (lang === 'en') {
-          offlineText = daysAgo === 0 ? 'Online Verified' : (daysAgo === 1 ? 'Online Verified 1 day ago' : `Online Verified ${daysAgo} days ago`);
+          offlineText = daysAgo === 1 ? 'Online Verified 1 day ago' : `Online Verified ${daysAgo} days ago`;
         } else if (lang === 'fr') {
-          offlineText = daysAgo === 0 ? 'Vérifié en ligne' : (daysAgo === 1 ? 'Vérifié en ligne il y a 1 jour' : `Vérifié en ligne il y a ${daysAgo} jours`);
+          offlineText = daysAgo === 1 ? 'Vérifié en ligne il y a 1 jour' : `Vérifié en ligne il y a ${daysAgo} jours`;
         } else {
-          offlineText = daysAgo === 0 ? 'Online verifiziert' : (daysAgo === 1 ? 'Online verifiziert vor 1 Tag' : `Online verifiziert vor ${daysAgo} Tagen`);
+          offlineText = daysAgo === 1 ? 'Online verifiziert vor 1 Tag' : `Online verifiziert vor ${daysAgo} Tagen`;
         }
         
         statusLabel.innerText = offlineText;
