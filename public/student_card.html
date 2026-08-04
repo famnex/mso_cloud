@@ -280,21 +280,35 @@
       100% { transform: translateY(110vh) rotate(360deg) scaleX(1); opacity: 0; }
     }
 
-    /* ── Unter-18-Symbol & Geburtstagstorte ─────────────────────────────── */
+    /* ── Sonder-Symbole (Torte & Unter-18) Links neben dem Hologramm ──── */
+    .special-card-badges {
+      position: absolute;
+      right: 54px;
+      bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+      z-index: 30;
+      white-space: nowrap;
+    }
     .under18-badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 18px;
-      height: 18px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
-      border: 2px solid currentColor;
-      font-size: 0.52rem;
+      border: 2px solid var(--text);
+      font-size: 0.65rem;
       font-weight: 800;
       line-height: 1;
       position: relative;
-      opacity: 0.85;
+      opacity: 0.88;
       flex-shrink: 0;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(4px);
     }
     .under18-badge::after {
       content: '';
@@ -303,7 +317,7 @@
       left: -2px;
       right: -2px;
       height: 2px;
-      background: currentColor;
+      background: var(--text);
       transform: translateY(-50%) rotate(-40deg);
       border-radius: 1px;
     }
@@ -311,7 +325,7 @@
     /* ── Geburtstagstoast (kleine Anzeige auf dem Ausweis) ─────────── */
     .birthday-cake-icon {
       display: none;
-      font-size: 0.95rem;
+      font-size: 1.1rem;
       line-height: 1;
       animation: cakePulse 1.5s ease-in-out infinite;
     }
@@ -1388,11 +1402,7 @@
           </div>
           <div class="detail-item birth-item">
             <span class="detail-label" data-i18n="labelBirth">Geburtsdatum</span>
-            <span class="detail-value" id="card-birth" style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px;">
-              <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
-              <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
-              <span id="card-birth-text">-</span>
-            </span>
+            <span class="detail-value" id="card-birth">-</span>
           </div>
           <div class="detail-item place-item">
             <span class="detail-label" data-i18n="labelBirthplace">Geburtsort</span>
@@ -1407,6 +1417,12 @@
           <div class="principal-container" id="signature-container">
             <span class="signature-placeholder">Unterschrift</span>
           </div>
+        </div>
+
+        <!-- Sonder-Symbole (Torte & Unter-18) ABSOLUT links neben dem Hologramm -->
+        <div class="special-card-badges" id="special-card-badges">
+          <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
+          <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
         </div>
 
         <!-- Hologram PWA App-Icon Badge (Rechtsbündig OBERHALB der Trennlinie) -->
@@ -2501,7 +2517,7 @@
 
       // 4. Personendaten befüllen (Bei Sperrung anonymisieren/leeren)
       if (shouldBlockContent) {
-        document.getElementById('card-birth-text').textContent = '—';
+        document.getElementById('card-birth').textContent = '—';
         document.getElementById('card-birthplace').innerText = '—';
         document.getElementById('card-expiry').innerText = '—';
         document.getElementById('card-mediothek-number-display').innerText = '—';
@@ -2532,7 +2548,7 @@
             birthStr = data.birth_date;
           }
         }
-        document.getElementById('card-birth-text').textContent = birthStr;
+        document.getElementById('card-birth').textContent = birthStr;
 
         // ── Unter-18-Badge ─────────────────────────────────────────────
         const under18Badge = document.getElementById('under18-badge');
