@@ -431,6 +431,9 @@ async function loadTiles() {
         </div>
         <div class="tile-body">
           <h4 class="tile-title">${tile.title}</h4>
+          <div class="tile-bottom-content">
+            <p class="tile-description">${tile.description || ''}</p>
+          </div>
         </div>
         <div class="tile-bg-glow"></div>
       `;
@@ -1056,6 +1059,9 @@ async function loadAdminTiles() {
       tr.dataset.id = tile.id;
       tr.style.transition = 'background-color 0.2s ease';
       
+      const extraBadges = `${timeLockBadge}${newTabBadge}${noCheckBadge}`;
+      const extraBadgesLine = extraBadges.trim() ? `<div class="acc-detail-line"><strong>Hinweise:</strong> <span>${extraBadges}</span></div>` : '';
+
       tr.innerHTML = `
         <!-- Mobile Accordion Cell -->
         <td class="acc-cell-main mobile-only">
@@ -1064,7 +1070,6 @@ async function loadAdminTiles() {
               <strong>${tile.title}</strong>
             </div>
             <div class="acc-header-right">
-              <span class="user-badge" style="font-size:0.75rem;">${visLabel}</span>
               <i class="fa-solid fa-chevron-down acc-chevron"></i>
             </div>
           </div>
@@ -1073,6 +1078,7 @@ async function loadAdminTiles() {
             <div class="acc-detail-line"><strong>Icon:</strong> <span>${renderIcon(tile.icon)}</span></div>
             <div class="acc-detail-line"><strong>Sichtbarkeit:</strong> <span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></div>
             <div class="acc-detail-line"><strong>SSO-Typ:</strong> <code>${tile.sso_type}</code></div>
+            ${extraBadgesLine}
             <div class="acc-detail-line"><strong>Reihenfolge:</strong> <span>${tile.sort_order}</span></div>
             <div class="acc-detail-line" style="border-bottom:none;">
               <strong>Aktionen:</strong>
@@ -1086,7 +1092,7 @@ async function loadAdminTiles() {
 
         <!-- Desktop Columns -->
         <td class="desktop-only" style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
-        <td class="desktop-only"><strong>${tile.title}</strong></td>
+        <td class="desktop-only"><strong>${tile.title}</strong>${timeLockBadge}${newTabBadge}${noCheckBadge}</td>
         <td class="desktop-only" style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
         <td class="desktop-only" style="font-size: 1.25rem;">${renderIcon(tile.icon)}</td>
         <td class="desktop-only"><span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></td>
