@@ -280,23 +280,7 @@
       100% { transform: translateY(110vh) rotate(360deg) scaleX(1); opacity: 0; }
     }
 
-    /* ── Unter-18-Symbol & Geburtstagstorte (Positionierung links ohne Textverschiebung) ─ */
-    .card-birth-container {
-      position: relative;
-      display: inline-block;
-    }
-    .card-birth-badges {
-      position: absolute;
-      right: 100%;
-      top: 50%;
-      transform: translateY(-50%);
-      margin-right: 6px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      pointer-events: none;
-      white-space: nowrap;
-    }
+    /* ── Unter-18-Symbol & Geburtstagstorte ─────────────────────────────── */
     .under18-badge {
       display: inline-flex;
       align-items: center;
@@ -1404,11 +1388,9 @@
           </div>
           <div class="detail-item birth-item">
             <span class="detail-label" data-i18n="labelBirth">Geburtsdatum</span>
-            <span class="detail-value card-birth-container" id="card-birth">
-              <span class="card-birth-badges">
-                <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
-                <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
-              </span>
+            <span class="detail-value" id="card-birth" style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px;">
+              <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
+              <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
               <span id="card-birth-text">-</span>
             </span>
           </div>
