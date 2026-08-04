@@ -232,6 +232,8 @@
     .special-btn:hover { background: rgba(255,255,255,0.25); transform: scale(1.08); }
     .special-btn.active-snow { background: rgba(147,210,255,0.35); border-color: #7ecfff; box-shadow: 0 0 8px rgba(126,207,255,0.5); }
     .special-btn.active-birthday { background: rgba(255,200,100,0.35); border-color: #ffcc55; box-shadow: 0 0 8px rgba(255,200,100,0.5); }
+    .special-btn.active-fireworks { background: rgba(255,100,200,0.35); border-color: #ff77ee; box-shadow: 0 0 8px rgba(255,119,238,0.5); }
+    .special-btn.active-halloween { background: rgba(255,140,0,0.4); border-color: #ff9900; box-shadow: 0 0 8px rgba(255,153,0,0.6); }
 
     /* ── Schneeflocken ─────────────────────────────────────────────── */
     .snowflake-layer {
@@ -319,6 +321,66 @@
     @keyframes cakePulse {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.2); }
+    }
+
+    /* ── Feuerwerk ─────────────────────────────────────────────────── */
+    .firework-layer {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 999;
+      overflow: hidden;
+    }
+    .firework-burst {
+      position: absolute;
+      width: 0; height: 0;
+      animation: burstFade 1.8s ease-out forwards;
+    }
+    .firework-particle {
+      position: absolute;
+      top: 0; left: 0;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      transform-origin: 0 0;
+      animation: particleFly 1.8s ease-out forwards;
+    }
+    @keyframes particleFly {
+      0%   { transform: translate(0,0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(0.2); opacity: 0; }
+    }
+    @keyframes burstFade {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* ── Halloween ─────────────────────────────────────────────────── */
+    .halloween-layer {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 999;
+      overflow: hidden;
+    }
+    .halloween-piece {
+      position: absolute;
+      top: -40px;
+      font-size: 1.4rem;
+      opacity: 0;
+      animation: hauntFall linear infinite;
+      user-select: none;
+      filter: drop-shadow(0 0 4px rgba(255,100,0,0.6));
+    }
+    @keyframes hauntFall {
+      0%   { transform: translateY(0) rotate(0deg);   opacity: 0.9; }
+      80%  { opacity: 0.7; }
+      100% { transform: translateY(110vh) rotate(30deg); opacity: 0; }
+    }
+    /* Subtiler orange Schimmer auf dem Body */
+    body.halloween-mode {
+      background: radial-gradient(ellipse at center, #1a0a00 0%, #0d0600 100%);
+    }
+    body.halloween-mode .card-container {
+      filter: drop-shadow(0 0 18px rgba(255,90,0,0.35));
     }
 
     /* Card Perspective Frame — Versteckt bis alle Daten geladen sind */
@@ -1146,12 +1208,18 @@
   <div class="special-design-btns" id="special-design-btns">
     <button class="special-btn" id="btn-snow" onclick="toggleSpecialDesign('snow')" title="Schneedesign Vorschau">❄️</button>
     <button class="special-btn" id="btn-birthday" onclick="toggleSpecialDesign('birthday')" title="Geburtstagsdesign Vorschau">🎂</button>
+    <button class="special-btn" id="btn-fireworks" onclick="toggleSpecialDesign('fireworks')" title="Feuerwerk Vorschau">🎆</button>
+    <button class="special-btn" id="btn-halloween" onclick="toggleSpecialDesign('halloween')" title="Halloween Vorschau">🎃</button>
   </div>
 
   <!-- Schneeflocken-Ebene -->
   <div class="snowflake-layer" id="snowflake-layer" style="display:none;"></div>
   <!-- Konfetti-Ebene -->
   <div class="confetti-layer" id="confetti-layer" style="display:none;"></div>
+  <!-- Feuerwerk-Ebene -->
+  <div class="firework-layer" id="firework-layer" style="display:none;"></div>
+  <!-- Halloween-Ebene -->
+  <div class="halloween-layer" id="halloween-layer" style="display:none;"></div>
 
   <!-- Top Bar Controls -->
   <div class="top-controls">
@@ -1758,7 +1826,8 @@
     }
 
     // ── Sonder-Design-System ──────────────────────────────────────────────
-    let activeDesign = null; // 'snow' | 'birthday' | null
+    let activeDesign = null; // 'snow' | 'birthday' | 'fireworks' | 'halloween' | null
+    let fireworksInterval = null;
 
     function activateSpecialDesign(type) {
       if (activeDesign === type) return; // Bereits aktiv
@@ -1775,6 +1844,14 @@
         if (cake) cake.style.display = 'inline';
         const btn = document.getElementById('btn-birthday');
         if (btn) btn.classList.add('active-birthday');
+      } else if (type === 'fireworks') {
+        buildFireworks();
+        const btn = document.getElementById('btn-fireworks');
+        if (btn) btn.classList.add('active-fireworks');
+      } else if (type === 'halloween') {
+        buildHalloween();
+        const btn = document.getElementById('btn-halloween');
+        if (btn) btn.classList.add('active-halloween');
       }
     }
 
@@ -1792,6 +1869,20 @@
       if (cakeIcon) cakeIcon.style.display = 'none';
       const btnBday = document.getElementById('btn-birthday');
       if (btnBday) btnBday.classList.remove('active-birthday');
+
+      // Feuerwerk stoppen
+      if (fireworksInterval) { clearInterval(fireworksInterval); fireworksInterval = null; }
+      const fwLayer = document.getElementById('firework-layer');
+      if (fwLayer) { fwLayer.style.display = 'none'; fwLayer.innerHTML = ''; }
+      const btnFw = document.getElementById('btn-fireworks');
+      if (btnFw) btnFw.classList.remove('active-fireworks');
+
+      // Halloween stoppen
+      const hwLayer = document.getElementById('halloween-layer');
+      if (hwLayer) { hwLayer.style.display = 'none'; hwLayer.innerHTML = ''; }
+      document.body.classList.remove('halloween-mode');
+      const btnHw = document.getElementById('btn-halloween');
+      if (btnHw) btnHw.classList.remove('active-halloween');
 
       activeDesign = null;
     }
@@ -1842,6 +1933,77 @@
         el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
         el.style.animationDuration = (3 + Math.random() * 5) + 's';
         el.style.animationDelay = -(Math.random() * 8) + 's';
+        layer.appendChild(el);
+      }
+    }
+
+    function spawnFireworkBurst() {
+      const layer = document.getElementById('firework-layer');
+      if (!layer || activeDesign !== 'fireworks') return;
+
+      const burst = document.createElement('div');
+      burst.className = 'firework-burst';
+      const originX = 10 + Math.random() * 80; // in vw
+      const originY = 15 + Math.random() * 60; // in vh
+      burst.style.left = originX + 'vw';
+      burst.style.top = originY + 'vh';
+
+      const colors = ['#ff4d4d', '#fffa65', '#32ff7e', '#18dcff', '#7d5fff', '#ff3838', '#ffaf40'];
+      const particlesCount = 24 + Math.floor(Math.random() * 12);
+      const color = colors[Math.floor(Math.random() * colors.length)];
+
+      for (let i = 0; i < particlesCount; i++) {
+        const p = document.createElement('div');
+        p.className = 'firework-particle';
+        const angle = (i / particlesCount) * (2 * Math.PI) + (Math.random() * 0.2);
+        const distance = 40 + Math.random() * 80; // in px
+        const tx = Math.cos(angle) * distance;
+        const ty = Math.sin(angle) * distance;
+        p.style.setProperty('--tx', tx + 'px');
+        p.style.setProperty('--ty', ty + 'px');
+        p.style.backgroundColor = color;
+        p.style.boxShadow = `0 0 6px ${color}`;
+        burst.appendChild(p);
+      }
+
+      layer.appendChild(burst);
+      setTimeout(() => { burst.remove(); }, 1800);
+    }
+
+    function buildFireworks() {
+      const layer = document.getElementById('firework-layer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      layer.style.display = 'block';
+
+      // Sofort 3 Explosionen zünden
+      spawnFireworkBurst();
+      setTimeout(spawnFireworkBurst, 300);
+      setTimeout(spawnFireworkBurst, 600);
+
+      // Danach alle 700ms eine neue Explosion
+      if (fireworksInterval) clearInterval(fireworksInterval);
+      fireworksInterval = setInterval(spawnFireworkBurst, 700);
+    }
+
+    function buildHalloween() {
+      const layer = document.getElementById('halloween-layer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      layer.style.display = 'block';
+      document.body.classList.add('halloween-mode');
+
+      const symbols = ['🎃', '👻', '🦇', '🕷️', '💀', '🎃', '🦇'];
+      const count = 35;
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('span');
+        el.className = 'halloween-piece';
+        el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        const size = 0.9 + Math.random() * 1.1;
+        el.style.fontSize = size + 'rem';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.animationDuration = (5 + Math.random() * 8) + 's';
+        el.style.animationDelay = -(Math.random() * 10) + 's';
         layer.appendChild(el);
       }
     }
@@ -2390,15 +2552,19 @@
         // ── Automatisch Sonderdesign aktivieren (nicht Admin-Vorschau) ─
         if (!data.is_admin_preview) {
           const now = new Date();
+          const day = now.getDate();
           const month = now.getMonth() + 1; // 1-12
-          // Geburtstag?
-          const isBirthday = birthDateObj &&
-            birthDateObj.getDate() === now.getDate() &&
-            birthDateObj.getMonth() === now.getMonth();
-          // Winter (Dez oder Jan)?
-          const isWinter = month === 12 || month === 1;
 
-          if (isBirthday) activateSpecialDesign('birthday');
+          const isNewYear = (month === 12 && day === 31) || (month === 1 && day === 1);
+          const isHalloween = (month === 10 && day === 31);
+          const isBirthday = birthDateObj &&
+            birthDateObj.getDate() === day &&
+            birthDateObj.getMonth() === (month - 1);
+          const isWinter = (month === 12 || month === 1);
+
+          if (isNewYear) activateSpecialDesign('fireworks');
+          else if (isHalloween) activateSpecialDesign('halloween');
+          else if (isBirthday) activateSpecialDesign('birthday');
           else if (isWinter) activateSpecialDesign('snow');
         }
 
