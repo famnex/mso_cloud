@@ -73,7 +73,22 @@ self.addEventListener('fetch', (event) => {
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Network timeout')), 1500)
         )
-      ]).catch(() => caches.match(event.request))
+      ]).catch(() => {
+        return caches.match(event.request).then((cachedRes) => {
+          if (cachedRes) {
+            const headers = new Headers(cachedRes.headers);
+            headers.set('X-From-Cache', 'true');
+            return cachedRes.blob().then((blob) => {
+              return new Response(blob, {
+                status: cachedRes.status,
+                statusText: cachedRes.statusText,
+                headers: headers
+              });
+            });
+          }
+          return new Response(JSON.stringify({ error: 'Offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+        });
+      })
     );
     return;
   }

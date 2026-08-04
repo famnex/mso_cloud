@@ -2332,6 +2332,7 @@
           throw new Error(errData.error || 'Nicht autorisiert.');
         }
         
+        const isFromCache = !navigator.onLine || res.headers.get('X-From-Cache') === 'true';
         const data = await res.json();
         cardData = data;
         
@@ -2346,14 +2347,20 @@
           localStorage.setItem('mso_card_offline_blocked', 'false');
         }
 
-        localStorage.setItem('mso_cached_card', JSON.stringify(data));
-        localStorage.setItem('mso_cached_card_time', Date.now().toString());
-        
-        // Frischen Ausweis ausgeben
-        renderCard(data, false);
-        updateControlsState(false);
-        isFreshOnlineLoaded = true;
-        stopAutoRetry();
+        if (isFromCache) {
+          renderCard(data, true);
+          updateControlsState(true);
+          isFreshOnlineLoaded = false;
+          startAutoRetry();
+        } else {
+          localStorage.setItem('mso_cached_card', JSON.stringify(data));
+          localStorage.setItem('mso_cached_card_time', Date.now().toString());
+          
+          renderCard(data, false);
+          updateControlsState(false);
+          isFreshOnlineLoaded = true;
+          stopAutoRetry();
+        }
 
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
@@ -2365,27 +2372,25 @@
         console.warn('[PWA Card] Online-Abruf fehlgeschlagen oder verlangsamt:', err);
         isFreshOnlineLoaded = false;
 
-        if (!cacheRendered) {
-          if (cached && !isCacheExpired) {
-            cardData = JSON.parse(cached);
-            if (isOfflineBlocked) cardData.card_status = 'Ausweis gesperrt';
-            renderCard(cardData, true);
-            updateControlsState(true);
-          } else {
-            localStorage.removeItem('mso_cached_card');
-            localStorage.removeItem('mso_cached_card_time');
-            
-            const errorMsg = isCacheExpired ? 'Offline-Zeitraum abgelaufen (30 Tage überschritten)' : 'Kein Cache vorhanden';
-            const nameEl = document.getElementById('card-name');
-            if (nameEl) nameEl.innerText = errorMsg;
-            
-            const blockedData = {
-              card_status: 'Ausweis gesperrt',
-              first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
-            };
-            renderCard(blockedData, false);
-            updateControlsState(true);
-          }
+        if (cached && !isCacheExpired) {
+          try { cardData = JSON.parse(cached); } catch(e) {}
+          if (isOfflineBlocked && cardData) cardData.card_status = 'Ausweis gesperrt';
+          if (cardData) renderCard(cardData, true);
+          updateControlsState(true);
+        } else {
+          localStorage.removeItem('mso_cached_card');
+          localStorage.removeItem('mso_cached_card_time');
+          
+          const errorMsg = isCacheExpired ? 'Offline-Zeitraum abgelaufen (30 Tage überschritten)' : 'Kein Cache vorhanden';
+          const nameEl = document.getElementById('card-name');
+          if (nameEl) nameEl.innerText = errorMsg;
+          
+          const blockedData = {
+            card_status: 'Ausweis gesperrt',
+            first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
+          };
+          renderCard(blockedData, false);
+          updateControlsState(true);
         }
 
         // Starte automatische Wiederholungsversuche im Hintergrund!
