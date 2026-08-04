@@ -1524,6 +1524,8 @@ html, body {
 
 .student-grid {
   animation: fadeIn 0.4s ease;
+  width: 100%;
+  max-width: 100%;
 }
 
 .student-table td {
@@ -1533,6 +1535,28 @@ html, body {
 
 .student-table tr:last-child td {
   border-bottom: none;
+}
+
+.password-toggle-btn {
+  padding: 4px 10px !important;
+  font-size: 0.85rem !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-primary) !important;
+  height: 30px !important;
+  min-width: 36px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+}
+
+.password-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: var(--accent-color) !important;
 }
 
 @media (max-width: 900px) {
@@ -1576,10 +1600,16 @@ html, body {
   text-decoration: underline;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   body {
-    padding-top: 85px;
-    padding-bottom: 85px;
+    padding-top: 80px;
+    padding-bottom: 80px;
+  }
+  #student-view {
+    padding: 15px 10px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
   }
   .site-footer {
     flex-direction: column;
@@ -1588,35 +1618,48 @@ html, body {
     padding: 10px 15px;
   }
   .glass-panel {
-    padding: 15px !important;
+    padding: 15px 12px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
   }
   .student-table, .student-table tbody, .student-table tr, .student-table td {
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
   }
   .student-table tr {
-    padding: 12px 0 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding: 10px 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
     display: block !important;
   }
   .student-table tr:last-child {
     border-bottom: none !important;
   }
   .student-table td {
-    padding: 3px 0 !important;
+    padding: 2px 0 !important;
     border-bottom: none !important;
     min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     text-align: left !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
   }
   .student-table td:first-child {
     color: var(--text-secondary) !important;
-    font-size: 0.8rem !important;
-    font-weight: normal !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    margin-bottom: 2px !important;
   }
   .student-table td:last-child {
-    font-size: 0.95rem !important;
+    font-size: 0.92rem !important;
     font-weight: 600 !important;
+  }
+  #student-consents-container {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
   }
 }
 
