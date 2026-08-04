@@ -2694,17 +2694,6 @@
       } else {
         overlay.style.display = 'none';
       }
-
-      // 9. Lade-Skeleton ausblenden und fertig befüllte Karte geschmeidig einblenden
-      const skeletonLoader = document.getElementById('card-skeleton-loader');
-      if (skeletonLoader) {
-        skeletonLoader.style.opacity = '0';
-        setTimeout(() => { skeletonLoader.style.display = 'none'; }, 350);
-      }
-      const cardFrame = document.getElementById('card-frame');
-      if (cardFrame) {
-        cardFrame.classList.add('ready');
-      }
     }
 
     /**
