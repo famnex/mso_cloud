@@ -1,14 +1,15 @@
-const CACHE_NAME = 'mso-student-card-v4';
+const CACHE_NAME = 'mso-student-card-v5';
 const ASSETS = [
   'student_card.html',
   'style.css',
   'favicon.ico',
-  'assets/qrcode.min.js'
+  'assets/qrcode.min.js',
+  'assets/fontawesome/css/all.min.css',
+  'media/user.png'
 ];
 
 let loggingEnabled = false;
 
-// Custom Logging Helper
 function log(...args) {
   if (loggingEnabled) {
     console.log('[MSO PWA]', ...args);
@@ -49,57 +50,43 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Network First strategy with 1200ms Timeout Fallback to Cache for bad cell reception
-self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET' || (!e.request.url.startsWith('http://') && !e.request.url.startsWith('https://'))) {
-    e.respondWith(fetch(e.request));
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://'))) {
+    event.respondWith(fetch(event.request));
     return;
   }
 
-  e.respondWith(
-    new Promise((resolve) => {
-      let isResolved = false;
-
-      // 1200ms Timeout: Bei lahmem Empfang sofort auf den PWA-Cache zurückgreifen
-      const timeoutId = setTimeout(() => {
-        if (!isResolved) {
-          caches.match(e.request).then((cachedRes) => {
-            if (cachedRes && !isResolved) {
-              isResolved = true;
-              log('Netzwerk zu langsam (>1.2s). Antworte sofort aus PWA-Cache:', e.request.url);
-              resolve(cachedRes);
-            }
-          });
-        }
-      }, 1200);
-
-      fetch(e.request)
-        .then((res) => {
-          clearTimeout(timeoutId);
-          if (!isResolved) {
-            isResolved = true;
-            if (res.status === 200) {
-              const resClone = res.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(e.request, resClone);
-              });
-            }
-            resolve(res);
+  // 1. Bei API-Anfragen: Versuche Netzwerk mit 1500ms Timeout, sonst Fallback aus Cache
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(
+      Promise.race([
+        fetch(event.request).then((res) => {
+          if (res.status === 200) {
+            const resClone = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
           }
-        })
-        .catch(() => {
-          clearTimeout(timeoutId);
-          if (!isResolved) {
-            isResolved = true;
-            caches.match(e.request).then((cachedRes) => {
-              if (cachedRes) {
-                resolve(cachedRes);
-              } else {
-                resolve(new Response('Offline', { status: 503 }));
-              }
-            });
+          return res;
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Network timeout')), 1500)
+        )
+      ]).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // 2. Für App-Shell / Schriften / CSS / Assets (Cache First mit Revalidierung im Hintergrund)
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        fetch(event.request).then((networkRes) => {
+          if (networkRes.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkRes));
           }
-        });
+        }).catch(() => {});
+        return cachedResponse;
+      }
+      return fetch(event.request);
     })
   );
 });

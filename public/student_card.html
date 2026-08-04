@@ -13,11 +13,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="MSO Ausweis">
   
-  <!-- Google Fonts & FontAwesome -->
+  <!-- Local FontAwesome & Google Fonts -->
+  <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <!-- QRCode.js Library -->
   <script src="assets/qrcode.min.js"></script>
@@ -2247,13 +2247,13 @@
         } catch (e) {}
       }
 
-      // 2. Netzwerk-Abruf im Hintergrund (mit 5s Timeout für lahme Verbindungen)
+      // 2. Netzwerk-Abruf mit harten 1.5s Timeout für schlechten Empfang
       try {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         const sourceParam = isStandalone ? 'pwa' : 'web';
 
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
 
         const fetchOpts = controller ? { signal: controller.signal } : {};
         const res = await fetch(`api/student/card?source=${sourceParam}`, fetchOpts);
