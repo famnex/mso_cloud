@@ -1,10 +1,13 @@
-const CACHE_NAME = 'mso-student-card-v5';
+const CACHE_NAME = 'mso-student-card-v6';
 const ASSETS = [
   'student_card.html',
   'style.css',
   'favicon.ico',
   'assets/qrcode.min.js',
   'assets/fontawesome/css/all.min.css',
+  'assets/fontawesome/webfonts/fa-solid-900.woff2',
+  'assets/fontawesome/webfonts/fa-regular-400.woff2',
+  'assets/fontawesome/webfonts/fa-brands-400.woff2',
   'media/user.png'
 ];
 

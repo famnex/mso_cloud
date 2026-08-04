@@ -2194,8 +2194,9 @@
       const reloadBtn = document.getElementById('reload-card-btn');
       const offlineInd = document.getElementById('offline-indicator');
       
+      if (reloadBtn) reloadBtn.style.display = 'flex';
+
       if (isOfflineMode) {
-        if (reloadBtn) reloadBtn.style.display = 'none';
         if (offlineInd) {
           // Tage berechnen bis der Cache abläuft (30 Tage Limit)
           const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
@@ -2217,7 +2218,6 @@
           offlineInd.style.display = 'flex';
         }
       } else {
-        if (reloadBtn) reloadBtn.style.display = 'flex';
         if (offlineInd) offlineInd.style.display = 'none';
       }
     }
