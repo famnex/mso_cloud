@@ -75,10 +75,82 @@ router.get('/me', async (req, res) => {
   }
 });
 
+// IP Rate-Limiting für Login (max. 5 Fehlversuche -> 5 Minuten Sperre)
+const ipLoginAttempts = new Map();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 5 * 60 * 1000;
+
+function getIpLockStatus(ip) {
+  const record = ipLoginAttempts.get(ip);
+  if (!record) {
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_LOGIN_ATTEMPTS };
+  }
+
+  const now = Date.now();
+  if (record.lockUntil && now < record.lockUntil) {
+    const remainingSeconds = Math.ceil((record.lockUntil - now) / 1000);
+    return { isLocked: true, remainingSeconds, attemptsLeft: 0 };
+  }
+
+  if (record.lockUntil && now >= record.lockUntil) {
+    ipLoginAttempts.delete(ip);
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_LOGIN_ATTEMPTS };
+  }
+
+  const remainingAttempts = Math.max(0, MAX_LOGIN_ATTEMPTS - record.attempts);
+  return { isLocked: false, remainingSeconds: 0, attemptsLeft: remainingAttempts };
+}
+
+function recordFailedLogin(ip) {
+  const now = Date.now();
+  let record = ipLoginAttempts.get(ip);
+  if (!record || (record.lockUntil && now >= record.lockUntil)) {
+    record = { attempts: 0, lockUntil: null, lastAttempt: now };
+  }
+
+  record.attempts += 1;
+  record.lastAttempt = now;
+
+  if (record.attempts >= MAX_LOGIN_ATTEMPTS) {
+    record.lockUntil = now + LOCKOUT_DURATION_MS;
+    ipLoginAttempts.set(ip, record);
+    return { isLocked: true, remainingSeconds: 300, attemptsLeft: 0 };
+  }
+
+  ipLoginAttempts.set(ip, record);
+  return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_LOGIN_ATTEMPTS - record.attempts };
+}
+
+function resetFailedLogin(ip) {
+  ipLoginAttempts.delete(ip);
+}
+
 /**
- * Login-API (Lokale Daten & LDAP)
+ * Abfragen des aktuellen IP-Sperrstatus
+ */
+router.get('/login-status', (req, res) => {
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const status = getIpLockStatus(clientIp);
+  res.json(status);
+});
+
+/**
+ * Login-API (Lokaler Benutzer oder LDAP)
  */
 router.post('/login', async (req, res) => {
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const lockStatus = getIpLockStatus(clientIp);
+
+  if (lockStatus.isLocked) {
+    const minutes = Math.ceil(lockStatus.remainingSeconds / 60);
+    return res.status(429).json({
+      error: `Zu viele fehlgeschlagene Anmeldeversuche. Diese IP ist noch für ${lockStatus.remainingSeconds} Sekunden (ca. ${minutes} Min.) für die Anmeldung gesperrt.`,
+      locked: true,
+      remaining_seconds: lockStatus.remainingSeconds,
+      attempts_left: 0
+    });
+  }
+
   const password = req.body.password;
   const username = String(req.body.username || '').trim().toLowerCase();
 
@@ -94,6 +166,7 @@ router.post('/login', async (req, res) => {
       const match = bcrypt.compareSync(password, localUser.password_hash);
       if (match) {
         // Lokaler Login erfolgreich!
+        resetFailedLogin(clientIp);
         const groups = JSON.parse(localUser.groups || '[]');
         req.session.user = {
           id: localUser.id,
@@ -111,7 +184,7 @@ router.post('/login', async (req, res) => {
         }
 
         const isOauth = !!req.session.oauthQuery;
-        logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, req.ip);
+        logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, clientIp);
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
       }
     }
@@ -124,6 +197,7 @@ router.post('/login', async (req, res) => {
       
       if (ldapUser) {
         // LDAP-Login erfolgreich! Synchronisiere mit lokaler Cache-Datenbank
+        resetFailedLogin(clientIp);
         let localCache = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
         let userId;
 
@@ -174,17 +248,31 @@ router.post('/login', async (req, res) => {
         }
 
         const isOauth = !!req.session.oauthQuery;
-        logEvent('info', 'login_success', `LDAP-Login erfolgreich für: ${ldapUser.username}`, { userId: userId, role: role, groups: ldapUser.rawGroups }, req.ip);
+        logEvent('info', 'login_success', `LDAP-Login erfolgreich für: ${ldapUser.username}`, { userId: userId, role: role, groups: ldapUser.rawGroups }, clientIp);
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
       }
     }
 
     // Wenn beide fehlschlagen
-    logEvent('warn', 'login_failed', `Fehlgeschlagener Login-Versuch für: ${username}`, null, req.ip);
-    res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort.' });
+    logEvent('warn', 'login_failed', `Fehlgeschlagener Login-Versuch für: ${username}`, null, clientIp);
+    const failStatus = recordFailedLogin(clientIp);
+    if (failStatus.isLocked) {
+      return res.status(429).json({
+        error: `Zu viele fehlgeschlagene Anmeldeversuche (5 von 5). Diese IP wurde für 5 Minuten für die Anmeldung gesperrt.`,
+        locked: true,
+        remaining_seconds: failStatus.remainingSeconds,
+        attempts_left: 0
+      });
+    }
+
+    res.status(401).json({
+      error: `Ungültiger Benutzername oder Passwort. Verbleibende Anmeldeversuche: ${failStatus.attemptsLeft} von 5.`,
+      locked: false,
+      attempts_left: failStatus.attemptsLeft
+    });
   } catch (error) {
     console.error('Fehler beim Login:', error);
-    logEvent('error', 'login_error', `Ausnahmefehler bei Login für: ${username}`, { error: error.message }, req.ip);
+    logEvent('error', 'login_error', `Ausnahmefehler bei Login für: ${username}`, { error: error.message }, clientIp);
     res.status(500).json({ error: 'Serverfehler während der Authentifizierung: ' + error.message });
   }
 });

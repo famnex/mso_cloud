@@ -172,3 +172,31 @@ Um das Einloggen bei Microsoft 365 und Outlook Web App für Benutzer so komforta
    - **SchülerInnen (alle anderen)**: Es wird automatisch der UPN im Format `[Benutzername]@msohef.onmicrosoft.com` generiert und als `login_hint` übergeben (gemäß FAQ-Vorgabe).
 
 Dies ermöglicht ein vollautomatisches Überspringen der Benutzernamens-Eingabe auf den Microsoft-Login-Seiten.
+
+---
+
+## 8. Neue Funktionen & Sicherheitserweiterungen
+
+### A. Halloween-Thema Interaktivitäts-Fix (Schülerausweis)
+* Die Steuerungselemente (`.top-controls`, `.top-left-controls`, `.special-design-btns`, `.lang-switcher`) besitzen nun `z-index: 1005` und explizit `pointer-events: auto`.
+* Sämtliche Partikel-Layer (`.snowflake-layer`, `.confetti-layer`, `.firework-layer`, `.halloween-layer`) haben `z-index: 500` und `pointer-events: none !important`.
+* Dadurch sind alle Buttons, Sprachauswahlelemente und Ausweisfunktionen im Halloween-Modus uneingeschränkt klick- und tippbar.
+
+### B. Mobile Akkordeon-Ansicht in der Administration
+* Auf mobilen Bildschirmen (`max-width: 768px`) werden die Tabellen für **Dienste (Kacheln)** und **Systemprotokolle** als responsive Akkordeons dargestellt:
+  * **Dienste (Kacheln)**: Geschlossene Ansicht zeigt den Dienstnamen (Titel) sowie ein Aufklapp-Symbol. Nach dem Aufklappen werden alle Detailspalten (Beschreibung, Icon, Sichtbarkeit, SSO-Typ, Sortierung, Aktionen) angezeigt.
+  * **Systemprotokolle**: Geschlossene Ansicht zeigt `Aktion (Benutzername)` (z. B. `login_failed (admin)`) sowie das Level-Badge. Nach dem Aufklappen werden Zeitstempel, Level, Aktion, Meldung, IP-Adresse und der Details-Button eingeblendet.
+
+### C. 3-Sekunden Cache-Fallback für den Schülerausweis
+* Beim Abruf des Schülerausweises (`loadCardData()`) startet ein 3-Sekunden-Timer (`3000 ms`).
+* Dauert die Netzwerkverbindung länger als 3 Sekunden oder liegt ein Verbindungsengpass vor, wird der Schülerausweis vorab aus dem `localStorage`-Cache (`mso_cached_card`) geladen und angezeigt.
+* Sobald die Netzwerkanfrage erfolgreich abschließt, werden die Ausweisdaten im Hintergrund auf den neuesten Stand aktualisiert und der Cache erneuert.
+
+### D. IP-Rate-Limiting für Anmeldeversuche
+* Bei mehr als 5 fehlgeschlagenen Anmeldeversuchen (`login_failed`) von derselben IP-Adresse wird diese IP für **5 Minuten** (300 Sekunden) für die Anmeldung gesperrt.
+* Das Anmeldefenster zeigt verbleibende Versuche (z. B. "Noch 4 Anmeldeversuche verbleibend") und im Sperrfall die verbleibende Sperrzeit an.
+* **Wichtig**: Die Sperre beschränkt sich ausschließlich auf den Anmeldevorgang (`POST /api/auth/login`). Alle übrigen Portalbereiche (öffentliche Dienst-Kacheln, Hauptseite, gepufferte Ausweisansichten) bleiben für die betreffende IP weiterhin voll funktionsfähig.
+
+### E. Dynamisches "Tara" für Gyroskop-Neigung & Ausrichtungs-Fix
+* Das Drehen/Rotieren des Schülerausweises wurde unterbunden (`screen.orientation.lock('portrait')` & Entfernung von Z-Rotationen).
+* **Dynamisches Tara (Sliding Zero Baseline)**: Beim Kippen des Smartphones über die maximale Neigungsgrenze (15°) hinaus schiebt sich die Nullpunkt-Baseline (`baseBeta` / `baseGamma`) dynamisch mit der Bewegung mit. Sobald das Gerät zurückgekippt wird, reagiert der Ausweis sofort ohne Totpunkt oder Verzögerung.

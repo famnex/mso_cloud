@@ -813,11 +813,40 @@ async function handleChangePassword(e) {
   }
 }
 
+async function checkMainLoginLockStatus() {
+  try {
+    const res = await fetch('api/auth/login-status');
+    if (!res.ok) return;
+    const status = await res.json();
+    const alertBox = document.getElementById('login-alert');
+    const submitBtn = document.querySelector('#login-form button[type="submit"]');
+
+    if (status.isLocked) {
+      if (alertBox) {
+        alertBox.className = 'alert alert-danger';
+        alertBox.innerText = `Anmeldung gesperrt! Zu viele fehlgeschlagene Versuche. Bitte warten Sie noch ${status.remainingSeconds} Sekunden.`;
+        alertBox.style.display = 'block';
+      }
+      if (submitBtn) submitBtn.disabled = true;
+    } else {
+      if (submitBtn) submitBtn.disabled = false;
+      if (status.attemptsLeft < 5 && alertBox) {
+        alertBox.className = 'alert alert-warn';
+        alertBox.innerText = `Hinweis: Noch ${status.attemptsLeft} von 5 Anmeldeversuchen verbleibend.`;
+        alertBox.style.display = 'block';
+      }
+    }
+  } catch (e) {}
+}
+
 /* ==========================================================================
    5. Modals Helper
    ========================================================================== */
 function openModal(id) {
   document.getElementById(id).style.display = 'flex';
+  if (id === 'login-modal') {
+    checkMainLoginLockStatus();
+  }
 }
 
 function closeModal(id) {
@@ -1034,14 +1063,42 @@ async function loadAdminTiles() {
       tr.style.transition = 'background-color 0.2s ease';
       
       tr.innerHTML = `
-        <td style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
-        <td><strong>${tile.title}</strong>${timeLockBadge}${newTabBadge}${noCheckBadge}</td>
-        <td style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
-        <td style="font-size: 1.25rem;">${renderIcon(tile.icon)}</td>
-        <td><span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></td>
-        <td><code>${tile.sso_type}</code></td>
-        <td>${tile.sort_order}</td>
-        <td class="actions-cell">
+        <!-- Mobile Accordion Cell -->
+        <td class="acc-cell-main mobile-only">
+          <div class="acc-header-bar" onclick="toggleAccRow(this.closest('tr'))">
+            <div class="acc-header-left">
+              <strong>${tile.title}</strong>${timeLockBadge}${newTabBadge}${noCheckBadge}
+            </div>
+            <div class="acc-header-right">
+              <span class="user-badge" style="font-size:0.75rem;">${visLabel}</span>
+              <i class="fa-solid fa-chevron-down acc-chevron"></i>
+            </div>
+          </div>
+          <div class="acc-body-content">
+            <div class="acc-detail-line"><strong>Beschreibung:</strong> <span>${tile.description || '-'}</span></div>
+            <div class="acc-detail-line"><strong>Icon:</strong> <span>${renderIcon(tile.icon)}</span></div>
+            <div class="acc-detail-line"><strong>Sichtbarkeit:</strong> <span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></div>
+            <div class="acc-detail-line"><strong>SSO-Typ:</strong> <code>${tile.sso_type}</code></div>
+            <div class="acc-detail-line"><strong>Reihenfolge:</strong> <span>${tile.sort_order}</span></div>
+            <div class="acc-detail-line" style="border-bottom:none;">
+              <strong>Aktionen:</strong>
+              <div class="actions-cell">
+                <button class="btn btn-secondary btn-icon" onclick="event.stopPropagation(); openTileForm(${JSON.stringify(tile).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-pen-to-square"></i></button>
+                <button class="btn btn-danger btn-icon" onclick="event.stopPropagation(); deleteTile(${tile.id})" title="Löschen"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <!-- Desktop Columns -->
+        <td class="desktop-only" style="text-align:center; padding: 12px 6px;"><i class="fa-solid fa-grip-vertical drag-handle-grip" style="cursor: grab; color: var(--text-secondary); opacity: 0.5; font-size:1.1rem;" title="Reihenfolge per Drag & Drop verschieben"></i></td>
+        <td class="desktop-only"><strong>${tile.title}</strong>${timeLockBadge}${newTabBadge}${noCheckBadge}</td>
+        <td class="desktop-only" style="font-size:0.8rem; color:var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${tile.description || ''}</td>
+        <td class="desktop-only" style="font-size: 1.25rem;">${renderIcon(tile.icon)}</td>
+        <td class="desktop-only"><span class="user-badge" style="font-size:0.75rem;">${visLabel}</span></td>
+        <td class="desktop-only"><code>${tile.sso_type}</code></td>
+        <td class="desktop-only">${tile.sort_order}</td>
+        <td class="desktop-only actions-cell">
           <button class="btn btn-secondary btn-icon" onclick="openTileForm(${JSON.stringify(tile).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-pen-to-square"></i></button>
           <button class="btn btn-danger btn-icon" onclick="deleteTile(${tile.id})" title="Löschen"><i class="fa-solid fa-trash"></i></button>
         </td>
@@ -2436,6 +2493,30 @@ function renderPaginationControls(containerId, startIndex, endIndex, totalEntrie
   `;
 }
 
+function toggleAccRow(tr) {
+  if (window.innerWidth <= 768) {
+    tr.classList.toggle('expanded');
+  }
+}
+
+function getLogUsername(log) {
+  if (log.details) {
+    try {
+      const d = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+      if (d.username) return d.username;
+      if (d.user) return d.user;
+      if (d.email) return d.email;
+    } catch(e) {}
+  }
+  if (log.message) {
+    const match = log.message.match(/für:\s*([^\s,;]+)|Benutzer\s+([^\s,;]+)|User\s+([^\s,;]+)|E-Mail:\s*([^\s,;]+)/i);
+    if (match) {
+      return match[1] || match[2] || match[3] || match[4];
+    }
+  }
+  return 'system';
+}
+
 function renderAdminLogs(logs) {
   const tableBody = document.getElementById('admin-logs-table-body');
   
@@ -2497,14 +2578,42 @@ function renderAdminLogs(logs) {
       });
     } catch(e) {}
 
+    const username = getLogUsername(log);
+    const actionFormatted = `${log.action} (${username})`;
+
     return `
       <tr>
-        <td style="font-size:0.9rem; font-weight:500;">${dateStr}</td>
-        <td>${levelBadge}</td>
-        <td><code style="color:var(--warn-color); font-weight:600; font-family:monospace; font-size:0.85rem;">${log.action}</code></td>
-        <td style="font-size:0.9rem; font-weight:normal; max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.message}">${log.message}</td>
-        <td><code style="font-family:monospace; font-size:0.85rem;">${log.ip || '-'}</code></td>
-        <td style="text-align:center;">${detailBtn}</td>
+        <!-- Mobile Accordion Cell -->
+        <td class="acc-cell-main mobile-only">
+          <div class="acc-header-bar" onclick="toggleAccRow(this.closest('tr'))">
+            <div class="acc-header-left">
+              <code style="color:var(--warn-color); font-weight:600; font-family:monospace; font-size:0.85rem;">${actionFormatted}</code>
+            </div>
+            <div class="acc-header-right">
+              ${levelBadge}
+              <i class="fa-solid fa-chevron-down acc-chevron"></i>
+            </div>
+          </div>
+          <div class="acc-body-content">
+            <div class="acc-detail-line"><strong>Zeitstempel:</strong> <span>${dateStr}</span></div>
+            <div class="acc-detail-line"><strong>Level:</strong> <span>${levelBadge}</span></div>
+            <div class="acc-detail-line"><strong>Aktion:</strong> <code style="color:var(--warn-color); font-weight:600; font-family:monospace; font-size:0.85rem;">${log.action}</code></div>
+            <div class="acc-detail-line"><strong>Meldung:</strong> <span style="word-break:break-word;">${log.message}</span></div>
+            <div class="acc-detail-line"><strong>IP-Adresse:</strong> <code>${log.ip || '-'}</code></div>
+            <div class="acc-detail-line" style="border-bottom:none;">
+              <strong>Details:</strong>
+              <div>${detailBtn}</div>
+            </div>
+          </div>
+        </td>
+
+        <!-- Desktop Columns -->
+        <td class="desktop-only" style="font-size:0.9rem; font-weight:500;">${dateStr}</td>
+        <td class="desktop-only">${levelBadge}</td>
+        <td class="desktop-only"><code style="color:var(--warn-color); font-weight:600; font-family:monospace; font-size:0.85rem;">${log.action}</code></td>
+        <td class="desktop-only" style="font-size:0.9rem; font-weight:normal; max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.message}">${log.message}</td>
+        <td class="desktop-only"><code style="font-family:monospace; font-size:0.85rem;">${log.ip || '-'}</code></td>
+        <td class="desktop-only" style="text-align:center;">${detailBtn}</td>
       </tr>
     `;
   }).join('');
