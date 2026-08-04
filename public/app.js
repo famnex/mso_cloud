@@ -498,41 +498,53 @@ function checkTileStatus(tileId, link) {
     if (xhr.status === 200) {
       try {
         const result = JSON.parse(xhr.responseText);
-        dot.className = 'status-dot';
+        if (dot) dot.className = 'status-dot';
         
         if (result.color === 'a3e77f') {
           // Online
-          dot.classList.add('online');
-          dot.setAttribute('title', result.reason);
+          if (dot) {
+            dot.classList.add('online');
+            dot.setAttribute('title', result.reason);
+          }
         } else {
           // Offline (e77f7f)
-          dot.classList.add('offline');
-          dot.setAttribute('title', result.reason);
+          if (dot) {
+            dot.classList.add('offline');
+            dot.setAttribute('title', result.reason);
+          }
           disableTileCard(card);
         }
       } catch (e) {
         // Fallback bei JSON Parsefehler
-        dot.className = 'status-dot online';
-        dot.setAttribute('title', 'Erreichbar');
+        if (dot) {
+          dot.className = 'status-dot online';
+          dot.setAttribute('title', 'Erreichbar');
+        }
       }
     } else {
-      dot.className = 'status-dot offline';
-      dot.setAttribute('title', 'Prüfung fehlgeschlagen');
+      if (dot) {
+        dot.className = 'status-dot offline';
+        dot.setAttribute('title', 'Prüfung fehlgeschlagen');
+      }
       disableTileCard(card);
     }
   };
 
   xhr.onerror = function() {
     requestCompleted = true;
-    dot.className = 'status-dot offline';
-    dot.setAttribute('title', 'Netzwerkfehler bei Prüfung');
+    if (dot) {
+      dot.className = 'status-dot offline';
+      dot.setAttribute('title', 'Netzwerkfehler bei Prüfung');
+    }
     disableTileCard(card);
   };
 
   xhr.ontimeout = function() {
     requestCompleted = true;
-    dot.className = 'status-dot timeout';
-    dot.setAttribute('title', 'Timeout: Keine Antwort nach 10s');
+    if (dot) {
+      dot.className = 'status-dot timeout';
+      dot.setAttribute('title', 'Timeout: Keine Antwort nach 10s');
+    }
     disableTileCard(card);
   };
 
