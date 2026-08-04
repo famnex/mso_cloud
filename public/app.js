@@ -3933,12 +3933,15 @@ async function loadStudentProfile() {
 
 
 
+    const fullName = ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim();
+
     // 2. Header Avatar & Anzeigenamen befüllen (Nur wenn es ein echter Schüler ist, nicht bei Admin-Vorschau)
     if (!profile.is_preview) {
-      const fullName = ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim();
-      document.getElementById('header-full-name').innerText = fullName || currentUser.username;
+      const headerName = document.getElementById('header-full-name');
+      if (headerName) headerName.innerText = fullName || currentUser.username;
       if (profile.card_image) {
-        document.getElementById('header-user-avatar').src = profile.card_image;
+        const headerAvatar = document.getElementById('header-user-avatar');
+        if (headerAvatar) headerAvatar.src = profile.card_image;
       }
     }
 
