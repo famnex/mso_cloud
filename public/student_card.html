@@ -2907,7 +2907,18 @@
 
       overlay.style.display = 'flex';
 
-      // Screen Wake Lock anfordern (Display hell halten & nicht in Standby gehen)
+      // 1. Echten Hardware-Vollbildmodus aktivieren (maximiert auf Mobilgeräten die Display-Leuchtkraft)
+      try {
+        if (overlay.requestFullscreen) {
+          await overlay.requestFullscreen();
+        } else if (overlay.webkitRequestFullscreen) {
+          await overlay.webkitRequestFullscreen();
+        }
+      } catch (e) {
+        console.log('Vollbildmodus nicht unterstützt:', e);
+      }
+
+      // 2. Screen Wake Lock anfordern (Display hell halten & nicht in Standby gehen)
       try {
         if ('wakeLock' in navigator && navigator.wakeLock) {
           screenWakeLock = await navigator.wakeLock.request('screen');
@@ -2921,6 +2932,15 @@
       const overlay = document.getElementById('fullscreen-qr-overlay');
       if (overlay) {
         overlay.style.display = 'none';
+      }
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            await document.webkitExitFullscreen();
+          }
+        } catch (e) {}
       }
       if (screenWakeLock) {
         try {
