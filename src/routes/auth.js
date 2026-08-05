@@ -235,7 +235,15 @@ router.post('/login', async (req, res) => {
       // Wenn das Konto als LDAP-Konto markiert ist, aber der LDAP-Login fehlschlug -> Fehler
       if (ldapEnabled && localUser.is_ldap === 1) {
         console.warn(`LDAP-Authentifizierung für LDAP-Konto ${username} fehlgeschlagen.`);
-        registerFailedLogin(clientIp);
+        const failStatus = recordFailedLogin(clientIp);
+        if (failStatus.isLocked) {
+          return res.status(429).json({
+            error: `Zu viele fehlgeschlagene Anmeldeversuche (5 von 5). Diese IP wurde für 5 Minuten für die Anmeldung gesperrt.`,
+            locked: true,
+            remaining_seconds: failStatus.remainingSeconds,
+            attempts_left: 0
+          });
+        }
         return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort.' });
       }
 
