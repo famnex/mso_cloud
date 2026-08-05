@@ -1230,6 +1230,71 @@
       transform: scale(0.97);
       opacity: 0.9;
     }
+
+    /* Mobile Landscape Phone Rotation Overlay Styles & Animation */
+    #rotate-device-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 20000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+      user-select: none;
+    }
+
+    .phone-rotate-anim-box {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .phone-icon-animated {
+      font-size: 3.8rem;
+      color: #3b82f6;
+      animation: rotate-phone-back 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.5));
+      transform-origin: center center;
+    }
+
+    @keyframes rotate-phone-back {
+      0%, 30% {
+        transform: rotate(90deg);
+      }
+      70%, 100% {
+        transform: rotate(0deg);
+      }
+    }
+
+    .rotate-arrow-animated {
+      position: absolute;
+      font-size: 2rem;
+      color: #38bdf8;
+      top: -2px;
+      right: -2px;
+      animation: rotate-arrow-spin 2.5s ease-in-out infinite;
+    }
+
+    @keyframes rotate-arrow-spin {
+      0%, 30% {
+        opacity: 1;
+        transform: rotate(0deg) scale(1);
+      }
+      70%, 100% {
+        opacity: 0.25;
+        transform: rotate(-90deg) scale(0.85);
+      }
+    }
   </style>
 </head>
 <body>
@@ -1238,6 +1303,31 @@
   <div class="blob-container">
     <div class="blob blob-1" id="bg-blob-1"></div>
     <div class="blob blob-2" id="bg-blob-2"></div>
+  </div>
+
+  <!-- Rotate Device Overlay (Mobile Landscape Mode Warning) -->
+  <div id="rotate-device-overlay">
+    <div class="phone-rotate-anim-box">
+      <div class="phone-icon-animated">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+      </div>
+      <div class="rotate-arrow-animated">
+        <i class="fa-solid fa-rotate-left"></i>
+      </div>
+    </div>
+
+    <h2 id="rotate-overlay-title" style="font-size: 1.4rem; font-weight: 800; margin: 16px 0 8px; color: #f8fafc; letter-spacing: 0.3px;" data-i18n="rotateTitle">
+      Bitte ins Hochformat drehen
+    </h2>
+    
+    <p id="rotate-overlay-desc" style="font-size: 0.92rem; color: #94a3b8; max-width: 320px; line-height: 1.5; margin: 0;" data-i18n="rotateDesc">
+      Der digitale Schülerausweis erfordert das Hochformat für die vollständige Anzeige und Echtheitsprüfung.
+    </p>
+
+    <div style="margin-top: 22px; font-size: 0.8rem; color: #64748b; background: rgba(255,255,255,0.06); padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1);">
+      <i class="fa-solid fa-arrows-rotate" style="color: #60a5fa; margin-right: 6px;"></i>
+      <span id="rotate-overlay-hint" data-i18n="rotateHint">Drehe dein Smartphone in die vertikale Ausrichtung</span>
+    </div>
   </div>
 
   <!-- Top Left Controls (Reload Button & Offline Indicator) -->
@@ -1571,7 +1661,12 @@
         pwaB2Title: "Offline verfügbar",
         pwaB2Desc: "Funktioniert in der Schule auch komplett ohne Internet.",
         pwaInstruct: "Installationsanleitung:",
-        pwaInstallBtn: "Jetzt installieren"
+        pwaInstallBtn: "Jetzt installieren",
+
+        // Rotate Overlay
+        rotateTitle: "Bitte ins Hochformat drehen",
+        rotateDesc: "Der digitale Schülerausweis erfordert das Hochformat für die vollständige Anzeige und Echtheitsprüfung.",
+        rotateHint: "Drehe dein Smartphone in die vertikale Ausrichtung"
       },
       en: {
         offlineMode: "Offline Mode Active (Cached Card)",
@@ -1609,7 +1704,12 @@
         pwaB2Title: "Offline support",
         pwaB2Desc: "Works completely offline inside the school buildings.",
         pwaInstruct: "Installation Guide:",
-        pwaInstallBtn: "Install Now"
+        pwaInstallBtn: "Install Now",
+
+        // Rotate Overlay
+        rotateTitle: "Please Rotate to Portrait Mode",
+        rotateDesc: "The digital student ID card requires portrait mode for full display and authenticity verification.",
+        rotateHint: "Rotate your smartphone to vertical orientation"
       },
       fr: {
         offlineMode: "Mode hors ligne actif (carte mise en cache)",
@@ -1647,7 +1747,27 @@
         pwaB2Title: "Disponible hors ligne",
         pwaB2Desc: "Fonctionne hors ligne dans l'école, même sans réseau.",
         pwaInstruct: "Guide d'installation:",
-        pwaInstallBtn: "Installer maintenant"
+        pwaInstallBtn: "Installer maintenant",
+
+        // Rotate Overlay
+        rotateTitle: "Veuillez tourner en mode portrait",
+        rotateDesc: "La carte d'étudiant numérique nécessite le mode portrait pour un affichage complet et la vérification d'authenticité.",
+        rotateHint: "Tournez votre smartphone à la verticale"
+      },
+      tr: {
+        rotateTitle: "Lütfen dikey konuma getirin",
+        rotateDesc: "Dijital öğrenci kimliği, tam görüntüleme ve doğrulama için dikey modu gerektirir.",
+        rotateHint: "Akıllı telefonunuzu dikey konuma döndürün"
+      },
+      ua: {
+        rotateTitle: "Поверніть у портретний режим",
+        rotateDesc: "Цифровий учнівський квиток потребує портретного режиму для повного відображення та перевірки автентичності.",
+        rotateHint: "Поверніть смартфон у вертикальне положення"
+      },
+      ar: {
+        rotateTitle: "يرجى التدوير إلى الوضع العمودي",
+        rotateDesc: "تتطلب بطاقة الطالب الرقمية الوضع العمودي للعرض الكامل والتحقق من الأصالة.",
+        rotateHint: "قم بتدوير هاتفك الذكي إلى الاتجاه العمودي"
       }
     };
 
@@ -3486,6 +3606,33 @@
       }
     }
 
+    /* Mobile Landscape Orientation Check Overlay */
+    function checkOrientationOverlay() {
+      const overlay = document.getElementById('rotate-device-overlay');
+      if (!overlay) return;
+
+      // 1. Prüfen, ob es sich um ein mobiles Endgerät (Touch / Mobile User Agent) handelt
+      const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobi/i.test(navigator.userAgent);
+      const isSmallViewport = window.innerWidth <= 1024 || window.innerHeight <= 600;
+      const isMobileDevice = (isTouchDevice || isMobileUserAgent) && isSmallViewport;
+
+      // 2. Prüfen, ob Querformat (Landscape) aktiv ist
+      const isLandscape = window.innerWidth > window.innerHeight && window.innerHeight < 700;
+
+      // 3. Nur wenn Mobilgerät UND Querformat -> Overlay anzeigen
+      if (isMobileDevice && isLandscape) {
+        overlay.style.display = 'flex';
+      } else {
+        overlay.style.display = 'none';
+      }
+    }
+
+    window.addEventListener('resize', checkOrientationOverlay);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(checkOrientationOverlay, 150);
+    });
+
     // Event Listeners for connection state changes (instant UI reaction)
     window.addEventListener('online', () => {
       updateControlsState(false);
@@ -3497,8 +3644,10 @@
 
     // Start
     switchLanguage(currentLang);
+    checkOrientationOverlay();
     loadCardData().then(() => {
       checkPwaInstallPrompt();
+      checkOrientationOverlay();
     });
   </script>
 </body>
