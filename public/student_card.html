@@ -787,16 +787,28 @@
     }
 
     .qr-code-box {
-      width: 66px;
-      height: 66px;
+      width: 72px;
+      height: 72px;
       background: #ffffff;
-      padding: 4px;
+      padding: 5px;
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
       flex-shrink: 0;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .qr-code-box img,
+    .qr-code-box canvas {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      display: block !important;
+      object-fit: contain !important;
     }
 
     /* Hologram PWA Badge über dem QR-Code */
@@ -2785,8 +2797,8 @@
         
         qrGenerator = new QRCode(qrBox, {
           text: qrPayload,
-          width: 68,
-          height: 68,
+          width: 62,
+          height: 62,
           colorDark : "#000000",
           colorLight : "#ffffff",
           correctLevel : QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur für geringe Punktdichte (einfaches Scannen)
