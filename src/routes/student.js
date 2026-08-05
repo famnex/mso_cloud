@@ -273,7 +273,7 @@ router.get('/status-check', async (req, res) => {
 
   try {
     // 1. Prüfen, ob der Benutzer in der lokalen DB existiert und aktiv ist
-    const dbUser = db.prepare('SELECT id, is_active FROM users WHERE username = ?').get(username);
+    const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_active FROM users WHERE username = ?').get(username);
     if (!dbUser || dbUser.is_active === 0) {
       return res.json({ active: false, account_deleted: true, reason: 'Konto deaktiviert oder gelöscht.' });
     }
@@ -292,10 +292,33 @@ router.get('/status-check', async (req, res) => {
       return res.json({ active: false, account_deleted: true, reason: 'Konto im LDAP deaktiviert oder gelöscht.' });
     }
 
-    // 3. Ausweis-Profil und Status prüfen
-    const profile = db.prepare('SELECT card_status FROM student_profiles WHERE user_id = ?').get(dbUser.id);
-    const rawStatus = profile ? profile.card_status : 'Bild verifiziert';
-    const isRevoked = rawStatus === 'Ausweis gesperrt' || rawStatus === 'gesperrt' || rawStatus === 'Ungültig';
+    // 3. Schülerprofil in Schulanmeldungs-Datenbank (MySQL / SQLite) abfragen
+    let profile = null;
+    try {
+      profile = await studentDb.getStudentProfile(dbUser);
+    } catch (e) {
+      console.error('[Express /status-check] Fehler beim Abrufen des Schülerprofils:', e);
+    }
+
+    // Admin-Vorschau oder Testbetrieb ohne Schülerprüfungs-Pflicht berücksichtigen
+    const disableCheck = getConfig('disable_student_check', '0') === '1';
+    if (!profile && (disableCheck || dbUser.role === 'admin')) {
+      return res.json({ active: true, card_status: 'Bild verifiziert', expires_at: `${new Date().getFullYear() + 1}-07-31` });
+    }
+
+    if (!profile) {
+      return res.json({ active: false, account_deleted: false, reason: 'Kein Schülerprofil in der Schulanmeldungs-Datenbank vorhanden.', card_status: 'Ausweis gesperrt' });
+    }
+
+    const rawStatus = profile.card_status || 'Bild ungeprüft / Kein Bild';
+    const hasImage = !!profile.card_image;
+
+    const isVerified = rawStatus === 'Bild genehmigt' || 
+                       rawStatus === 'genehmigt' || 
+                       rawStatus === 'Bild verifiziert' ||
+                       rawStatus === 'Bild akzeptiert' ||
+                       rawStatus === 'Ausweis gedruckt' ||
+                       rawStatus === 'Ausweis ausgegeben';
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -306,8 +329,13 @@ router.get('/status-check', async (req, res) => {
     }
     const expiresAt = `${expirationYear}-07-31`;
 
-    if (isRevoked) {
-      return res.json({ active: false, account_deleted: false, reason: 'Ausweis gesperrt.', card_status: rawStatus, expires_at: expiresAt });
+    // Falls kein Bild vorhanden ist oder der Status abgelehnt/ungeprüft/gesperrt ist:
+    if (!hasImage) {
+      return res.json({ active: false, account_deleted: false, reason: 'Kein Passbild hinterlegt.', card_status: 'Kein Foto hinterlegt', expires_at: expiresAt });
+    }
+
+    if (!isVerified) {
+      return res.json({ active: false, account_deleted: false, reason: `Ausweis-Status nicht verifiziert (${rawStatus}).`, card_status: rawStatus, expires_at: expiresAt });
     }
 
     return res.json({ active: true, card_status: rawStatus, expires_at: expiresAt });

@@ -2368,7 +2368,7 @@
                   localStorage.removeItem('mso_cached_card_time');
                   
                   const blockedData = {
-                    card_status: 'Ausweis gesperrt',
+                    card_status: statusData.card_status || 'Ausweis gesperrt',
                     first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
                   };
                   renderCard(blockedData, false);
@@ -3223,8 +3223,11 @@
       // öffnen wir das Login-Modal, damit der Nutzer sich einloggen kann (z.B. für Namensänderungen nach Heirat)
       try {
         const checkRes = await fetch('api/auth/me');
-        if (!checkRes.ok && checkRes.status === 401) {
-          openLoginModal();
+        if (checkRes.ok) {
+          const meData = await checkRes.json();
+          if (!meData.logged_in) {
+            openLoginModal();
+          }
         }
       } catch (e) {}
     }
