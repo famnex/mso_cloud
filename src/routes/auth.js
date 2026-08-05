@@ -390,10 +390,14 @@ router.post('/reset-request', async (req, res) => {
  * Passwort mit Token tatsächlich im LDAP zurücksetzen
  */
 router.post('/reset-password', async (req, res) => {
-  const { token, password } = req.body;
+  const { token, password, confirmPassword } = req.body;
 
   if (!token || !password) {
     return res.status(400).json({ error: 'Token und neues Passwort sind erforderlich.' });
+  }
+
+  if (confirmPassword && password !== confirmPassword) {
+    return res.status(400).json({ error: 'Die Passwörter stimmen nicht überein.' });
   }
 
   const ip = req.ip || req.headers['x-forwarded-for'] || '0.0.0.0';
@@ -457,9 +461,13 @@ router.post('/change-password-logged-in', async (req, res) => {
     return res.status(401).json({ error: 'Nicht angemeldet.' });
   }
 
-  const { password } = req.body;
+  const { password, confirmPassword } = req.body;
   if (!password) {
     return res.status(400).json({ error: 'Neues Passwort ist erforderlich.' });
+  }
+
+  if (confirmPassword && password !== confirmPassword) {
+    return res.status(400).json({ error: 'Die Passwörter stimmen nicht überein.' });
   }
 
   const ip = req.ip || req.headers['x-forwarded-for'] || '0.0.0.0';

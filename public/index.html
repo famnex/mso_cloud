@@ -1189,11 +1189,11 @@
         <input type="hidden" id="reset-token-field">
         <div class="form-group">
           <label for="reset-new-password">Neues Passwort</label>
-          <input type="password" id="reset-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number')">
+          <input type="password" id="reset-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number', 'reset-new-password-confirm', 'reset-req-match')">
         </div>
         <div class="form-group">
           <label for="reset-new-password-confirm">Neues Passwort bestätigen</label>
-          <input type="password" id="reset-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off">
+          <input type="password" id="reset-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number', 'reset-new-password-confirm', 'reset-req-match')">
         </div>
 
         <div class="password-requirements" style="margin-top: 10px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 5px; text-align: left; background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px;">
@@ -1206,6 +1206,9 @@
           </div>
           <div id="reset-req-number" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
             <i class="fa-solid fa-circle-xmark"></i> Mindestens 1 Zahl (0-9)
+          </div>
+          <div id="reset-req-match" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Passwörter stimmen überein
           </div>
         </div>
 
@@ -1230,11 +1233,11 @@
       <form id="change-password-form" onsubmit="handleChangePassword(event)">
         <div class="form-group">
           <label for="change-new-password">Neues Passwort</label>
-          <input type="password" id="change-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number')">
+          <input type="password" id="change-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number', 'change-new-password-confirm', 'change-req-match')">
         </div>
         <div class="form-group">
           <label for="change-new-password-confirm">Passwort bestätigen</label>
-          <input type="password" id="change-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off">
+          <input type="password" id="change-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number', 'change-new-password-confirm', 'change-req-match')">
         </div>
 
         <div class="password-requirements" style="margin-top: 10px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 5px; text-align: left; background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px;">
@@ -1247,6 +1250,9 @@
           </div>
           <div id="change-req-number" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
             <i class="fa-solid fa-circle-xmark"></i> Mindestens 1 Zahl (0-9)
+          </div>
+          <div id="change-req-match" style="display: flex; align-items: center; gap: 8px; color: #fca5a5; transition: all 0.2s;">
+            <i class="fa-solid fa-circle-xmark"></i> Passwörter stimmen überein
           </div>
         </div>
 

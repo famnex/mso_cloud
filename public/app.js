@@ -678,7 +678,7 @@ async function handlePasswordResetExecute(e) {
       alertBox.classList.add('alert-success');
       alertBox.style.display = 'flex';
       document.getElementById('reset-password-form').reset();
-      validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number');
+      validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number', 'reset-new-password-confirm', 'reset-req-match');
       
       setTimeout(() => {
         closeModal('reset-password-modal');
@@ -728,19 +728,25 @@ function togglePasswordVisibility(type) {
 }
 
 // Echtzeit-Passwortprüfung (Richtlinien)
-function validatePasswordInput(inputId, submitBtnId, reqLengthId, reqLetterId, reqNumberId) {
+function validatePasswordInput(inputId, submitBtnId, reqLengthId, reqLetterId, reqNumberId, confirmInputId, reqMatchId) {
   const val = document.getElementById(inputId).value;
   const submitBtn = document.getElementById(submitBtnId);
+  const confirmVal = confirmInputId && document.getElementById(confirmInputId) ? document.getElementById(confirmInputId).value : '';
   
   const isLongEnough = val.length >= 8;
   const hasLetter = /[a-zA-Z]/.test(val);
   const hasNumber = /\d/.test(val);
+  const doMatch = val.length > 0 && val === confirmVal;
   
   const reqs = [
     { id: reqLengthId, text: 'Mindestens 8 Zeichen', valid: isLongEnough },
     { id: reqLetterId, text: 'Mindestens 1 Buchstabe (a-z, A-Z)', valid: hasLetter },
     { id: reqNumberId, text: 'Mindestens 1 Zahl (0-9)', valid: hasNumber }
   ];
+
+  if (reqMatchId) {
+    reqs.push({ id: reqMatchId, text: 'Passwörter stimmen überein', valid: doMatch });
+  }
 
   reqs.forEach(r => {
     const el = document.getElementById(r.id);
@@ -756,7 +762,8 @@ function validatePasswordInput(inputId, submitBtnId, reqLengthId, reqLetterId, r
   });
 
   if (submitBtn) {
-    submitBtn.disabled = !(isLongEnough && hasLetter && hasNumber);
+    const isAllValid = isLongEnough && hasLetter && hasNumber && (reqMatchId ? doMatch : true);
+    submitBtn.disabled = !isAllValid;
   }
 }
 
@@ -768,7 +775,7 @@ function openChangePasswordModal(event) {
   if (form) form.reset();
   
   // Anforderungen zurücksetzen
-  validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number');
+  validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number', 'change-new-password-confirm', 'change-req-match');
   
   const alertBox = document.getElementById('change-password-alert');
   if (alertBox) {
