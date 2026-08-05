@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mso-student-card-v6';
+const CACHE_NAME = 'mso-student-card-v7';
 const ASSETS = [
   'student_card.html',
   'style.css',
@@ -54,13 +54,19 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // 1. Alle Nicht-GET Anfragen (POST, PUT, DELETE) sowie Nicht-HTTP(S) URLs NICHT abfangen.
+  // Ohne event.respondWith() übernimmt der Browser das Request-Handling nativ!
   if (event.request.method !== 'GET' || (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://'))) {
-    event.respondWith(fetch(event.request));
     return;
   }
 
-  // 1. Bei API-Anfragen: Versuche Netzwerk mit 1500ms Timeout, sonst Fallback aus Cache
-  if (event.request.url.includes('/api/')) {
+  // 2. Auth-, Admin- & System-APIs nicht abfangen
+  if (event.request.url.includes('/api/auth/') || event.request.url.includes('/api/admin/')) {
+    return;
+  }
+
+  // 3. Bei Schülerausweis-APIs: Versuche Netzwerk mit 1500ms Timeout, sonst Fallback aus Cache
+  if (event.request.url.includes('/api/student/')) {
     event.respondWith(
       Promise.race([
         fetch(event.request).then((res) => {
