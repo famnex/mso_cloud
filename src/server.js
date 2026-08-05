@@ -83,32 +83,36 @@ app.get(['/manifest.json', '/novus/manifest.json'], (req, res) => {
   });
 });
 
+// Öffentliche Verifizierungsseite für Schülerausweis-QR-Codes
+// Reagiert sofort auf /v, /verify sowie alle Subpfad-Präfixe (z.B. /novus/v) vor Statik- und SPA-Fallbacks!
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase().replace(/\/$/, '');
+  if (p === '/v' || p === '/verify' || p === '/v.html' || p === '/verify.html' || 
+      p.endsWith('/v') || p.endsWith('/verify') || p.endsWith('/v.html') || p.endsWith('/verify.html')) {
+    return res.sendFile(path.join(__dirname, '../public/verify.html'));
+  }
+  next();
+});
+
 // Statische Dateien aus /public ausliefern
 app.use(express.static(path.join(__dirname, '../public')));
+app.use('/novus', express.static(path.join(__dirname, '../public')));
 
 /* ==========================================================================
    Routen registrieren
    ========================================================================== */
-app.use('/api/setup', require('./routes/setup'));
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/tiles', require('./routes/tiles'));
-app.use('/api/messages', require('./routes/messages'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/student', require('./routes/student'));
+app.use(['/api/setup', '/novus/api/setup'], require('./routes/setup'));
+app.use(['/api/auth', '/novus/api/auth'], require('./routes/auth'));
+app.use(['/api/tiles', '/novus/api/tiles'], require('./routes/tiles'));
+app.use(['/api/messages', '/novus/api/messages'], require('./routes/messages'));
+app.use(['/api/admin', '/novus/api/admin'], require('./routes/admin'));
+app.use(['/api/student', '/novus/api/student'], require('./routes/student'));
+app.use(['/api/oauth', '/novus/api/oauth'], require('./routes/oauth'));
+
 // OIDC standardisierte Pfade auf Root-Ebene (Direkte JSON-Antworten ohne Redirect für Auto-Discovery)
 const { openidConfigurationHandler, jwksHandler } = require('./oidcHelper');
-app.get('/.well-known/openid-configuration', openidConfigurationHandler);
-app.get('/novus/.well-known/openid-configuration', openidConfigurationHandler);
-app.get('/jwks', jwksHandler);
-app.get('/novus/jwks', jwksHandler);
-
-
-app.use('/api/oauth', require('./routes/oauth'));
-
-// Öffentliche Verifizierungsseite für Schülerausweis-QR-Codes (unterstützt /verify und Ultrakurz-Route /v)
-app.get(['/verify', '/verify.html', '/novus/verify', '/novus/verify.html', '/v', '/v.html', '/novus/v', '/novus/v.html'], (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/verify.html'));
-});
+app.get(['/.well-known/openid-configuration', '/novus/.well-known/openid-configuration'], openidConfigurationHandler);
+app.get(['/jwks', '/novus/jwks'], jwksHandler);
 
 // Fallback für SPA (sendet immer index.html, falls kein statischer Ordner matched)
 app.get('*', (req, res) => {
