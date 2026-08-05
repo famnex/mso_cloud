@@ -15,17 +15,21 @@ function generateVerificationUrl(student, baseUrl = '') {
   const firstName = student.first_name || '';
   const lastName = student.last_name || '';
   const rawName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : (student.name || 'Schüler');
-  const studentId = student.student_id || student.id || (student.username ? `S-${student.username}` : 'S-00000');
-  const bibNumber = student.mediothek_number || student.bib || '';
+  const bibNumber = student.mediothek_number || student.bib || student.b || '';
 
   const cleanBase = baseUrl ? baseUrl.replace(/\/$/, '') : '';
-  const path = cleanBase.endsWith('/verify') ? cleanBase : `${cleanBase}/verify`;
+  let path = cleanBase;
+  if (path.endsWith('/verify')) {
+    path = path.substring(0, path.length - 7) + '/v';
+  } else if (!path.endsWith('/v')) {
+    path = `${path}/v`;
+  }
 
-  // WICHTIG: bib= muss immer als letzter Parameter angehängt werden (Prefix/Suffix-Parsing für Hardware-Scanner)
-  // Aus Optimierungsgründen für eine möglichst geringe QR-Code-Punktdichte (bessere Scannbarkeit) wird id weggelassen.
+  // WICHTIG: b= muss immer als letzter Parameter angehängt werden (Prefix/Suffix-Parsing für Hardware-Scanner)
+  // Ultrakurz-Schema: /v?n=...&b=... für minimale Punktdichte
   const queryParams = [
-    `name=${encodeURIComponent(rawName)}`,
-    `bib=${encodeURIComponent(bibNumber)}`
+    `n=${encodeURIComponent(rawName)}`,
+    `b=${encodeURIComponent(bibNumber)}`
   ].join('&');
 
   return `${path}?${queryParams}`;
@@ -45,17 +49,17 @@ function parseVerificationParams(params) {
   if (typeof params === 'string') {
     const search = params.includes('?') ? params.split('?')[1] : params;
     const urlParams = new URLSearchParams(search);
-    name = urlParams.get('name') || '';
+    name = urlParams.get('n') || urlParams.get('name') || '';
     id = urlParams.get('id') || '';
-    bib = urlParams.get('bib') || '';
+    bib = urlParams.get('b') || urlParams.get('bib') || '';
   } else if (params && typeof params.get === 'function') {
-    name = params.get('name') || '';
+    name = params.get('n') || params.get('name') || '';
     id = params.get('id') || '';
-    bib = params.get('bib') || '';
+    bib = params.get('b') || params.get('bib') || '';
   } else if (params && typeof params === 'object') {
-    name = params.name || '';
+    name = params.n || params.name || '';
     id = params.id || '';
-    bib = params.bib || '';
+    bib = params.b || params.bib || '';
   }
 
   // Parameter trimmen und säubern
@@ -63,8 +67,8 @@ function parseVerificationParams(params) {
   id = id.trim();
   bib = bib.trim();
 
-  // Gültigkeits-Prüfung: Mindestens Name sowie ID oder Bibliotheksnummer müssen vorhanden sein
-  const isValid = !!(name && (id || bib));
+  // Gültigkeits-Prüfung: Mindestens Name sowie Bibliotheksnummer/ID müssen vorhanden sein
+  const isValid = !!(name && (bib || id));
 
   return {
     name,

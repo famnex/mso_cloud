@@ -803,8 +803,8 @@
     // 4. BACKGROUND DATABASE VERIFICATION (GET /api/student/verify-check)
     async function initVerification() {
       const urlParams = new URLSearchParams(window.location.search);
-      const nameParam = urlParams.get('name') || '';
-      const bibParam = urlParams.get('bib') || '';
+      const nameParam = urlParams.get('n') || urlParams.get('name') || '';
+      const bibParam = urlParams.get('b') || urlParams.get('bib') || '';
       const idParam = urlParams.get('id') || '';
 
       const cleanName = nameParam.trim();
@@ -828,7 +828,7 @@
       document.getElementById('display-name').textContent = cleanName;
 
       try {
-        const res = await fetch(`api/student/verify-check?name=${encodeURIComponent(cleanName)}&bib=${encodeURIComponent(cleanBib)}&id=${encodeURIComponent(cleanId)}`);
+        const res = await fetch(`api/student/verify-check?n=${encodeURIComponent(cleanName)}&b=${encodeURIComponent(cleanBib || cleanId)}`);
         const data = await res.json();
 
         isDbChecked = true;

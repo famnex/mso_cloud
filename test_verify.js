@@ -31,7 +31,7 @@ function runTest(description, testFn) {
 // -----------------------------------------------------------------------------
 // Test 1: Korrekte URL-Generierung aus Schüler-Objekten
 // -----------------------------------------------------------------------------
-runTest('URL-Generierung für Standard-Schülerdaten', () => {
+runTest('URL-Generierung für Standard-Schülerdaten (/v?n=...&b=...)', () => {
   const student = {
     first_name: 'Max',
     last_name: 'Mustermann',
@@ -43,12 +43,12 @@ runTest('URL-Generierung für Standard-Schülerdaten', () => {
   
   assert.strictEqual(
     url,
-    'https://ausweis.meineschule.de/verify?name=Max%20Mustermann&bib=12345678',
-    'URL stimmt nicht mit dem erwarteten Schema überein'
+    'https://ausweis.meineschule.de/v?n=Max%20Mustermann&b=12345678',
+    'URL stimmt nicht mit dem Ultrakurz-Schema überein'
   );
 
-  // Wichtig für Hardware-Scanner: bib= muss am Ende stehen!
-  assert.ok(url.endsWith('bib=12345678'), 'bib= Parameter steht nicht am Ende der URL');
+  // Wichtig für Hardware-Scanner: b= muss am Ende stehen!
+  assert.ok(url.endsWith('b=12345678'), 'b= Parameter steht nicht am Ende der URL');
 });
 
 runTest('URL-Generierung mit Umlauten und Sonderzeichen in Namen', () => {
@@ -61,45 +61,52 @@ runTest('URL-Generierung mit Umlauten und Sonderzeichen in Namen', () => {
 
   const url = generateVerificationUrl(student, 'https://cloud.mso-hef.de/novus');
   
-  assert.ok(url.includes('name=Bj%C3%B6rn-Ren%C3%A9%20M%C3%BCller-%C3%96zdemir'), 'Namen mit Umlauten wurden nicht sauber kodiert');
-  assert.ok(url.endsWith('bib=99887766'), 'bib Parameter steht nicht sauber isoliert am Ende');
+  assert.ok(url.includes('/v?n=Bj%C3%B6rn-Ren%C3%A9%20M%C3%BCller-%C3%96zdemir'), 'Namen mit Umlauten wurden nicht sauber kodiert');
+  assert.ok(url.endsWith('b=99887766'), 'b Parameter steht nicht sauber isoliert am Ende');
 });
 
 // -----------------------------------------------------------------------------
-// Test 2: Korrekte Parameter-Extraktion auf der /verify Route
+// Test 2: Korrekte Parameter-Extraktion auf der /v Route
 // -----------------------------------------------------------------------------
-runTest('Parameter-Parsing bei gültiger Verifizierungs-URL', () => {
-  const testUrl = 'https://cloud.mso-hef.de/novus/verify?name=Max%20Mustermann&id=S-98765&bib=12345678';
+runTest('Parameter-Parsing bei gültiger Ultrakurz-Verifizierungs-URL (/v?n=...&b=...)', () => {
+  const testUrl = 'https://cloud.mso-hef.de/novus/v?n=Max%20Mustermann&b=12345678';
   const parsed = parseVerificationParams(testUrl);
 
   assert.strictEqual(parsed.name, 'Max Mustermann', 'Name wurde nicht korrekt dekodiert');
-  assert.strictEqual(parsed.id, 'S-98765', 'ID wurde nicht korrekt extrahiert');
-  assert.strictEqual(parsed.bib, '12345678', 'Bibliotheksnummer (bib) wurde nicht korrekt extrahiert');
+  assert.strictEqual(parsed.bib, '12345678', 'Bibliotheksnummer (b) wurde nicht korrekt extrahiert');
   assert.strictEqual(parsed.isValid, true, 'Erwartetes Gültigkeits-Flag isValid sollte true sein');
 });
 
+runTest('Parameter-Parsing Abwärtskompatibilität (/verify?name=...&bib=...)', () => {
+  const legacyUrl = 'https://cloud.mso-hef.de/novus/verify?name=Erika%20Muster&bib=87654321';
+  const parsed = parseVerificationParams(legacyUrl);
+
+  assert.strictEqual(parsed.name, 'Erika Muster', 'Name aus Legacy-URL wurde nicht korrekt dekodiert');
+  assert.strictEqual(parsed.bib, '87654321', 'Bibliotheksnummer (bib) aus Legacy-URL wurde nicht korrekt extrahiert');
+  assert.strictEqual(parsed.isValid, true, 'Legacy-URL sollte isValid=true liefern');
+});
+
 runTest('Parameter-Parsing bei fehlenden/ungültigen Parametern', () => {
-  const invalidUrl1 = 'https://cloud.mso-hef.de/novus/verify?foo=bar';
+  const invalidUrl1 = 'https://cloud.mso-hef.de/novus/v?foo=bar';
   const parsed1 = parseVerificationParams(invalidUrl1);
   assert.strictEqual(parsed1.isValid, false, 'Leere Parameter sollten isValid=false liefern');
 
-  const invalidUrl2 = 'https://cloud.mso-hef.de/novus/verify?name=OnlyName';
+  const invalidUrl2 = 'https://cloud.mso-hef.de/novus/v?n=OnlyName';
   const parsed2 = parseVerificationParams(invalidUrl2);
-  assert.strictEqual(parsed2.isValid, false, 'Nur Name ohne id oder bib sollte isValid=false liefern');
+  assert.strictEqual(parsed2.isValid, false, 'Nur Name ohne b oder bib sollte isValid=false liefern');
 });
 
-runTest('Hardware-Scanner bib-Isolierung am Ende der URL', () => {
+runTest('Hardware-Scanner b-Isolierung am Ende der URL', () => {
   const student = {
     name: 'Anna Schmidt',
-    id: 'S-11223',
     bib: 'BIB-55443322'
   };
   const url = generateVerificationUrl(student, 'https://mso.de');
   
   // Hardware-Scanner Prefix/Suffix Regel prüfen
-  const bibMatch = url.match(/bib=([^&]+)$/);
-  assert.ok(bibMatch !== null, 'Hardware-Scanner Regex matchte bib= am Ende nicht');
-  assert.strictEqual(bibMatch[1], 'BIB-55443322', 'Extrahiertes bib-Suffix stimmt nicht überein');
+  const bibMatch = url.match(/b=([^&]+)$/);
+  assert.ok(bibMatch !== null, 'Hardware-Scanner Regex matchte b= am Ende nicht');
+  assert.strictEqual(bibMatch[1], 'BIB-55443322', 'Extrahiertes b-Suffix stimmt nicht überein');
 });
 
 console.log(`\n===================================================`);

@@ -105,8 +105,8 @@ app.get('/novus/jwks', jwksHandler);
 
 app.use('/api/oauth', require('./routes/oauth'));
 
-// Öffentliche Verifizierungsseite für Schülerausweis-QR-Codes
-app.get(['/verify', '/verify.html', '/novus/verify', '/novus/verify.html'], (req, res) => {
+// Öffentliche Verifizierungsseite für Schülerausweis-QR-Codes (unterstützt /verify und Ultrakurz-Route /v)
+app.get(['/verify', '/verify.html', '/novus/verify', '/novus/verify.html', '/v', '/v.html', '/novus/v', '/novus/v.html'], (req, res) => {
   res.sendFile(path.join(__dirname, '../public/verify.html'));
 });
 

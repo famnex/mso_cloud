@@ -351,8 +351,8 @@ router.get('/status-check', async (req, res) => {
  * und die Bibliotheksnummer (bib) exakt übereinstimmen und das Konto aktiv ist.
  */
 router.get('/verify-check', async (req, res) => {
-  const name = String(req.query.name || '').trim();
-  const bib = String(req.query.bib || '').trim();
+  const name = String(req.query.n || req.query.name || '').trim();
+  const bib = String(req.query.b || req.query.bib || '').trim();
   const id = String(req.query.id || '').trim();
 
   if (!name || (!bib && !id)) {
