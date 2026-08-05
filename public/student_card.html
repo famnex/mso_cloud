@@ -2865,6 +2865,9 @@
         overlayTitle.innerText = translations[currentLang].photoPendingTitle;
         overlayDesc.innerText = reasonPrefix + translations[currentLang].photoPendingDesc;
         overlay.style.display = 'flex';
+      } else {
+        overlay.style.display = 'none';
+      }
     }
 
     /* FULLSCREEN QR CODE OVERLAY & SCREEN WAKE LOCK */
@@ -2958,6 +2961,11 @@
         openFullscreenQR();
       }
     }
+
+    // Global auf window registrieren für HTML-inline onclick Handhabung
+    window.toggleFullscreenQR = toggleFullscreenQR;
+    window.openFullscreenQR = openFullscreenQR;
+    window.closeFullscreenQR = closeFullscreenQR;
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
