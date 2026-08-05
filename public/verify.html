@@ -419,6 +419,30 @@
       font-weight: 700;
     }
 
+    /* School Website Direct Link Button */
+    .school-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(96, 165, 250, 0.35);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .school-link-btn:hover {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      border-color: var(--primary);
+    }
+
     .footer-note {
       text-align: center;
       font-size: 0.75rem;
@@ -431,14 +455,21 @@
 
   <div class="container">
     
-    <!-- LANGUAGE SWITCHER BAR -->
-    <div class="lang-switcher">
-      <button class="lang-btn active" onclick="setLanguage('de')">🇩🇪 Deutsch</button>
-      <button class="lang-btn" onclick="setLanguage('en')">🇬🇧 English</button>
-      <button class="lang-btn" onclick="setLanguage('fr')">🇫🇷 Français</button>
-      <button class="lang-btn" onclick="setLanguage('tr')">🇹🇷 Türkçe</button>
-      <button class="lang-btn" onclick="setLanguage('ua')">🇺🇦 UA</button>
-      <button class="lang-btn" onclick="setLanguage('ar')">🇸🇦 AR</button>
+    <!-- TOP NAVIGATION BAR (SCHOOL LINK & LANGUAGE SWITCHER) -->
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <a href="https://www.mso-hef.de" target="_blank" rel="noopener" class="school-link-btn" title="Zur offiziellen Schul-Website mso-hef.de">
+        <i class="fa-solid fa-globe"></i> <span>mso-hef.de</span> <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.7rem; opacity: 0.85;"></i>
+      </a>
+
+      <!-- LANGUAGE SWITCHER BAR -->
+      <div class="lang-switcher">
+        <button class="lang-btn active" onclick="setLanguage('de')">🇩🇪 Deutsch</button>
+        <button class="lang-btn" onclick="setLanguage('en')">🇬🇧 English</button>
+        <button class="lang-btn" onclick="setLanguage('fr')">🇫🇷 Français</button>
+        <button class="lang-btn" onclick="setLanguage('tr')">🇹🇷 Türkçe</button>
+        <button class="lang-btn" onclick="setLanguage('ua')">🇺🇦 UA</button>
+        <button class="lang-btn" onclick="setLanguage('ar')">🇸🇦 AR</button>
+      </div>
     </div>
 
     <div class="header-logo">
