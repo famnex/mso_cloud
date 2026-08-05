@@ -159,40 +159,9 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // 1. Lokalen Login-Versuch durchführen
-    const localUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
-    
-    if (localUser && localUser.password_hash) {
-      const match = bcrypt.compareSync(password, localUser.password_hash);
-      if (match) {
-        // Lokaler Login erfolgreich!
-        resetFailedLogin(clientIp);
-        const groups = JSON.parse(localUser.groups || '[]');
-        const studentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(localUser.id);
-        req.session.user = {
-          id: localUser.id,
-          username: localUser.username,
-          email: localUser.email,
-          role: localUser.role,
-          groups: groups,
-          isLdap: false,
-          display_name: localUser.display_name || '',
-          card_image: studentRow ? studentRow.card_image : null
-        };
-        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
-        const returnTo = req.session.returnTo || null;
-        if (returnTo) {
-          delete req.session.returnTo;
-        }
-
-        const isOauth = !!req.session.oauthQuery;
-        logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, clientIp);
-        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
-      }
-    }
-
-    // 2. LDAP Login-Versuch (wenn lokaler Login scheiterte oder User nicht existiert)
     const ldapEnabled = getConfig('ldap_enabled') === '1';
+
+    // 1. LDAP Login-Versuch durchführen (wenn LDAP in den Einstellungen aktiviert ist)
     if (ldapEnabled) {
       console.log(`Versuche LDAP-Login für Benutzer: ${username}`);
       const ldapUser = await ldap.authenticate(username, password);
@@ -200,7 +169,7 @@ router.post('/login', async (req, res) => {
       if (ldapUser) {
         // LDAP-Login erfolgreich! Synchronisiere mit lokaler Cache-Datenbank
         resetFailedLogin(clientIp);
-        let localCache = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+        let localCache = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
         let userId;
 
         const groupsJson = JSON.stringify(ldapUser.rawGroups);
@@ -247,6 +216,7 @@ router.post('/login', async (req, res) => {
           sn: ldapUser.sn,
           card_image: ldapStudentRow ? ldapStudentRow.card_image : null
         };
+        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
         const returnTo = req.session.returnTo || null;
         if (returnTo) {
           delete req.session.returnTo;
@@ -254,6 +224,45 @@ router.post('/login', async (req, res) => {
 
         const isOauth = !!req.session.oauthQuery;
         logEvent('info', 'login_success', `LDAP-Login erfolgreich für: ${ldapUser.username}`, { userId: userId, role: role, groups: ldapUser.rawGroups }, clientIp);
+        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
+      }
+    }
+
+    // 2. Lokalen Login-Versuch durchführen (falls LDAP deaktiviert ist oder der Benutzer ein reines lokales Konto nutzt)
+    const localUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
+    
+    if (localUser && localUser.password_hash) {
+      // Wenn das Konto als LDAP-Konto markiert ist, aber der LDAP-Login fehlschlug -> Fehler
+      if (ldapEnabled && localUser.is_ldap === 1) {
+        console.warn(`LDAP-Authentifizierung für LDAP-Konto ${username} fehlgeschlagen.`);
+        registerFailedLogin(clientIp);
+        return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort.' });
+      }
+
+      const match = bcrypt.compareSync(password, localUser.password_hash);
+      if (match) {
+        // Lokaler Login erfolgreich!
+        resetFailedLogin(clientIp);
+        const groups = JSON.parse(localUser.groups || '[]');
+        const studentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(localUser.id);
+        req.session.user = {
+          id: localUser.id,
+          username: localUser.username,
+          email: localUser.email,
+          role: localUser.role,
+          groups: groups,
+          isLdap: false,
+          display_name: localUser.display_name || '',
+          card_image: studentRow ? studentRow.card_image : null
+        };
+        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
+        const returnTo = req.session.returnTo || null;
+        if (returnTo) {
+          delete req.session.returnTo;
+        }
+
+        const isOauth = !!req.session.oauthQuery;
+        logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, clientIp);
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
       }
     }

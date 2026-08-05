@@ -676,10 +676,11 @@ async function createStudentToken(email, token, ip) {
               userId = userByUsername.id;
             } else {
               // Lege neuen Benutzer an
+              const isLdapVal = getConfig('ldap_enabled') === '1' ? 1 : 0;
               const info = db.prepare(`
                 INSERT INTO users (username, email, role, groups, is_ldap)
-                VALUES (?, ?, 'user', '["Schueler"]', 0)
-              `).run(username, email.trim());
+                VALUES (?, ?, 'user', '["Schueler"]', ?)
+              `).run(username, email.trim(), isLdapVal);
               userId = info.lastInsertRowid;
             }
 
@@ -833,10 +834,11 @@ async function verifyStudentToken(token, ip) {
             const lastName = lastNameRow ? lastNameRow.value.trim() : '';
             username = usernameRow ? usernameRow.value.trim() : email.split('@')[0];
 
+            const isLdapVal = getConfig('ldap_enabled') === '1' ? 1 : 0;
             const info = db.prepare(`
               INSERT INTO users (username, email, role, groups, is_ldap)
-              VALUES (?, ?, 'user', ?, 0)
-            `).run(username, email);
+              VALUES (?, ?, 'user', ?, ?)
+            `).run(username, email, isLdapVal);
             userId = info.lastInsertRowid;
 
             db.prepare(`

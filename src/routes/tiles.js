@@ -72,17 +72,24 @@ router.get('/', (req, res) => {
           const mapped = ldap.mapLdapGroupsToLocal(userGroups);
           effectiveGroups = effectiveGroups.concat(mapped);
         }
+
+        const normalizeGroup = (g) => {
+          if (!g) return '';
+          let name = String(g);
+          const match = name.match(/cn=([^,]+)/i);
+          if (match) name = match[1];
+          return name.trim().toLowerCase()
+            .normalize('NFC')
+            .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+            .replace(/\s+/g, ' ');
+        };
+
+        const normalizedUserGroups = effectiveGroups.map(g => normalizeGroup(g));
         
-        // Prüfen, ob eine Überschneidung der Gruppen vorliegt (unterstützt raw DNs und CNs)
-        const userGroupsCNs = effectiveGroups.map(g => {
-          const match = g.match(/cn=([^,]+)/i);
-          return match ? match[1].trim() : g;
+        const hasAccess = allowedGroups.some(group => {
+          const normAllowed = normalizeGroup(group);
+          return normalizedUserGroups.some(normUg => normUg === normAllowed);
         });
-        
-        const hasAccess = allowedGroups.some(group => 
-          effectiveGroups.some(ug => ug.toLowerCase() === group.toLowerCase()) ||
-          userGroupsCNs.some(ugCN => ugCN.toLowerCase() === group.toLowerCase())
-        );
         return hasAccess;
       }
       
