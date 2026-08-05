@@ -17,6 +17,7 @@
       --success-glow: rgba(34, 197, 94, 0.25);
       --danger: #ef4444;
       --danger-glow: rgba(239, 68, 68, 0.25);
+      --warning: #f59e0b;
       --text-main: #f8fafc;
       --text-secondary: #94a3b8;
       --text-muted: #64748b;
@@ -38,8 +39,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: 20px 16px 40px;
+      padding: 16px 14px 40px;
       line-height: 1.5;
+      perspective: 1000px;
     }
 
     .container {
@@ -48,17 +50,57 @@
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
+    }
+
+    /* Language Switcher Bar */
+    .lang-switcher {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      padding: 6px 10px;
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      flex-wrap: wrap;
+    }
+
+    .lang-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .lang-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .lang-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
     }
 
     .header-logo {
       text-align: center;
-      padding: 10px 0 5px;
+      padding: 4px 0;
     }
 
     .header-logo h2 {
-      font-size: 1.25rem;
-      font-weight: 700;
+      font-size: 1.2rem;
+      font-weight: 800;
       letter-spacing: 0.5px;
       background: linear-gradient(90deg, #60a5fa, #c084fc);
       -webkit-background-clip: text;
@@ -77,7 +119,13 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      transition: all 0.3s ease;
+    }
+
+    .status-banner.checking {
+      border-color: var(--warning);
+      box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.25);
     }
 
     .status-banner.invalid {
@@ -92,12 +140,18 @@
       background: rgba(34, 197, 94, 0.15);
       color: #4ade80;
       border: 1px solid rgba(74, 222, 128, 0.3);
-      padding: 6px 16px;
+      padding: 5px 14px;
       border-radius: 999px;
-      font-size: 0.95rem;
+      font-size: 0.85rem;
       font-weight: 700;
       letter-spacing: 0.3px;
       text-transform: uppercase;
+    }
+
+    .status-banner.checking .status-badge {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-color: rgba(251, 191, 36, 0.3);
     }
 
     .status-banner.invalid .status-badge {
@@ -107,7 +161,7 @@
     }
 
     .status-title {
-      font-size: 1.35rem;
+      font-size: 1.3rem;
       font-weight: 800;
       color: var(--text-main);
     }
@@ -117,17 +171,48 @@
       color: var(--text-secondary);
     }
 
-    /* Student Details Card */
+    /* Student Details Card with 3D Tilt Effect */
+    .student-card-wrapper {
+      perspective: 1000px;
+    }
+
     .student-card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 20px;
-      padding: 24px;
+      padding: 22px;
       backdrop-filter: blur(16px);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
+      transition: transform 0.15s ease-out;
+      transform-style: preserve-3d;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Interactive Hologram Shimmer Layer */
+    .hologram-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        135deg, 
+        rgba(255, 255, 255, 0) 0%, 
+        rgba(255, 0, 128, 0.08) 25%, 
+        rgba(0, 255, 255, 0.12) 50%, 
+        rgba(255, 255, 0, 0.08) 75%, 
+        rgba(255, 255, 255, 0) 100%
+      );
+      mix-blend-mode: overlay;
+      opacity: 0.8;
+      transition: background-position 0.1s ease;
+      background-size: 200% 200%;
+      border-radius: 20px;
     }
 
     .card-header-row {
@@ -135,11 +220,11 @@
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 14px;
+      padding-bottom: 12px;
     }
 
     .card-header-title {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       text-transform: uppercase;
       letter-spacing: 1px;
       color: var(--text-secondary);
@@ -161,39 +246,35 @@
     }
 
     .field-value {
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--text-main);
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #60a5fa;
       word-break: break-word;
     }
 
-    .field-value.highlight {
-      font-size: 1.35rem;
-      color: #60a5fa;
+    /* Dynamic Security Elements Box */
+    .security-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 4px;
     }
 
-    .field-value-mono {
-      font-family: 'Courier New', Courier, monospace;
-      letter-spacing: 1px;
-      color: #c084fc;
-    }
-
-    /* Dynamic Security Seal Element */
+    /* Millisecond Timer Seal */
     .security-stamp {
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
-      border: 1px dashed rgba(96, 165, 250, 0.4);
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.12));
+      border: 1px dashed rgba(96, 165, 250, 0.35);
       border-radius: 12px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-top: 4px;
     }
 
     .stamp-left {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
     .pulse-dot {
@@ -206,28 +287,74 @@
     }
 
     @keyframes pulse-ring {
-      0% {
-        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-      }
-      70% {
-        box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
-      }
-      100% {
-        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-      }
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
 
     .stamp-text {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 600;
       color: #93c5fd;
     }
 
-    .stamp-clock {
-      font-family: monospace;
+    .stamp-clock-ms {
+      font-family: 'Courier New', Courier, monospace;
       font-size: 0.95rem;
       font-weight: 700;
       color: #4ade80;
+      letter-spacing: 0.5px;
+    }
+
+    /* Hologram Badge Seal with 3D Tilt Shimmer */
+    .hologram-seal {
+      background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 33%, #3b82f6 66%, #10b981 100%);
+      background-size: 300% 300%;
+      animation: holo-gradient 4s ease infinite;
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #ffffff;
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+      position: relative;
+    }
+
+    @keyframes holo-gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .hologram-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    .hologram-tilt-hint {
+      font-size: 0.72rem;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+    }
+
+    /* Fallback Error Card */
+    .invalid-card {
+      display: none;
+      background: var(--card-bg);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 20px;
+      padding: 24px 20px;
+      text-align: center;
+      backdrop-filter: blur(16px);
     }
 
     /* Authenticity Verification Instructions Box */
@@ -235,29 +362,29 @@
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 20px;
-      padding: 20px 22px;
+      padding: 18px 20px;
       backdrop-filter: blur(16px);
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
     }
 
     .instructions-title {
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 700;
       color: #f1f5f9;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 10px;
+      padding-bottom: 8px;
     }
 
     .instruction-step {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
-      font-size: 0.88rem;
+      gap: 10px;
+      font-size: 0.85rem;
       color: var(--text-secondary);
       line-height: 1.45;
     }
@@ -266,13 +393,13 @@
       background: rgba(59, 130, 246, 0.2);
       color: #60a5fa;
       border: 1px solid rgba(96, 165, 250, 0.3);
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
       flex-shrink: 0;
       margin-top: 1px;
@@ -294,9 +421,9 @@
 
     .footer-note {
       text-align: center;
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       color: var(--text-muted);
-      margin-top: 10px;
+      margin-top: 6px;
     }
   </style>
 </head>
@@ -304,123 +431,381 @@
 
   <div class="container">
     
+    <!-- LANGUAGE SWITCHER BAR -->
+    <div class="lang-switcher">
+      <button class="lang-btn active" onclick="setLanguage('de')">🇩🇪 Deutsch</button>
+      <button class="lang-btn" onclick="setLanguage('en')">🇬🇧 English</button>
+      <button class="lang-btn" onclick="setLanguage('fr')">🇫🇷 Français</button>
+      <button class="lang-btn" onclick="setLanguage('tr')">🇹🇷 Türkçe</button>
+      <button class="lang-btn" onclick="setLanguage('ua')">🇺🇦 UA</button>
+      <button class="lang-btn" onclick="setLanguage('ar')">🇸🇦 AR</button>
+    </div>
+
     <div class="header-logo">
-      <h2><i class="fa-solid fa-graduation-cap"></i> MSO DIGITAL ID VERIFICATION</h2>
+      <h2><i class="fa-solid fa-shield-check"></i> MSO DIGITAL ID VERIFICATION</h2>
     </div>
 
     <!-- STATUS BANNER -->
-    <div id="status-banner" class="status-banner">
+    <div id="status-banner" class="status-banner checking">
       <div id="status-badge" class="status-badge">
-        <i class="fa-solid fa-shield-halved"></i>
-        <span>Offizieller Schülerausweis / Official Student ID</span>
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span id="txt-badge">Prüfe Datenbank...</span>
       </div>
-      <div id="status-title" class="status-title">Ausweis Verifiziert</div>
-      <div id="status-subtitle" class="status-subtitle">Gültiges digitales Dokument | Modellschule Obersberg</div>
+      <div id="status-title" class="status-title">Echtheitsprüfung läuft</div>
+      <div id="status-subtitle" class="status-subtitle">Abgleich mit der Schulanmeldungs-Datenbank</div>
     </div>
 
     <!-- STUDENT DETAILS CARD -->
-    <div id="student-card" class="student-card">
-      <div class="card-header-row">
-        <div class="card-header-title">Schülerdaten / Student Details</div>
-        <i class="fa-solid fa-user-check" style="color: #4ade80; font-size: 1.1rem;"></i>
-      </div>
-
-      <div class="card-field">
-        <div class="field-label">Name des Schülers / Student Name</div>
-        <div id="display-name" class="field-value highlight">—</div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-        <div class="card-field">
-          <div class="field-label">Bibliotheksnummer / Library ID</div>
-          <div id="display-bib" class="field-value field-value-mono">—</div>
+    <div class="student-card-wrapper">
+      <div id="student-card" class="student-card">
+        <div class="hologram-overlay" id="holo-overlay"></div>
+        
+        <div class="card-header-row">
+          <div class="card-header-title" id="txt-card-title">Schülerdaten / Student Details</div>
+          <i class="fa-solid fa-user-check" style="color: #4ade80; font-size: 1.1rem;"></i>
         </div>
 
         <div class="card-field">
-          <div class="field-label">Schülernummer / Student ID</div>
-          <div id="display-id" class="field-value field-value-mono">—</div>
+          <div class="field-label" id="txt-label-name">Name des Schülers / Student Name</div>
+          <div id="display-name" class="field-value">—</div>
         </div>
-      </div>
 
-      <!-- DYNAMIC SECURITY ELEMENT -->
-      <div class="security-stamp">
-        <div class="stamp-left">
-          <div class="pulse-dot"></div>
-          <div class="stamp-text">Live Echtheits-Siegel</div>
+        <!-- DYNAMIC SECURITY ELEMENTS -->
+        <div class="security-box">
+          <!-- 1. MILLISECOND TIMER SEAL -->
+          <div class="security-stamp">
+            <div class="stamp-left">
+              <div class="pulse-dot"></div>
+              <div class="stamp-text" id="txt-live-seal">Live Echtheits-Stempel</div>
+            </div>
+            <div id="live-clock-ms" class="stamp-clock-ms">--:--:--.---</div>
+          </div>
+
+          <!-- 2. HOLOGRAM SEAL WITH 3D TILT SHIMMER -->
+          <div class="hologram-seal">
+            <div class="hologram-title">
+              <i class="fa-solid fa-compact-disc"></i>
+              <span id="txt-holo-title">MSO Sicherheits-Hologramm</span>
+            </div>
+            <div class="hologram-tilt-hint" id="txt-holo-hint">
+              <i class="fa-solid fa-mobile-screen-button"></i> <span id="txt-tilt-label">Kippen</span>
+            </div>
+          </div>
         </div>
-        <div id="live-clock" class="stamp-clock">--:--:--</div>
+
       </div>
     </div>
 
     <!-- FALLBACK ERROR CARD (Hidden by default) -->
-    <div id="invalid-card" class="student-card" style="display: none; border-color: rgba(239, 68, 68, 0.4);">
-      <div style="text-align: center; padding: 10px 0;">
-        <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; color: var(--danger); margin-bottom: 12px;"></i>
-        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--danger); margin-bottom: 8px;">Ungültiger Ausweis-Code / Invalid ID Code</h3>
-        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5;">
-          Der gescannte QR-Code enthält keine vollständigen Ausweisdaten. Bitte überprüfen Sie den QR-Code auf dem Schülerausweis oder scannen Sie diesen erneut.
-        </p>
-      </div>
+    <div id="invalid-card" class="invalid-card">
+      <i class="fa-solid fa-circle-exclamation" style="font-size: 2.8rem; color: var(--danger); margin-bottom: 10px;"></i>
+      <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--danger); margin-bottom: 6px;" id="txt-invalid-title">Ungültiger Ausweis-Code / Invalid ID Code</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45;" id="txt-invalid-desc">
+        Der gescannte QR-Code konnte nicht in der Schulanmeldungs-Datenbank verifiziert werden oder enthält unvollständige Daten.
+      </p>
     </div>
 
-    <!-- AUTHENTICITY VERIFICATION INSTRUCTIONS -->
+    <!-- AUTHENTICITY VERIFICATION INSTRUCTIONS BOX (4 POINTS) -->
     <div class="instructions-box">
       <div class="instructions-title">
         <i class="fa-solid fa-circle-info" style="color: #60a5fa;"></i>
-        <span>Prüfung der Echtheit / Authenticity Check</span>
+        <span id="txt-instr-title">Prüfung der Echtheit / Authenticity Check</span>
       </div>
 
+      <!-- POINT 1: FOTO-ABGLEICH -->
       <div class="instruction-step">
         <div class="step-number">1</div>
-        <div class="step-text">
+        <div class="step-text" id="txt-step-1">
           <strong>Foto-Abgleich / Photo Match:</strong><br>
-          Prüfen Sie, ob das Lichtbild auf dem Smartphone des Schülers mit der vorlegenden Person übereinstimmt.
+          Prüfen Sie, ob das Passbild auf dem Smartphone des Schülers mit der vorlegenden Person übereinstimmt.
         </div>
       </div>
 
+      <!-- POINT 2: DOMAIN-PRÜFUNG -->
       <div class="instruction-step">
         <div class="step-number">2</div>
-        <div class="step-text">
+        <div class="step-text" id="txt-step-2">
           <strong>Domain-Prüfung / Address Bar Domain:</strong><br>
           Stellen Sie sicher, dass die Adresse in der Adresszeile des Browsers exakt mit <span id="current-domain-display" class="domain-highlight">https://...</span> übereinstimmt.
         </div>
       </div>
 
+      <!-- POINT 3: DYNAMISCHER MILLISEKUNDENTIMER -->
       <div class="instruction-step">
         <div class="step-number">3</div>
-        <div class="step-text">
-          <strong>Dynamisches Sicherheitselement / Live Security Badge:</strong><br>
-          Achten Sie auf das oben angezeigte animierte Live-Siegel und die mitlaufende Server-Uhrzeit, um statische Screenshots auszuschließen.
+        <div class="step-text" id="txt-step-3">
+          <strong>Millisekundentimer / Live Timestamp:</strong><br>
+          Achten Sie auf die fortlaufenden Millisekunden und das Live-Siegel, um statische Screenshots sicher auszuschließen.
+        </div>
+      </div>
+
+      <!-- POINT 4: HOLOGRAMM & KIPPBARKEIT -->
+      <div class="instruction-step">
+        <div class="step-number">4</div>
+        <div class="step-text" id="txt-step-4">
+          <strong>Hologramm & Kippbarkeit / 3D Hologram Tilt:</strong><br>
+          Kippen Sie das Smartphone oder bewegen Sie die Maus, um den 3D-Effekt und die Regenbogen-Lichtreflexionen des Hologramms zu prüfen.
         </div>
       </div>
     </div>
 
-    <div class="footer-note">
+    <div class="footer-note" id="txt-footer">
       MSO Cloud Launcher &bull; Modellschule Obersberg &bull; Echtheitsprüfung System v2.0
     </div>
 
   </div>
 
   <script>
-    // Live Server/Client Clock
-    function updateClock() {
-      const clockEl = document.getElementById('live-clock');
-      if (clockEl) {
-        const now = new Date();
-        clockEl.textContent = now.toLocaleTimeString('de-DE');
+    // TRANSLATION DICTIONARY FOR 6 LANGUAGES
+    const translations = {
+      de: {
+        badgeChecking: "Prüfe Datenbank...",
+        titleChecking: "Echtheitsprüfung läuft",
+        subChecking: "Abgleich mit der Schulanmeldungs-Datenbank",
+        badgeVerified: "Offizieller Schülerausweis",
+        titleVerified: "Ausweis Verifiziert",
+        subVerified: "Gültiger Datensatz | Modellschule Obersberg",
+        badgeInvalid: "Nicht Verifiziert",
+        titleInvalid: "Echtheit nicht verifizierbar",
+        subInvalid: "Kein übereinstimmender Datensatz in der Datenbank",
+        cardTitle: "Schülerdaten",
+        labelName: "Name des Schülers",
+        liveSeal: "Live Echtheits-Stempel",
+        holoTitle: "MSO Sicherheits-Hologramm",
+        tiltLabel: "Kippen",
+        invalidTitle: "Ungültiger Ausweis-Code / Nicht in DB",
+        invalidDesc: "Für die gescannte Kombination aus Name und Bibliotheksnummer wurde kein gültiger Datensatz in der Schulanmeldungs-Datenbank gefunden.",
+        instrTitle: "Prüfung der Echtheit",
+        step1: "<strong>Foto-Abgleich:</strong> Prüfen Sie, ob das Passbild auf dem Smartphone des Schülers mit der vorlegenden Person übereinstimmt.",
+        step2: "<strong>Domain-Prüfung:</strong> Stellen Sie sicher, dass die Adresse in der Adresszeile des Browsers exakt mit der offiziellen Schul-Domain übereinstimmt.",
+        step3: "<strong>Millisekundentimer:</strong> Achten Sie auf die fortlaufenden Millisekunden und das Live-Siegel, um statische Screenshots auszuschließen.",
+        step4: "<strong>Hologramm & Kippbarkeit:</strong> Kippen Sie das Smartphone, um den 3D-Kippeffekt und die Regenbogen-Lichtreflexionen des Hologramms zu prüfen."
+      },
+      en: {
+        badgeChecking: "Checking Database...",
+        titleChecking: "Verification in Progress",
+        subChecking: "Cross-referencing with School Enrollment Database",
+        badgeVerified: "Official Student ID",
+        titleVerified: "ID Verified",
+        subVerified: "Valid Record | Modellschule Obersberg",
+        badgeInvalid: "Not Verified",
+        titleInvalid: "Authenticity Cannot Be Verified",
+        subInvalid: "No matching record in database",
+        cardTitle: "Student Details",
+        labelName: "Student Name",
+        liveSeal: "Live Authenticity Seal",
+        holoTitle: "MSO Security Hologram",
+        tiltLabel: "Tilt Device",
+        invalidTitle: "Invalid ID Code / Not in DB",
+        invalidDesc: "No matching active student record was found in the school enrollment database for the scanned parameters.",
+        instrTitle: "Authenticity Verification",
+        step1: "<strong>Photo Match:</strong> Check if the photo on the student's smartphone matches the person presenting it.",
+        step2: "<strong>Domain Check:</strong> Ensure that the address in the browser address bar matches the official school domain exactly.",
+        step3: "<strong>Millisecond Timer:</strong> Observe the ticking milliseconds and live seal to rule out static screenshots.",
+        step4: "<strong>Hologram & Tilt:</strong> Tilt the smartphone to verify the 3D tilt effect and rainbow light reflections of the hologram."
+      },
+      fr: {
+        badgeChecking: "Vérification en cours...",
+        titleChecking: "Vérification de la base de données",
+        subChecking: "Comparaison avec la base de données scolaire",
+        badgeVerified: "Carte d'Étudiant Officielle",
+        titleVerified: "Carte Vérifiée",
+        subVerified: "Enregistrement Valide | Modellschule Obersberg",
+        badgeInvalid: "Non Vérifiée",
+        titleInvalid: "Authenticité Non Vérifiable",
+        subInvalid: "Aucun enregistrement correspondant dans la base de données",
+        cardTitle: "Détails de l'Élève",
+        labelName: "Nom de l'Élève",
+        liveSeal: "Sceau d'Authenticité en Direct",
+        holoTitle: "Hologramme de Sécurité MSO",
+        tiltLabel: "Incliner",
+        invalidTitle: "Code Invalide / Non trouvé",
+        invalidDesc: "Aucun enregistrement correspondant n'a été trouvé dans la base de données scolaire.",
+        instrTitle: "Vérification de l'Authenticité",
+        step1: "<strong>Vérification Photo:</strong> Vérifiez si la photo sur le smartphone correspond à la personne.",
+        step2: "<strong>Vérification du Domaine:</strong> Assurez-vous que l'adresse dans la barre du navigateur correspond exactement au domaine officiel.",
+        step3: "<strong>Horodatage en Millisecondes:</strong> Observez les millisecondes pour exclure les captures d'écran.",
+        step4: "<strong>Hologramme & Inclinaison:</strong> Inclinez le smartphone pour vérifier l'effet 3D et les réflexions arc-en-ciel."
+      },
+      tr: {
+        badgeChecking: "Veritabanı Kontrol Ediliyor...",
+        titleChecking: "Doğrulama Devam Ediyor",
+        subChecking: "Okul veritabanı ile karşılaştırılıyor",
+        badgeVerified: "Resmi Öğrenci Kimliği",
+        titleVerified: "Kimlik Doğrulandı",
+        subVerified: "Geçerli Kayıt | Modellschule Obersberg",
+        badgeInvalid: "Doğrulanmadı",
+        titleInvalid: "Kimlik Doğrulanamadı",
+        subInvalid: "Veritabanında eşleşen kayıt bulunamadı",
+        cardTitle: "Öğrenci Bilgileri",
+        labelName: "Öğrenci Adı Soyadı",
+        liveSeal: "Canlı Güvenlik Mührü",
+        holoTitle: "MSO Güvenlik Hologramı",
+        tiltLabel: "Eğme",
+        invalidTitle: "Geçersiz Kod / Kayıt Bulunamadı",
+        invalidDesc: "Okul veritabanında taranan bilgilere ait geçerli bir öğrenci kaydı bulunamadı.",
+        instrTitle: "Orijinallik Kontrolü",
+        step1: "<strong>Fotoğraf Kontrolü:</strong> Akıllı telefondaki fotoğrafın kişiye ait olduğunu kontrol edin.",
+        step2: "<strong>Alan Adı Kontrolü:</strong> Tarayıcı adres çubuğundaki adresin resmi okul alan adı olduğunu doğrulayın.",
+        step3: "<strong>Milisaniye Sayacı:</strong> Ekran görüntüsü ihtimalini elemek için canlı milisaniye sayacını gözlemleyin.",
+        step4: "<strong>Hologram ve Eğme:</strong> Hologramın 3D efektini ve gökkuşağı parıltılarını kontrol etmek için telefonu eğin."
+      },
+      ua: {
+        badgeChecking: "Перевірка бази даних...",
+        titleChecking: "Триває перевірка автентичності",
+        subChecking: "Звірка зі шкільною базою даних",
+        badgeVerified: "Офіційний Учнівський Квиток",
+        titleVerified: "Квиток Перевірено",
+        subVerified: "Дійсний запис | Modellschule Obersberg",
+        badgeInvalid: "Не підтверджено",
+        titleInvalid: "Автентичність не підтверджено",
+        subInvalid: "Запис у базі даних не знайдено",
+        cardTitle: "Дані Учня",
+        labelName: "Прізвище та Ім'я Учня",
+        liveSeal: "Жива Печатка Автентичності",
+        holoTitle: "Захисна Голограма MSO",
+        tiltLabel: "Нахил",
+        invalidTitle: "Недійсний код / Відсутній у БД",
+        invalidDesc: "У шкільній базі даних не знайдено запису, що відповідає зчитаним даним.",
+        instrTitle: "Перевірка Автентичності",
+        step1: "<strong>Перевірка Фото:</strong> Перевірте, чи відповідає фото на смартфоні особі.",
+        step2: "<strong>Перевірка Домену:</strong> Переконайтеся, що адреса в браузері збігається з офіційним доменом.",
+        step3: "<strong>Таймер у мілісекундах:</strong> Слідкуйте за мілісекундами, щоб виключити скріншот.",
+        step4: "<strong>Голограма та Нахил:</strong> Нахиліть смартфон для перевірки 3D-ефекту та веселкових відблисків."
+      },
+      ar: {
+        badgeChecking: "جاري الفحص في قاعدة البيانات...",
+        titleChecking: "جاري التحقق من الصحة",
+        subChecking: "مقارنة مع قاعدة بيانات المدرسة",
+        badgeVerified: "بطاقة طالب رسمية",
+        titleVerified: "تم التحقق من البطاقة",
+        subVerified: "سجل صالحة | Modellschule Obersberg",
+        badgeInvalid: "غير مؤكد",
+        titleInvalid: "تعذر التحقق من الأصالة",
+        subInvalid: "لا يوجد سجل مطابق في قاعدة البيانات",
+        cardTitle: "بيانات الطالب",
+        labelName: "اسم الطالب",
+        liveSeal: "ختم الأصالة المباشر",
+        holoTitle: "هولوغرام الأمان MSO",
+        tiltLabel: "إمالة",
+        invalidTitle: "رمز غير صالحة / غير موجود",
+        invalidDesc: "لم يتم العثور على سجل طالب مطابق في قاعدة بيانات المدرسة للمعلومات الممسوحة ضوئياً.",
+        instrTitle: "التحقق من الأصالة",
+        step1: "<strong>مطابقة الصورة:</strong> تحقق من مطابقة الصورة على الهاتف مع الشخص المتقدم.",
+        step2: "<strong>فحص النطاق:</strong> تأكد من أن العنوان في شريط العنوان يطابق نطاق المدرسة الرسمي تماماً.",
+        step3: "<strong>عداد الأجزاء من الثانية:</strong> راقب الأجزاء من الثانية لاستبعاد لقطات الشاشة الثابتة.",
+        step4: "<strong>الهولوغرام والإمالة:</strong> قم بإمالة الهاتف للتحقق من تأثير الأبعاد الثلاثية وانعكاسات قوس قزح."
+      }
+    };
+
+    let currentLang = 'de';
+
+    function setLanguage(lang) {
+      if (!translations[lang]) lang = 'de';
+      currentLang = lang;
+
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('onclick').includes(`'${lang}'`)) {
+          btn.classList.add('active');
+        }
+      });
+
+      const t = translations[lang];
+      document.getElementById('txt-card-title').textContent = t.cardTitle;
+      document.getElementById('txt-label-name').textContent = t.labelName;
+      document.getElementById('txt-live-seal').textContent = t.liveSeal;
+      document.getElementById('txt-holo-title').textContent = t.holoTitle;
+      document.getElementById('txt-tilt-label').textContent = t.tiltLabel;
+      document.getElementById('txt-invalid-title').textContent = t.invalidTitle;
+      document.getElementById('txt-invalid-desc').textContent = t.invalidDesc;
+      document.getElementById('txt-instr-title').textContent = t.instrTitle;
+      document.getElementById('txt-step-1').innerHTML = t.step1;
+      document.getElementById('txt-step-2').innerHTML = t.step2;
+      document.getElementById('txt-step-3').innerHTML = t.step3;
+      document.getElementById('txt-step-4').innerHTML = t.step4;
+
+      // Banner Text aktualisieren basierend auf Status
+      updateBannerText();
+    }
+
+    let isDbVerified = false;
+    let isDbChecked = false;
+
+    function updateBannerText() {
+      const t = translations[currentLang];
+      const badge = document.getElementById('txt-badge');
+      const title = document.getElementById('status-title');
+      const subtitle = document.getElementById('status-subtitle');
+
+      if (!isDbChecked) {
+        badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + t.badgeChecking;
+        title.textContent = t.titleChecking;
+        subtitle.textContent = t.subChecking;
+      } else if (isDbVerified) {
+        badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + t.badgeVerified;
+        title.textContent = t.titleVerified;
+        subtitle.textContent = t.subVerified;
+      } else {
+        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + t.badgeInvalid;
+        title.textContent = t.titleInvalid;
+        subtitle.textContent = t.subInvalid;
       }
     }
-    setInterval(updateClock, 1000);
-    updateClock();
 
-    // Domain Anzeige in Schritt 2 dynamisch befüllen
+    // 1. MILLISECOND LIVE CLOCK (Updates every 10ms)
+    function updateClockMs() {
+      const clockEl = document.getElementById('live-clock-ms');
+      if (clockEl) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('de-DE');
+        const ms = String(now.getMilliseconds()).padStart(3, '0');
+        clockEl.textContent = `${timeStr}.${ms}`;
+      }
+    }
+    setInterval(updateClockMs, 15);
+    updateClockMs();
+
+    // 2. DOMAIN DISPLAY
     const domainDisplay = document.getElementById('current-domain-display');
     if (domainDisplay) {
       domainDisplay.textContent = window.location.origin;
     }
 
-    // Parameter aus URL auslesen und validieren
-    function initVerification() {
+    // 3. INTERACTIVE 3D HOLOGRAM TILT (Gyroscope & Mouse Move)
+    const cardEl = document.getElementById('student-card');
+    const holoOverlay = document.getElementById('holo-overlay');
+
+    function applyTilt(rotateX, rotateY) {
+      if (!cardEl) return;
+      cardEl.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+      if (holoOverlay) {
+        const posX = 50 + rotateY * 2.5;
+        const posY = 50 - rotateX * 2.5;
+        holoOverlay.style.backgroundPosition = `${posX}% ${posY}%`;
+      }
+    }
+
+    // Mouse tilt for desktops
+    document.addEventListener('mousemove', (e) => {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const dx = (e.clientX - cx) / cx;
+      const dy = (e.clientY - cy) / cy;
+      applyTilt(-dy * 12, dx * 12);
+    });
+
+    // Gyroscope tilt for mobile smartphones
+    window.addEventListener('deviceorientation', (e) => {
+      if (e.gamma !== null && e.beta !== null) {
+        const rotY = Math.max(-25, Math.min(25, e.gamma / 2));
+        const rotX = Math.max(-25, Math.min(25, (e.beta - 45) / 2));
+        applyTilt(rotX, rotY);
+      }
+    });
+
+    // 4. BACKGROUND DATABASE VERIFICATION (GET /api/student/verify-check)
+    async function initVerification() {
       const urlParams = new URLSearchParams(window.location.search);
       const nameParam = urlParams.get('name') || '';
       const bibParam = urlParams.get('bib') || '';
@@ -430,29 +815,55 @@
       const cleanBib = bibParam.trim();
       const cleanId = idParam.trim();
 
-      const isValid = !!(cleanName && (cleanBib || cleanId));
-
       const statusBanner = document.getElementById('status-banner');
-      const statusTitle = document.getElementById('status-title');
-      const statusBadge = document.getElementById('status-badge');
-      const studentCard = document.getElementById('student-card');
+      const studentCard = document.getElementById('student-card').parentElement;
       const invalidCard = document.getElementById('invalid-card');
 
-      if (isValid) {
-        document.getElementById('display-name').textContent = cleanName;
-        document.getElementById('display-bib').textContent = cleanBib || '—';
-        document.getElementById('display-id').textContent = cleanId || '—';
+      if (!cleanName || (!cleanBib && !cleanId)) {
+        isDbChecked = true;
+        isDbVerified = false;
+        statusBanner.className = 'status-banner invalid';
+        studentCard.style.display = 'none';
+        invalidCard.style.display = 'block';
+        updateBannerText();
+        return;
+      }
 
-        statusBanner.classList.remove('invalid');
-        studentCard.style.display = 'flex';
-        invalidCard.style.display = 'none';
-      } else {
-        statusBanner.classList.add('invalid');
-        statusBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>Ungültiger Code / Invalid Code</span>';
-        statusTitle.textContent = 'Echtheit nicht verifizierbar';
+      document.getElementById('display-name').textContent = cleanName;
+
+      try {
+        const res = await fetch(`api/student/verify-check?name=${encodeURIComponent(cleanName)}&bib=${encodeURIComponent(cleanBib)}&id=${encodeURIComponent(cleanId)}`);
+        const data = await res.json();
+
+        isDbChecked = true;
+
+        if (res.ok && data.verified) {
+          isDbVerified = true;
+          statusBanner.className = 'status-banner';
+          studentCard.style.display = 'block';
+          invalidCard.style.display = 'none';
+          if (data.name) {
+            document.getElementById('display-name').textContent = data.name;
+          }
+        } else {
+          isDbVerified = false;
+          statusBanner.className = 'status-banner invalid';
+          studentCard.style.display = 'none';
+          invalidCard.style.display = 'block';
+          if (data.reason) {
+            document.getElementById('txt-invalid-desc').textContent = data.reason;
+          }
+        }
+      } catch (err) {
+        console.error('Fehler bei Datenbank-Prüfung:', err);
+        isDbChecked = true;
+        isDbVerified = false;
+        statusBanner.className = 'status-banner invalid';
         studentCard.style.display = 'none';
         invalidCard.style.display = 'block';
       }
+
+      updateBannerText();
     }
 
     initVerification();

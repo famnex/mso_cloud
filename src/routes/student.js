@@ -345,4 +345,117 @@ router.get('/status-check', async (req, res) => {
   }
 });
 
+/**
+ * Öffentlicher Endpunkt zur Online-Verifizierung eines Schülerausweis-QR-Codes.
+ * Prüft in der Datenbank (student_profiles / Schulanmeldung MySQL), ob der Name
+ * und die Bibliotheksnummer (bib) exakt übereinstimmen und das Konto aktiv ist.
+ */
+router.get('/verify-check', async (req, res) => {
+  const name = String(req.query.name || '').trim();
+  const bib = String(req.query.bib || '').trim();
+  const id = String(req.query.id || '').trim();
+
+  if (!name || (!bib && !id)) {
+    return res.status(400).json({ 
+      verified: false, 
+      reason: 'Name und Bibliotheksnummer / Schülernummer sind erforderlich.' 
+    });
+  }
+
+  try {
+    // 1. Suche nach Schülerprofil mit passender Bibliotheksnummer (bib) oder ID/Username
+    let matchingUser = null;
+
+    if (bib) {
+      matchingUser = db.prepare(`
+        SELECT u.id, u.username, u.is_active, sp.first_name, sp.last_name, sp.mediothek_number, sp.card_status
+        FROM student_profiles sp
+        JOIN users u ON sp.user_id = u.id
+        WHERE sp.mediothek_number = ? AND u.is_active = 1
+      `).get(bib);
+    }
+
+    if (!matchingUser && id) {
+      const cleanUsername = id.replace(/^S-/, '');
+      matchingUser = db.prepare(`
+        SELECT u.id, u.username, u.is_active, sp.first_name, sp.last_name, sp.mediothek_number, sp.card_status
+        FROM student_profiles sp
+        JOIN users u ON sp.user_id = u.id
+        WHERE (u.username = ? OR u.id = ? OR sp.id = ?) AND u.is_active = 1
+      `).get(cleanUsername, cleanUsername, cleanUsername);
+    }
+
+    // Wenn MySQL / Schulanmeldung-DB konfiguriert ist, darüber prüfen
+    if (!matchingUser && typeof studentDb.getStudentProfile === 'function') {
+      const dbUsers = db.prepare('SELECT id, username, is_active FROM users WHERE is_active = 1').all();
+      for (const u of dbUsers) {
+        try {
+          const prof = await studentDb.getStudentProfile(u);
+          if (prof && prof.mediothek_number && prof.mediothek_number === bib) {
+            matchingUser = {
+              id: u.id,
+              username: u.username,
+              is_active: u.is_active,
+              first_name: prof.first_name,
+              last_name: prof.last_name,
+              mediothek_number: prof.mediothek_number,
+              card_status: prof.card_status
+            };
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!matchingUser) {
+      return res.json({ 
+        verified: false, 
+        reason: 'Kein übereinstimmender Datensatz in der Schulanmeldungs-Datenbank gefunden.' 
+      });
+    }
+
+    // 2. Namensabgleich (Vorname + Nachname case-insensitive & Umlaute-tolerant)
+    const fullName = `${matchingUser.first_name || ''} ${matchingUser.last_name || ''}`.trim();
+    
+    const normalize = (str) => String(str || '').trim().toLowerCase()
+      .normalize('NFC')
+      .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/\s+/g, ' ');
+
+    const normQueryName = normalize(name);
+    const normDbName = normalize(fullName);
+
+    const nameMatches = normQueryName === normDbName || 
+                        (normQueryName.includes(normalize(matchingUser.last_name)) && normQueryName.includes(normalize(matchingUser.first_name)));
+
+    if (!nameMatches) {
+      return res.json({ 
+        verified: false, 
+        reason: 'Der angegebene Name stimmt nicht mit dem in der Datenbank hinterlegten Inhaber überein.' 
+      });
+    }
+
+    // 3. Statusabgleich
+    const rawStatus = matchingUser.card_status || '';
+    const isRevoked = rawStatus === 'Ausweis gesperrt' || rawStatus === 'gesperrt' || rawStatus === 'Ungültig';
+    if (isRevoked) {
+      return res.json({ 
+        verified: false, 
+        reason: 'Dieser Schülerausweis wurde serverseitig gesperrt.' 
+      });
+    }
+
+    return res.json({
+      verified: true,
+      name: fullName,
+      status: 'Gültig',
+      message: 'Ausweis erfolgreich in der Schul-Datenbank verifiziert.'
+    });
+
+  } catch (error) {
+    console.error('Fehler bei /verify-check:', error);
+    return res.status(500).json({ verified: false, reason: 'Interner Serverfehler bei der Verifizierung.' });
+  }
+});
+
 module.exports = router;
