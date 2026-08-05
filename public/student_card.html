@@ -2802,11 +2802,10 @@
         const verifyBase = `${origin}${pathPrefix}/verify`;
         
         const studentName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || data.username || 'Schüler';
-        const studentId = data.student_id || data.id || `S-${data.username || '0000'}`;
         const bibNumber = data.mediothek_number || '';
         
-        // WICHTIG: bib= steht immer als letzter Parameter für Scannermodule
-        const qrPayload = `${verifyBase}?name=${encodeURIComponent(studentName)}&id=${encodeURIComponent(studentId)}&bib=${encodeURIComponent(bibNumber)}`;
+        // WICHTIG: bib= steht immer als letzter Parameter für Scannermodule (id weggelassen für minimale Punktdichte)
+        const qrPayload = `${verifyBase}?name=${encodeURIComponent(studentName)}&bib=${encodeURIComponent(bibNumber)}`;
         
         qrGenerator = new QRCode(qrBox, {
           text: qrPayload,
@@ -2917,9 +2916,8 @@
         const pathname = window.location.pathname;
         const pathPrefix = pathname.substring(0, pathname.lastIndexOf('/'));
         const verifyBase = `${origin}${pathPrefix}/verify`;
-        const studentId = targetData.student_id || targetData.id || `S-${targetData.username || '0000'}`;
         const bibNumber = targetData.mediothek_number || '';
-        const qrPayload = `${verifyBase}?name=${encodeURIComponent(studentName)}&id=${encodeURIComponent(studentId)}&bib=${encodeURIComponent(bibNumber)}`;
+        const qrPayload = `${verifyBase}?name=${encodeURIComponent(studentName)}&bib=${encodeURIComponent(bibNumber)}`;
 
         if (typeof QRCode !== 'undefined') {
           fullscreenQrGenerator = new QRCode(qrBox, {

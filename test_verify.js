@@ -43,7 +43,7 @@ runTest('URL-Generierung für Standard-Schülerdaten', () => {
   
   assert.strictEqual(
     url,
-    'https://ausweis.meineschule.de/verify?name=Max%20Mustermann&id=S-98765&bib=12345678',
+    'https://ausweis.meineschule.de/verify?name=Max%20Mustermann&bib=12345678',
     'URL stimmt nicht mit dem erwarteten Schema überein'
   );
 
@@ -62,8 +62,7 @@ runTest('URL-Generierung mit Umlauten und Sonderzeichen in Namen', () => {
   const url = generateVerificationUrl(student, 'https://cloud.mso-hef.de/novus');
   
   assert.ok(url.includes('name=Bj%C3%B6rn-Ren%C3%A9%20M%C3%BCller-%C3%96zdemir'), 'Namen mit Umlauten wurden nicht sauber kodiert');
-  assert.ok(url.includes('id=S-bjoern.mueller'), 'Student ID Fallback aus username schlug fehl');
-  assert.ok(url.endsWith('&bib=99887766'), 'bib Parameter steht nicht sauber isoliert am Ende');
+  assert.ok(url.endsWith('bib=99887766'), 'bib Parameter steht nicht sauber isoliert am Ende');
 });
 
 // -----------------------------------------------------------------------------

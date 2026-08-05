@@ -22,9 +22,9 @@ function generateVerificationUrl(student, baseUrl = '') {
   const path = cleanBase.endsWith('/verify') ? cleanBase : `${cleanBase}/verify`;
 
   // WICHTIG: bib= muss immer als letzter Parameter angehängt werden (Prefix/Suffix-Parsing für Hardware-Scanner)
+  // Aus Optimierungsgründen für eine möglichst geringe QR-Code-Punktdichte (bessere Scannbarkeit) wird id weggelassen.
   const queryParams = [
     `name=${encodeURIComponent(rawName)}`,
-    `id=${encodeURIComponent(studentId)}`,
     `bib=${encodeURIComponent(bibNumber)}`
   ].join('&');
 
