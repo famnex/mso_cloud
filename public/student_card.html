@@ -1288,6 +1288,25 @@
     <button class="motion-tap-btn" onclick="requestMotionPermission(); event.stopPropagation();">Jetzt aktivieren</button>
   </div>
 
+  <!-- Fullscreen QR Code Overlay -->
+  <div id="fullscreen-qr-overlay" onclick="closeFullscreenQR()" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #ffffff; color: #0f172a; z-index: 10000; flex-direction: column; justify-content: center; align-items: center; padding: 24px; box-sizing: border-box; text-align: center; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;">
+    
+    <div style="position: absolute; top: 20px; right: 20px; font-size: 1.5rem; color: #475569; background: #f1f5f9; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+      <i class="fa-solid fa-xmark"></i>
+    </div>
+
+    <div style="margin-bottom: 24px;">
+      <div id="fullscreen-student-name" style="font-size: 1.6rem; font-weight: 800; color: #0f172a; margin-bottom: 6px;">-</div>
+      <div id="fullscreen-mediothek-num" style="font-family: monospace; font-size: 1.2rem; font-weight: 700; color: #2563eb; letter-spacing: 1px;">-</div>
+    </div>
+
+    <div id="fullscreen-qr-box" style="background: #ffffff; padding: 24px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center; border: 3px solid #e2e8f0;"></div>
+
+    <div style="margin-top: 28px; font-size: 0.95rem; font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 8px 18px; border-radius: 999px; border: 1px solid #e2e8f0;">
+      <i class="fa-solid fa-hand-pointer" style="color: #3b82f6;"></i> <span data-i18n="tapToClose">Tippen zum Schließen</span>
+    </div>
+  </div>
+
   <!-- PWA Install Prompt Overlay -->
   <div class="pwa-prompt-overlay" id="pwa-prompt">
     <div class="pwa-prompt-card">
@@ -1462,8 +1481,8 @@
           </div>
 
           <!-- QR Code Container (UNTERHALB der Trennlinie) -->
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; z-index: 10; position: relative;">
-            <div class="qr-code-box" id="qrcode-box" title="Scan Mediotheksnummer"></div>
+          <div onclick="toggleFullscreenQR()" style="display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; z-index: 10; position: relative; cursor: pointer;" title="Tippen zum Vergrößern (Vollbild)">
+            <div class="qr-code-box" id="qrcode-box"></div>
             <span style="font-family: monospace; font-size: 0.7rem; font-weight: 700; color: var(--text);" id="card-mediothek-number-display">-</span>
           </div>
 
@@ -2846,10 +2865,85 @@
         overlayTitle.innerText = translations[currentLang].photoPendingTitle;
         overlayDesc.innerText = reasonPrefix + translations[currentLang].photoPendingDesc;
         overlay.style.display = 'flex';
-      } else {
-        overlay.style.display = 'none';
+    }
+
+    /* FULLSCREEN QR CODE OVERLAY & SCREEN WAKE LOCK */
+    let fullscreenQrGenerator = null;
+    let screenWakeLock = null;
+
+    async function openFullscreenQR() {
+      const overlay = document.getElementById('fullscreen-qr-overlay');
+      const qrBox = document.getElementById('fullscreen-qr-box');
+      if (!overlay || !qrBox) return;
+
+      qrBox.innerHTML = '';
+      
+      const targetData = cardData || (localStorage.getItem('mso_cached_card') ? JSON.parse(localStorage.getItem('mso_cached_card')) : null);
+
+      if (targetData) {
+        const studentName = `${targetData.first_name || ''} ${targetData.last_name || ''}`.trim() || targetData.username || 'Schülerausweis';
+        document.getElementById('fullscreen-student-name').textContent = studentName;
+        document.getElementById('fullscreen-mediothek-num').textContent = targetData.mediothek_number ? `BIB: ${targetData.mediothek_number}` : '';
+
+        const origin = window.location.origin;
+        const pathname = window.location.pathname;
+        const pathPrefix = pathname.substring(0, pathname.lastIndexOf('/'));
+        const verifyBase = `${origin}${pathPrefix}/verify`;
+        const studentId = targetData.student_id || targetData.id || `S-${targetData.username || '0000'}`;
+        const bibNumber = targetData.mediothek_number || '';
+        const qrPayload = `${verifyBase}?name=${encodeURIComponent(studentName)}&id=${encodeURIComponent(studentId)}&bib=${encodeURIComponent(bibNumber)}`;
+
+        if (typeof QRCode !== 'undefined') {
+          fullscreenQrGenerator = new QRCode(qrBox, {
+            text: qrPayload,
+            width: 280,
+            height: 280,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.L
+          });
+        }
+      }
+
+      overlay.style.display = 'flex';
+
+      // Screen Wake Lock anfordern (Display hell halten & nicht in Standby gehen)
+      try {
+        if ('wakeLock' in navigator && navigator.wakeLock) {
+          screenWakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {
+        console.log('Screen Wake Lock nicht verfügbar:', e);
       }
     }
+
+    async function closeFullscreenQR() {
+      const overlay = document.getElementById('fullscreen-qr-overlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+      if (screenWakeLock) {
+        try {
+          await screenWakeLock.release();
+        } catch (e) {}
+        screenWakeLock = null;
+      }
+    }
+
+    function toggleFullscreenQR() {
+      const overlay = document.getElementById('fullscreen-qr-overlay');
+      if (overlay && overlay.style.display !== 'none') {
+        closeFullscreenQR();
+      } else {
+        openFullscreenQR();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeFullscreenQR();
+      }
+    });
 
     /**
      * Zeichnet das Passbild + Siegel sowie Unterschrift + Name untrennbar auf HTML5 Canvas Elemente.
