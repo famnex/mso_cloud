@@ -206,6 +206,7 @@ router.get('/card', async (req, res) => {
     }
 
     res.json({
+      username: user.username,
       first_name: profile.first_name,
       last_name: profile.last_name,
       birth_date: profile.birth_date,
@@ -274,7 +275,7 @@ router.get('/status-check', async (req, res) => {
     // 1. Prüfen, ob der Benutzer in der lokalen DB existiert und aktiv ist
     const dbUser = db.prepare('SELECT id, is_active FROM users WHERE username = ?').get(username);
     if (!dbUser || dbUser.is_active === 0) {
-      return res.json({ active: false, reason: 'Konto deaktiviert oder gelöscht.' });
+      return res.json({ active: false, account_deleted: true, reason: 'Konto deaktiviert oder gelöscht.' });
     }
 
     // 2. Prüfen, ob der Benutzer im LDAP aktiv ist
@@ -288,10 +289,28 @@ router.get('/status-check', async (req, res) => {
       // Konto im LDAP deaktiviert/gelöscht -> lokal deaktivieren
       db.prepare('UPDATE users SET is_active = 0 WHERE id = ?').run(dbUser.id);
       db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(dbUser.id);
-      return res.json({ active: false, reason: 'Konto im LDAP deaktiviert oder gelöscht.' });
+      return res.json({ active: false, account_deleted: true, reason: 'Konto im LDAP deaktiviert oder gelöscht.' });
     }
 
-    return res.json({ active: true });
+    // 3. Ausweis-Profil und Status prüfen
+    const profile = db.prepare('SELECT card_status FROM student_profiles WHERE user_id = ?').get(dbUser.id);
+    const rawStatus = profile ? profile.card_status : 'Bild verifiziert';
+    const isRevoked = rawStatus === 'Ausweis gesperrt' || rawStatus === 'gesperrt' || rawStatus === 'Ungültig';
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const augustFirst = new Date(currentYear, 7, 1);
+    let expirationYear = currentYear;
+    if (now >= augustFirst) {
+      expirationYear = currentYear + 1;
+    }
+    const expiresAt = `${expirationYear}-07-31`;
+
+    if (isRevoked) {
+      return res.json({ active: false, account_deleted: false, reason: 'Ausweis gesperrt.', card_status: rawStatus, expires_at: expiresAt });
+    }
+
+    return res.json({ active: true, card_status: rawStatus, expires_at: expiresAt });
   } catch (err) {
     console.error('[Express /status-check] Fehler:', err);
     return res.json({ active: true, error: err.message });

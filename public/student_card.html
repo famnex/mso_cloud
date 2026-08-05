@@ -1515,6 +1515,8 @@
         photoPendingDesc: "Ihr hochgeladenes Passbild wird derzeit von der Verwaltung geprüft. Sobald das Foto verifiziert ist, wird Ihr Ausweis freigeschaltet.",
         photoRejectedTitle: "Foto abgelehnt",
         photoRejectedDesc: "Ihr hochgeladenes Passbild wurde abgelehnt. Bitte laden Sie in Ihrem Profil in der MSO Cloud ein neues Passbild hoch.",
+        expiredOfflineTitle: "Offline-Zeitraum abgelaufen",
+        expiredOfflineDesc: 'Offline-Zeitraum abgelaufen. Bitte aktualisieren <button class="inline-reload-btn" onclick="triggerCardReload()" title="Aktualisieren" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: inherit; padding: 6px 12px; border-radius: 8px; cursor: pointer; margin-left: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; vertical-align: middle; pointer-events: auto;"><i class="fa-solid fa-rotate-right"></i></button>',
         securityNotice: "Gültigkeitsprüfung: Beim Neigen des Smartphones bewegen sich Ausweis und Hologramm. Die Uhrzeit läuft im Millisekundentakt.",
         
         // PWA Translation strings
@@ -1551,6 +1553,8 @@
         photoPendingDesc: "Your uploaded photo is currently under review by the administration. Your card will be unlocked once approved.",
         photoRejectedTitle: "Photo Rejected",
         photoRejectedDesc: "Your uploaded portrait photo was rejected. Please upload a new photo in your MSO Cloud profile.",
+        expiredOfflineTitle: "Offline Period Expired",
+        expiredOfflineDesc: 'Offline period expired. Please refresh <button class="inline-reload-btn" onclick="triggerCardReload()" title="Refresh" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: inherit; padding: 6px 12px; border-radius: 8px; cursor: pointer; margin-left: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; vertical-align: middle; pointer-events: auto;"><i class="fa-solid fa-rotate-right"></i></button>',
         securityNotice: "Validity check: Tilting the smartphone moves the ID card and hologram. The clock runs in milliseconds.",
         
         // PWA Translation strings
@@ -1587,6 +1591,8 @@
         photoPendingDesc: "Votre photo téléchargée est en cours d'examen par l'administration. La carte sera activée une fois approuvée.",
         photoRejectedTitle: "Photo refusée",
         photoRejectedDesc: "La photo d'identité téléchargée a été refusée. Veuillez télécharger une nouvelle photo dans votre profil MSO Cloud.",
+        expiredOfflineTitle: "Période hors ligne expirée",
+        expiredOfflineDesc: 'Période hors ligne expirée. Veuillez actualiser <button class="inline-reload-btn" onclick="triggerCardReload()" title="Actualiser" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: inherit; padding: 6px 12px; border-radius: 8px; cursor: pointer; margin-left: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; vertical-align: middle; pointer-events: auto;"><i class="fa-solid fa-rotate-right"></i></button>',
         securityNotice: "Vérification de validité : L'inclinaison du smartphone anime la carte et le hologramme. L'horloge tourne en millisecondes.",
         
         // PWA Translation strings
@@ -2329,11 +2335,60 @@
             stopAutoRetry();
             return;
           }
+
+          // Anonyme Statusprüfung ausführen, falls Session abgelaufen (401), aber ein Ausweis-Cache existiert
+          let tempCached = null;
+          try { if (cached) tempCached = JSON.parse(cached); } catch (e) {}
+          const storedUsername = (cardData && (cardData.username || cardData.user)) || (tempCached && (tempCached.username || tempCached.user));
+
+          if (navigator.onLine && storedUsername) {
+            try {
+              const statusRes = await fetch(`api/student/status-check?username=${encodeURIComponent(storedUsername)}`);
+              if (statusRes.ok) {
+                const statusData = await statusRes.json();
+                if (statusData.active && statusData.card_status !== 'Ausweis gesperrt' && statusData.card_status !== 'gesperrt' && statusData.card_status !== 'Ungültig') {
+                  // Ausweis ist online weiterhin GÜLTIG! Zeitstempel erneuern -> bleibt dauerhaft über 30 Tage hinaus online verifiziert
+                  localStorage.setItem('mso_cached_card_time', Date.now().toString());
+                  localStorage.setItem('mso_card_offline_blocked', 'false');
+                  
+                  if (tempCached) {
+                    cardData = tempCached;
+                    if (statusData.card_status) cardData.card_status = statusData.card_status;
+                    if (statusData.expires_at) cardData.expires_at = statusData.expires_at;
+                  }
+                  
+                  renderCard(cardData, false); // Normal online verifiziert (isOffline = false)
+                  updateControlsState(false);  // Resttage-Badge ausblenden
+                  isFreshOnlineLoaded = true;
+                  stopAutoRetry();
+                  return;
+                } else if (statusData.active === false || statusData.account_deleted === true) {
+                  localStorage.setItem('mso_card_offline_blocked', 'true');
+                  localStorage.removeItem('mso_cached_card');
+                  localStorage.removeItem('mso_cached_card_time');
+                  
+                  const blockedData = {
+                    card_status: 'Ausweis gesperrt',
+                    first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
+                  };
+                  renderCard(blockedData, false);
+                  updateControlsState(false);
+                  isFreshOnlineLoaded = true;
+                  stopAutoRetry();
+                  return;
+                }
+              }
+            } catch (e) {
+              console.warn('[PWA Card] Anonyme Statusprüfung fehlgeschlagen:', e);
+            }
+          }
+
           throw new Error(errData.error || 'Nicht autorisiert.');
         }
         
         const isFromCache = !navigator.onLine || res.headers.get('X-From-Cache') === 'true';
         const data = await res.json();
+        if (data && !data.username && data.user) data.username = data.user;
         cardData = data;
         
         const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
@@ -2378,18 +2433,12 @@
           if (cardData) renderCard(cardData, true);
           updateControlsState(true);
         } else {
-          localStorage.removeItem('mso_cached_card');
-          localStorage.removeItem('mso_cached_card_time');
-          
-          const errorMsg = isCacheExpired ? 'Offline-Zeitraum abgelaufen (30 Tage überschritten)' : 'Kein Cache vorhanden';
-          const nameEl = document.getElementById('card-name');
-          if (nameEl) nameEl.innerText = errorMsg;
-          
+          // Kein Cache vorhanden ODER Offline-Zeitraum abgelaufen
           const blockedData = {
-            card_status: 'Ausweis gesperrt',
+            card_status: 'Offline-Zeitraum abgelaufen',
             first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
           };
-          renderCard(blockedData, false);
+          renderCard(blockedData, true);
           updateControlsState(true);
         }
 
@@ -2550,6 +2599,7 @@
 
       // 2. Sperr- & Statusprüfung vornehmen
       const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
+      const isOfflineExpired = data.card_status === 'Offline-Zeitraum abgelaufen';
       const hasNoImage = !data.card_image;
       const isRejected = data.card_status === 'Bild abgelehnt' || data.card_status_code === '1134';
       const isVerified = data.card_status === 'Bild genehmigt' || 
@@ -2558,14 +2608,14 @@
                          data.card_status === 'Bild akzeptiert' ||
                          data.card_status === 'Ausweis gedruckt' ||
                          data.card_status === 'Ausweis ausgegeben';
-      const isNotVerified = !isVerified && !isRejected;
+      const isNotVerified = !isVerified && !isRejected && !isOfflineExpired;
 
       // Check Expiry
       const now = new Date();
       const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59') : '2099-12-31T23:59:59');
       const isExpired = now > expiry;
 
-      const shouldBlockContent = isRevoked || isExpired || hasNoImage || isNotVerified;
+      const shouldBlockContent = isRevoked || isExpired || isOfflineExpired || hasNoImage || isNotVerified;
 
       // 3. Schultitel & Logo (Wasserzeichen im Hintergrund)
       const watermarkContainer = document.getElementById('logo-watermark-container');
@@ -2750,6 +2800,12 @@
         overlayIcon.style.color = "var(--danger)";
         overlayTitle.innerText = translations[currentLang].revokedTitle;
         overlayDesc.innerText = translations[currentLang].revokedDesc;
+        overlay.style.display = 'flex';
+      } else if (isOfflineExpired) {
+        overlayIcon.className = "fa-solid fa-rotate-right revoked-icon";
+        overlayIcon.style.color = "#f59e0b";
+        overlayTitle.innerText = (translations[currentLang] && translations[currentLang].expiredOfflineTitle) ? translations[currentLang].expiredOfflineTitle : "Offline-Zeitraum abgelaufen";
+        overlayDesc.innerHTML = (translations[currentLang] && translations[currentLang].expiredOfflineDesc) ? translations[currentLang].expiredOfflineDesc : 'Offline-Zeitraum abgelaufen. Bitte aktualisieren <button class="inline-reload-btn" onclick="triggerCardReload()" title="Aktualisieren" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: inherit; padding: 6px 12px; border-radius: 8px; cursor: pointer; margin-left: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; vertical-align: middle; pointer-events: auto;"><i class="fa-solid fa-rotate-right"></i></button>';
         overlay.style.display = 'flex';
       } else if (isExpired) {
         overlayIcon.className = "fa-solid fa-calendar-times revoked-icon";
@@ -3162,6 +3218,15 @@
       if (isFetchInProgress) return;
       isFreshOnlineLoaded = false;
       await loadCardData(false);
+
+      // Falls nach dem Versuch weiterhin keine aktive Session vorhanden ist,
+      // öffnen wir das Login-Modal, damit der Nutzer sich einloggen kann (z.B. für Namensänderungen nach Heirat)
+      try {
+        const checkRes = await fetch('api/auth/me');
+        if (!checkRes.ok && checkRes.status === 401) {
+          openLoginModal();
+        }
+      } catch (e) {}
     }
 
     async function checkCardLoginLockStatus() {
