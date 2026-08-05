@@ -105,6 +105,11 @@ app.get('/novus/jwks', jwksHandler);
 
 app.use('/api/oauth', require('./routes/oauth'));
 
+// Öffentliche Verifizierungsseite für Schülerausweis-QR-Codes
+app.get(['/verify', '/verify.html', '/novus/verify', '/novus/verify.html'], (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/verify.html'));
+});
+
 // Fallback für SPA (sendet immer index.html, falls kein statischer Ordner matched)
 app.get('*', (req, res) => {
   const setupCompleted = getConfig('setup_completed') === '1';

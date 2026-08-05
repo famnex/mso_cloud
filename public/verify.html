@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Offizieller Schülerausweis - Online Echtheitsprüfung | MSO Cloud</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      --card-bg: rgba(30, 41, 59, 0.75);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --primary: #3b82f6;
+      --success: #22c55e;
+      --success-glow: rgba(34, 197, 94, 0.25);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.25);
+      --text-main: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px 16px 40px;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .header-logo {
+      text-align: center;
+      padding: 10px 0 5px;
+    }
+
+    .header-logo h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #60a5fa, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Verification Status Banner */
+    .status-banner {
+      background: var(--card-bg);
+      border: 1px solid var(--success);
+      border-radius: 16px;
+      padding: 16px 20px;
+      text-align: center;
+      box-shadow: 0 10px 25px -5px var(--success-glow);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-banner.invalid {
+      border-color: var(--danger);
+      box-shadow: 0 10px 25px -5px var(--danger-glow);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(74, 222, 128, 0.3);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .status-banner.invalid .status-badge {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    .status-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .status-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    /* Student Details Card */
+    .student-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 14px;
+    }
+
+    .card-header-title {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .card-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .field-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-main);
+      word-break: break-word;
+    }
+
+    .field-value.highlight {
+      font-size: 1.35rem;
+      color: #60a5fa;
+    }
+
+    .field-value-mono {
+      font-family: 'Courier New', Courier, monospace;
+      letter-spacing: 1px;
+      color: #c084fc;
+    }
+
+    /* Dynamic Security Seal Element */
+    .security-stamp {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
+      border: 1px dashed rgba(96, 165, 250, 0.4);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .stamp-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      background-color: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+      animation: pulse-ring 1.8s infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+      }
+    }
+
+    .stamp-text {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #93c5fd;
+    }
+
+    .stamp-clock {
+      font-family: monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #4ade80;
+    }
+
+    /* Authenticity Verification Instructions Box */
+    .instructions-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px 22px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .instructions-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px;
+    }
+
+    .instruction-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .step-number {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-text strong {
+      color: var(--text-main);
+    }
+
+    .domain-highlight {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: monospace;
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <div class="header-logo">
+      <h2><i class="fa-solid fa-graduation-cap"></i> MSO DIGITAL ID VERIFICATION</h2>
+    </div>
+
+    <!-- STATUS BANNER -->
+    <div id="status-banner" class="status-banner">
+      <div id="status-badge" class="status-badge">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>Offizieller Schülerausweis / Official Student ID</span>
+      </div>
+      <div id="status-title" class="status-title">Ausweis Verifiziert</div>
+      <div id="status-subtitle" class="status-subtitle">Gültiges digitales Dokument | Modellschule Obersberg</div>
+    </div>
+
+    <!-- STUDENT DETAILS CARD -->
+    <div id="student-card" class="student-card">
+      <div class="card-header-row">
+        <div class="card-header-title">Schülerdaten / Student Details</div>
+        <i class="fa-solid fa-user-check" style="color: #4ade80; font-size: 1.1rem;"></i>
+      </div>
+
+      <div class="card-field">
+        <div class="field-label">Name des Schülers / Student Name</div>
+        <div id="display-name" class="field-value highlight">—</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="card-field">
+          <div class="field-label">Bibliotheksnummer / Library ID</div>
+          <div id="display-bib" class="field-value field-value-mono">—</div>
+        </div>
+
+        <div class="card-field">
+          <div class="field-label">Schülernummer / Student ID</div>
+          <div id="display-id" class="field-value field-value-mono">—</div>
+        </div>
+      </div>
+
+      <!-- DYNAMIC SECURITY ELEMENT -->
+      <div class="security-stamp">
+        <div class="stamp-left">
+          <div class="pulse-dot"></div>
+          <div class="stamp-text">Live Echtheits-Siegel</div>
+        </div>
+        <div id="live-clock" class="stamp-clock">--:--:--</div>
+      </div>
+    </div>
+
+    <!-- FALLBACK ERROR CARD (Hidden by default) -->
+    <div id="invalid-card" class="student-card" style="display: none; border-color: rgba(239, 68, 68, 0.4);">
+      <div style="text-align: center; padding: 10px 0;">
+        <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; color: var(--danger); margin-bottom: 12px;"></i>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--danger); margin-bottom: 8px;">Ungültiger Ausweis-Code / Invalid ID Code</h3>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5;">
+          Der gescannte QR-Code enthält keine vollständigen Ausweisdaten. Bitte überprüfen Sie den QR-Code auf dem Schülerausweis oder scannen Sie diesen erneut.
+        </p>
+      </div>
+    </div>
+
+    <!-- AUTHENTICITY VERIFICATION INSTRUCTIONS -->
+    <div class="instructions-box">
+      <div class="instructions-title">
+        <i class="fa-solid fa-circle-info" style="color: #60a5fa;"></i>
+        <span>Prüfung der Echtheit / Authenticity Check</span>
+      </div>
+
+      <div class="instruction-step">
+        <div class="step-number">1</div>
+        <div class="step-text">
+          <strong>Foto-Abgleich / Photo Match:</strong><br>
+          Prüfen Sie, ob das Lichtbild auf dem Smartphone des Schülers mit der vorlegenden Person übereinstimmt.
+        </div>
+      </div>
+
+      <div class="instruction-step">
+        <div class="step-number">2</div>
+        <div class="step-text">
+          <strong>Domain-Prüfung / Address Bar Domain:</strong><br>
+          Stellen Sie sicher, dass die Adresse in der Adresszeile des Browsers exakt mit <span id="current-domain-display" class="domain-highlight">https://...</span> übereinstimmt.
+        </div>
+      </div>
+
+      <div class="instruction-step">
+        <div class="step-number">3</div>
+        <div class="step-text">
+          <strong>Dynamisches Sicherheitselement / Live Security Badge:</strong><br>
+          Achten Sie auf das oben angezeigte animierte Live-Siegel und die mitlaufende Server-Uhrzeit, um statische Screenshots auszuschließen.
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      MSO Cloud Launcher &bull; Modellschule Obersberg &bull; Echtheitsprüfung System v2.0
+    </div>
+
+  </div>
+
+  <script>
+    // Live Server/Client Clock
+    function updateClock() {
+      const clockEl = document.getElementById('live-clock');
+      if (clockEl) {
+        const now = new Date();
+        clockEl.textContent = now.toLocaleTimeString('de-DE');
+      }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Domain Anzeige in Schritt 2 dynamisch befüllen
+    const domainDisplay = document.getElementById('current-domain-display');
+    if (domainDisplay) {
+      domainDisplay.textContent = window.location.origin;
+    }
+
+    // Parameter aus URL auslesen und validieren
+    function initVerification() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const nameParam = urlParams.get('name') || '';
+      const bibParam = urlParams.get('bib') || '';
+      const idParam = urlParams.get('id') || '';
+
+      const cleanName = nameParam.trim();
+      const cleanBib = bibParam.trim();
+      const cleanId = idParam.trim();
+
+      const isValid = !!(cleanName && (cleanBib || cleanId));
+
+      const statusBanner = document.getElementById('status-banner');
+      const statusTitle = document.getElementById('status-title');
+      const statusBadge = document.getElementById('status-badge');
+      const studentCard = document.getElementById('student-card');
+      const invalidCard = document.getElementById('invalid-card');
+
+      if (isValid) {
+        document.getElementById('display-name').textContent = cleanName;
+        document.getElementById('display-bib').textContent = cleanBib || '—';
+        document.getElementById('display-id').textContent = cleanId || '—';
+
+        statusBanner.classList.remove('invalid');
+        studentCard.style.display = 'flex';
+        invalidCard.style.display = 'none';
+      } else {
+        statusBanner.classList.add('invalid');
+        statusBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> <span>Ungültiger Code / Invalid Code</span>';
+        statusTitle.textContent = 'Echtheit nicht verifizierbar';
+        studentCard.style.display = 'none';
+        invalidCard.style.display = 'block';
+      }
+    }
+
+    initVerification();
+  </script>
+</body>
+</html>

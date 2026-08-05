@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "update": "node src/updater.js"
+    "update": "node src/updater.js",
+    "test": "node test_verify.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

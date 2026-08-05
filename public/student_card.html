@@ -2747,17 +2747,30 @@
       // 5. Prerendering der kopiergeschützten Canvas-Bilder mit DPR-Verdreifachung (Retina-Qualität)
       await prerenderElementsOnCanvas(data, shouldBlockContent);
       
-      // 6. QR-Code für Mediotheksnummer generieren (Bei Sperrung leeren)
+      // 6. QR-Code für Verifizierung & Mediotheksnummer generieren (Payload: https://<DOMAIN>/verify?name=...&id=...&bib=...)
       const qrBox = document.getElementById('qrcode-box');
-      if (!shouldBlockContent && typeof QRCode !== 'undefined' && data.mediothek_number) {
+      if (!shouldBlockContent && typeof QRCode !== 'undefined' && (data.mediothek_number || data.first_name || data.username)) {
         qrBox.innerHTML = '';
+        
+        const origin = window.location.origin;
+        const pathname = window.location.pathname;
+        const pathPrefix = pathname.substring(0, pathname.lastIndexOf('/'));
+        const verifyBase = `${origin}${pathPrefix}/verify`;
+        
+        const studentName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || data.username || 'Schüler';
+        const studentId = data.student_id || data.id || `S-${data.username || '0000'}`;
+        const bibNumber = data.mediothek_number || '';
+        
+        // WICHTIG: bib= steht immer als letzter Parameter für Scannermodule
+        const qrPayload = `${verifyBase}?name=${encodeURIComponent(studentName)}&id=${encodeURIComponent(studentId)}&bib=${encodeURIComponent(bibNumber)}`;
+        
         qrGenerator = new QRCode(qrBox, {
-          text: data.mediothek_number,
-          width: 64,
-          height: 64,
+          text: qrPayload,
+          width: 68,
+          height: 68,
           colorDark : "#000000",
           colorLight : "#ffffff",
-          correctLevel : QRCode.CorrectLevel.M
+          correctLevel : QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur für geringe Punktdichte (einfaches Scannen)
         });
       } else {
         qrBox.innerHTML = `<i class="fa-solid fa-ban" style="color:var(--danger); font-size:2rem;"></i>`;
