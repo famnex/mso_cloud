@@ -512,14 +512,11 @@
             <div id="live-clock-ms" class="stamp-clock-ms">--:--:--.---</div>
           </div>
 
-          <!-- 2. HOLOGRAM SEAL WITH 3D TILT SHIMMER -->
+          <!-- 2. HOLOGRAM SEAL -->
           <div class="hologram-seal">
             <div class="hologram-title">
               <i class="fa-solid fa-compact-disc"></i>
               <span id="txt-holo-title">MSO Sicherheits-Hologramm</span>
-            </div>
-            <div class="hologram-tilt-hint" id="txt-holo-hint">
-              <i class="fa-solid fa-mobile-screen-button"></i> <span id="txt-tilt-label">Kippen</span>
             </div>
           </div>
         </div>
@@ -570,12 +567,12 @@
         </div>
       </div>
 
-      <!-- POINT 4: HOLOGRAMM & KIPPBARKEIT -->
+      <!-- POINT 4: HOLOGRAMM & SIEGEL -->
       <div class="instruction-step">
         <div class="step-number">4</div>
         <div class="step-text" id="txt-step-4">
-          <strong>Hologramm & Kippbarkeit / 3D Hologram Tilt:</strong><br>
-          Kippen Sie das Smartphone oder bewegen Sie die Maus, um den 3D-Effekt und die Regenbogen-Lichtreflexionen des Hologramms zu prüfen.
+          <strong>Hologramm & Sicherheits-Siegel:</strong><br>
+          Achten Sie auf das animierte Sicherheits-Hologramm und die Farbreflexionen des Siegels.
         </div>
       </div>
     </div>
@@ -802,38 +799,6 @@
     if (domainDisplay) {
       domainDisplay.textContent = window.location.origin;
     }
-
-    // 3. INTERACTIVE 3D HOLOGRAM TILT (Gyroscope & Mouse Move)
-    const cardEl = document.getElementById('student-card');
-    const holoOverlay = document.getElementById('holo-overlay');
-
-    function applyTilt(rotateX, rotateY) {
-      if (!cardEl) return;
-      cardEl.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-      if (holoOverlay) {
-        const posX = 50 + rotateY * 2.5;
-        const posY = 50 - rotateX * 2.5;
-        holoOverlay.style.backgroundPosition = `${posX}% ${posY}%`;
-      }
-    }
-
-    // Mouse tilt for desktops
-    document.addEventListener('mousemove', (e) => {
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-      const dx = (e.clientX - cx) / cx;
-      const dy = (e.clientY - cy) / cy;
-      applyTilt(-dy * 12, dx * 12);
-    });
-
-    // Gyroscope tilt for mobile smartphones
-    window.addEventListener('deviceorientation', (e) => {
-      if (e.gamma !== null && e.beta !== null) {
-        const rotY = Math.max(-25, Math.min(25, e.gamma / 2));
-        const rotX = Math.max(-25, Math.min(25, (e.beta - 45) / 2));
-        applyTilt(rotX, rotY);
-      }
-    });
 
     // 4. BACKGROUND DATABASE VERIFICATION (GET /api/student/verify-check)
     async function initVerification() {
