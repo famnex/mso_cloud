@@ -2201,7 +2201,7 @@ async function loadAdminUsers() {
         <td style="font-size:0.8rem; color:var(--text-secondary);">${new Date(user.created_at).toLocaleDateString('de-DE')}</td>
         <td class="actions-cell">
           <button class="btn btn-secondary btn-icon" onclick="openUserForm(${JSON.stringify(user).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-user-pen"></i></button>
-          ${user.is_ldap === 1 ? `<button class="btn btn-secondary btn-icon" onclick="syncLdapGroups(${user.id})" title="LDAP-Gruppen neu laden" style="color: var(--warn-color);"><i class="fa-solid fa-arrows-rotate"></i></button>` : ''}
+          <button class="btn btn-secondary btn-icon" onclick="syncLdapGroups(${user.id}, '${(user.username || '').replace(/'/g, "\\'")}')" title="Im LDAP/AD suchen, als LDAP-Konto übernehmen & Gruppen synchronisieren" style="color: var(--warn-color);"><i class="fa-solid fa-arrows-rotate"></i></button>
           <button class="btn btn-danger btn-icon" onclick="deleteUser(${user.id})" title="Löschen" ${currentUser.id === user.id ? 'disabled' : ''}><i class="fa-solid fa-user-xmark"></i></button>
         </td>
       `;
@@ -2290,9 +2290,9 @@ async function saveUserForm(e) {
   }
 }
 
-async function syncLdapGroups(userId) {
+async function syncLdapGroups(userId, username = '') {
   try {
-    const btn = document.querySelector(`button[onclick="syncLdapGroups(${userId})"]`);
+    const btn = document.querySelector(`button[onclick*="syncLdapGroups(${userId}"]`);
     if (btn) {
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
       btn.disabled = true;
@@ -2302,13 +2302,13 @@ async function syncLdapGroups(userId) {
     const data = await res.json();
 
     if (res.ok) {
-      showAdminAlert('LDAP-Sicherheitsgruppen erfolgreich aktualisiert.');
+      showAdminAlert(data.message || 'Benutzer erfolgreich im LDAP gefunden und Gruppen aktualisiert.');
       loadAdminUsers();
     } else {
-      throw new Error(data.error);
+      throw new Error(data.error || 'LDAP-Synchronisation fehlgeschlagen.');
     }
   } catch (err) {
-    alert('Fehler beim Synchronisieren: ' + err.message);
+    alert(`Fehler beim LDAP-Abgleich: ${err.message}`);
     loadAdminUsers();
   }
 }

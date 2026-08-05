@@ -629,31 +629,67 @@ router.put('/users/:id', (req, res) => {
 });
 
 /**
- * Synchronisiert die Gruppen eines LDAP-Benutzers manuell aus dem LDAP.
+ * Synchronisiert einen Benutzer mit dem LDAP, übernimmt ihn als LDAP-Konto und lädt Gruppen neu.
  */
 router.post('/users/:id/sync-ldap', async (req, res) => {
   try {
     const { id } = req.params;
-    const user = db.prepare('SELECT username, is_ldap FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, username, email, is_ldap FROM users WHERE id = ?').get(id);
 
     if (!user) {
       return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
     }
 
-    if (user.is_ldap !== 1) {
-      return res.status(400).json({ error: 'Nur LDAP-Benutzer können synchronisiert werden.' });
+    const ldapEnabled = getConfig('ldap_enabled') === '1';
+    if (!ldapEnabled) {
+      return res.status(400).json({ error: 'LDAP-Integration ist in den Einstellungen deaktiviert.' });
     }
 
-    // Gruppen vom LDAP-Server abfragen und mappen
-    const localGroups = await ldap.syncUserGroups(user.username);
-    const groupsJson = JSON.stringify(localGroups);
+    // 1. Suche nach LDAP-Gruppen & LDAP-Profil
+    let rawGroups = [];
+    let ldapInfo = null;
 
-    // In der lokalen DB speichern
-    db.prepare('UPDATE users SET groups = ? WHERE id = ?').run(groupsJson, id);
+    try {
+      rawGroups = await ldap.syncUserGroups(user.username);
+    } catch (syncErr) {
+      console.warn(`[Admin LDAP Sync] syncUserGroups for ${user.username}: ${syncErr.message}`);
+    }
 
-    res.json({ success: true, message: 'LDAP-Gruppen erfolgreich synchronisiert.', groups: localGroups });
+    if (user.email) {
+      try {
+        ldapInfo = await ldap.findUserByEmail(user.email);
+      } catch (emailErr) {
+        console.warn(`[Admin LDAP Sync] findUserByEmail for ${user.email}: ${emailErr.message}`);
+      }
+    }
+
+    const activeCheck = await ldap.isUserActiveInLdap(user.username);
+
+    if (!activeCheck.active && !ldapInfo && (!rawGroups || rawGroups.length === 0)) {
+      return res.status(404).json({ error: `Der Benutzer '${user.username}' konnte im LDAP / Active Directory nicht gefunden werden oder ist dort deaktiviert.` });
+    }
+
+    const groupsJson = JSON.stringify(rawGroups || []);
+    const dnVal = ldapInfo ? ldapInfo.dn : null;
+    const emailVal = (ldapInfo && ldapInfo.email) ? ldapInfo.email.trim().toLowerCase() : user.email;
+
+    // 2. Konto in der Datenbank als LDAP-Konto (is_ldap = 1) übernehmen und Gruppen/DN/Email aktualisieren
+    db.prepare(`
+      UPDATE users 
+      SET is_ldap = 1, groups = ?, dn = COALESCE(?, dn), email = COALESCE(?, email)
+      WHERE id = ?
+    `).run(groupsJson, dnVal, emailVal, id);
+
+    logEvent('info', 'user_ldap_synced_by_admin', `Benutzer '${user.username}' wurde vom Admin mit LDAP synchronisiert und als LDAP-Konto übernommen.`, { userId: id }, req.ip || '0.0.0.0');
+
+    res.json({ 
+      success: true, 
+      message: `Benutzer '${user.username}' wurde im LDAP gefunden, als LDAP-Konto übernommen und Gruppen wurden aktualisiert (${(rawGroups || []).length} Gruppen).`,
+      groups: rawGroups 
+    });
   } catch (error) {
-    res.status(500).json({ error: 'LDAP-Gruppen-Sync fehlgeschlagen: ' + error.message });
+    console.error('Fehler bei Admin LDAP Sync:', error);
+    res.status(500).json({ error: 'LDAP-Synchronisation fehlgeschlagen: ' + error.message });
   }
 });
 
