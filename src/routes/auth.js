@@ -429,25 +429,44 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Der Link ist ungültig oder abgelaufen.' });
     }
 
-    // Passwort in LDAP ändern
-    console.log(`Setze neues Passwort in LDAP für DN: ${reset.user_dn}`);
-    await ldap.changePassword(reset.user_dn, password);
+    // Passwort in LDAP ändern (mit Fehlerabfangung)
+    let ldapSuccess = false;
+    let ldapError = null;
+
+    try {
+      console.log(`Setze neues Passwort in LDAP für DN: ${reset.user_dn}`);
+      await ldap.changePassword(reset.user_dn, password);
+      ldapSuccess = true;
+    } catch (err) {
+      console.error('LDAP Passwortänderung fehlgeschlagen:', err.message);
+      ldapError = err.message;
+    }
+
+    // Auch in lokaler DB (users) Passwort aktualisieren, falls der User lokal existiert
+    const bcrypt = require('bcryptjs');
+    const salt = bcrypt.genSaltSync(10);
+    const passwordHash = bcrypt.hashSync(password, salt);
+
+    const userRow = db.prepare('SELECT id FROM users WHERE dn = ?').get(reset.user_dn);
+    if (userRow) {
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userRow.id);
+      db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(userRow.id);
+    }
+
+    if (!ldapSuccess && !userRow) {
+      logEvent('error', 'password_reset_failed', `Fehler beim Setzen des Passworts in LDAP und kein lokales Konto`, { error: ldapError }, ip);
+      return res.status(400).json({ error: 'Das Passwort konnte nicht geändert werden: ' + (ldapError || 'LDAP-Verbindung fehlgeschlagen') });
+    }
 
     // Token als verbraucht markieren
     const usedAt = new Date().toISOString();
     db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE id = ?').run(usedAt, reset.id);
 
-    // Startpasswort in student_profiles löschen bzw. als geändert markieren
-    const userRow = db.prepare('SELECT id FROM users WHERE dn = ?').get(reset.user_dn);
-    if (userRow) {
-      db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(userRow.id);
-    }
-
     logEvent('info', 'password_reset_success', `Passwort erfolgreich geändert für DN: ${reset.user_dn}`, { userDn: reset.user_dn }, ip);
     res.json({ success: true, message: 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.' });
   } catch (error) {
-    console.error('Fehler beim Zurücksetzen des LDAP-Passworts:', error);
-    logEvent('error', 'password_reset_failed', `Fehler beim Setzen des Passworts in LDAP`, { error: error.message }, ip);
+    console.error('Fehler beim Zurücksetzen des Passworts:', error);
+    logEvent('error', 'password_reset_failed', `Fehler beim Setzen des Passworts`, { error: error.message }, ip);
     res.status(500).json({ error: 'Fehler beim Passwort-Reset: ' + error.message });
   }
 });
