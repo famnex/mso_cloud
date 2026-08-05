@@ -511,57 +511,96 @@ async function changePassword(userDn, newPassword) {
 
   return new Promise((resolve, reject) => {
     let client;
+    let completed = false;
+    let timeoutId;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      if (client) {
+        try { client.destroy(); } catch (e) {}
+        client = null;
+      }
+    };
+
+    timeoutId = setTimeout(() => {
+      if (!completed) {
+        completed = true;
+        cleanup();
+        reject(new Error('LDAP-Verbindungstimeout (5 Sekunden überschritten) beim Passwort-Ändern.'));
+      }
+    }, 5000);
+
     try {
       client = createLdapClient();
-    } catch (err) {
-      return reject(err);
-    }
 
-    client.on('error', (err) => {
-      console.error('LDAP Client-Fehler beim Passwort ändern:', err);
-    });
-
-    client.bind(bindDn, bindPassword, (err) => {
-      if (err) {
-        client.destroy();
-        return reject(new Error('LDAP-Admin-Bind fehlgeschlagen: ' + err.message));
-      }
-
-      let change;
-      if (provider === 'ad') {
-        // Active Directory verlangt UTF-16LE mit Anführungszeichen
-        const doubleQuotedPassword = `"${newPassword}"`;
-        const unicodePwdBuffer = Buffer.from(doubleQuotedPassword, 'utf16le');
-        
-        change = new ldap.Change({
-          operation: 'replace',
-          modification: {
-            unicodePwd: [unicodePwdBuffer]
-          }
-        });
-      } else {
-        // OpenLDAP oder standardisiertes LDAP (SSHA-Verschlüsselung)
-        const salt = crypto.randomBytes(8);
-        const sha1Sum = crypto.createHash('sha1').update(newPassword).update(salt).digest();
-        const sshaHash = Buffer.concat([sha1Sum, salt]).toString('base64');
-        const hashedPw = '{SSHA}' + sshaHash;
-
-        change = new ldap.Change({
-          operation: 'replace',
-          modification: {
-            userPassword: hashedPw
-          }
-        });
-      }
-
-      client.modify(userDn, change, (err) => {
-        client.destroy();
-        if (err) {
-          return reject(new Error('LDAP-Passwortänderung fehlgeschlagen: ' + err.message));
+      client.on('error', (err) => {
+        console.error('LDAP Client-Fehler beim Passwort ändern:', err.message);
+        if (!completed) {
+          completed = true;
+          cleanup();
+          reject(new Error('LDAP-Verbindungsfehler: ' + err.message));
         }
-        resolve(true);
       });
-    });
+
+      client.bind(bindDn, bindPassword, (err) => {
+        if (err) {
+          console.error('LDAP-Admin-Bind fehlgeschlagen beim Passwort ändern:', err.message);
+          if (!completed) {
+            completed = true;
+            cleanup();
+            reject(new Error('LDAP-Admin-Bind fehlgeschlagen: ' + err.message));
+          }
+          return;
+        }
+
+        let change;
+        if (provider === 'ad') {
+          // Active Directory verlangt UTF-16LE mit Anführungszeichen
+          const doubleQuotedPassword = `"${newPassword}"`;
+          const unicodePwdBuffer = Buffer.from(doubleQuotedPassword, 'utf16le');
+          
+          change = new ldap.Change({
+            operation: 'replace',
+            modification: {
+              unicodePwd: [unicodePwdBuffer]
+            }
+          });
+        } else {
+          // OpenLDAP oder standardisiertes LDAP (SSHA-Verschlüsselung)
+          const salt = crypto.randomBytes(8);
+          const sha1Sum = crypto.createHash('sha1').update(newPassword).update(salt).digest();
+          const sshaHash = Buffer.concat([sha1Sum, salt]).toString('base64');
+          const hashedPw = '{SSHA}' + sshaHash;
+
+          change = new ldap.Change({
+            operation: 'replace',
+            modification: {
+              userPassword: hashedPw
+            }
+          });
+        }
+
+        client.modify(userDn, change, (err) => {
+          if (!completed) {
+            completed = true;
+            cleanup();
+            if (err) {
+              return reject(new Error('LDAP-Passwortänderung fehlgeschlagen: ' + err.message));
+            }
+            resolve(true);
+          }
+        });
+      });
+    } catch (err) {
+      if (!completed) {
+        completed = true;
+        cleanup();
+        reject(new Error('Unerwarteter Fehler bei LDAP-Passwortänderung: ' + err.message));
+      }
+    }
   });
 }
 

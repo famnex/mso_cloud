@@ -668,10 +668,16 @@ async function handlePasswordResetExecute(e) {
     const res = await fetch('api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password: pass })
+      body: JSON.stringify({ token, password: pass, confirmPassword: passConf })
     });
 
-    const data = await res.json();
+    let data = {};
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      throw new Error(`Server-Fehler (${res.status}): Das Passwort konnte nicht zurückgesetzt werden. Bitte versuchen Sie es erneut oder wenden Sie sich an den Administrator.`);
+    }
 
     if (res.ok) {
       alertBox.innerText = data.message;
