@@ -804,7 +804,8 @@
       display: none !important;
     }
 
-    .qr-code-box img {
+    .qr-code-box img,
+    #fullscreen-qr-box img {
       width: 100% !important;
       height: 100% !important;
       max-width: 100% !important;
@@ -818,6 +819,9 @@
       position: relative !important;
       top: 0 !important;
       left: 0 !important;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
     }
 
     /* Hologram PWA Badge über dem QR-Code */
@@ -2810,7 +2814,7 @@
           height: 128,
           colorDark : "#000000",
           colorLight : "#ffffff",
-          correctLevel : QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur für geringe Punktdichte (einfaches Scannen)
+          correctLevel : QRCode.CorrectLevel.M // Medium (15% Fehlerkorrektur & Redundanz für optimale Lesbarkeit)
         });
       } else {
         qrBox.innerHTML = `<i class="fa-solid fa-ban" style="color:var(--danger); font-size:2rem;"></i>`;
@@ -2924,7 +2928,7 @@
             height: 280,
             colorDark: "#000000",
             colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.L
+            correctLevel: QRCode.CorrectLevel.M
           });
         }
       }
