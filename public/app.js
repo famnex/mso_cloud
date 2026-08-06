@@ -319,12 +319,16 @@ async function handleLogin(e) {
       let errorMsg = data.error || `Fehler beim Anmelden (HTTP ${res.status}).`;
       let errorHtml = errorMsg;
       console.warn(`[MSO Login Fehlschlag] ${errorMsg}`);
-      if (res.status === 401) {
+      const helpdeskBox = `<div style="margin-top: 12px; padding: 10px 12px; background: rgba(59, 130, 246, 0.12); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.84rem; color: var(--text-color); line-height: 1.4;">
+        <i class="fa-solid fa-headset" style="color: #60a5fa; margin-right: 6px;"></i>
+        Du brauchst Hilfe bei der Anmeldung und weißt nicht weiter? Dann nutze unseren <a href="https://cloud.mso-hef.de/helpdesk" target="_blank" style="color: #60a5fa; font-weight: 700; text-decoration: underline;">Helpdesk</a>.
+      </div>`;
+      if (res.status === 401 || res.status === 429) {
         errorHtml = `${errorMsg}<br><br>Die Benutzernamen an unserer Schule sind in der Regel so aufgebaut:<br>
           <ul style="margin: 6px 0 0 18px; padding: 0; list-style: disc;">
             <li>Lehrperson: <strong>m.mustermann</strong></li>
             <li>Lernende: <strong>mustermann.max</strong></li>
-          </ul>`;
+          </ul>${helpdeskBox}`;
       }
       throw { message: errorMsg, html: errorHtml };
     }
@@ -1451,6 +1455,20 @@ async function loadAdminConfig() {
       }
     }
 
+    // Anmeldespamfilter & Whitelist Felder
+    const loginMaxAttemptsInput = document.getElementById('login_max_attempts');
+    if (loginMaxAttemptsInput) {
+      loginMaxAttemptsInput.value = cfg.login_max_attempts || '5';
+    }
+    const loginLockoutMinInput = document.getElementById('login_lockout_duration_min');
+    if (loginLockoutMinInput) {
+      loginLockoutMinInput.value = cfg.login_lockout_duration_min || '15';
+    }
+    const loginIpWhitelistInput = document.getElementById('login_ip_whitelist');
+    if (loginIpWhitelistInput) {
+      loginIpWhitelistInput.value = cfg.login_ip_whitelist || '';
+    }
+
     // Schülerausweis Felder befüllen
     const cardSchoolInput = document.getElementById('card_school_name');
     if (cardSchoolInput) {
@@ -1872,7 +1890,10 @@ async function saveGeneralConfig(e) {
     impressum_url: document.getElementById('impressum_url').value.trim(),
     disable_student_check: document.getElementById('disable_student_check').checked ? '1' : '0',
     platform_name: document.getElementById('platform_name').value.trim(),
-    platform_logo: document.getElementById('platform_logo').value
+    platform_logo: document.getElementById('platform_logo').value,
+    login_max_attempts: document.getElementById('login_max_attempts') ? document.getElementById('login_max_attempts').value.trim() : '5',
+    login_lockout_duration_min: document.getElementById('login_lockout_duration_min') ? document.getElementById('login_lockout_duration_min').value.trim() : '15',
+    login_ip_whitelist: document.getElementById('login_ip_whitelist') ? document.getElementById('login_ip_whitelist').value.trim() : ''
   };
 
   try {

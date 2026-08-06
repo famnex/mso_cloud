@@ -3583,7 +3583,15 @@
           await triggerCardReload();
         } else {
           if (alertBox) {
-            alertBox.innerText = data.error || 'Ungültiger Benutzername oder Passwort.';
+            const errText = data.error || 'Ungültiger Benutzername oder Passwort.';
+            const helpdeskHtml = `<div style="text-align: left; font-size: 0.8rem; line-height: 1.4;">
+              ${errText}<br><br>
+              <div style="padding: 8px 10px; background: rgba(59, 130, 246, 0.15); border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.3); color: var(--text-color);">
+                <i class="fa-solid fa-headset" style="color: #60a5fa; margin-right: 4px;"></i>
+                Du brauchst Hilfe bei der Anmeldung und weißt nicht weiter? Dann nutze unseren <a href="https://cloud.mso-hef.de/helpdesk" target="_blank" style="color: #60a5fa; font-weight: 700; text-decoration: underline;">Helpdesk</a>.
+              </div>
+            </div>`;
+            alertBox.innerHTML = helpdeskHtml;
             alertBox.style.display = 'block';
           }
           if (data.locked) {

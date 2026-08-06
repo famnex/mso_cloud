@@ -75,35 +75,102 @@ router.get('/me', async (req, res) => {
   }
 });
 
-// IP Rate-Limiting für Login (max. 5 Fehlversuche -> 5 Minuten Sperre)
+// IP Rate-Limiting für Login (konfigurierbare Fehlversuche & Sperrdauer sowie IP-Whitelist)
 const ipLoginAttempts = new Map();
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 5 * 60 * 1000;
+
+function getMaxLoginAttempts() {
+  const val = parseInt(getConfig('login_max_attempts', '5'), 10);
+  return isNaN(val) || val <= 0 ? 5 : val;
+}
+
+function getLockoutDurationMs() {
+  const minutes = parseInt(getConfig('login_lockout_duration_min', '15'), 10);
+  const val = isNaN(minutes) || minutes <= 0 ? 15 : minutes;
+  return val * 60 * 1000;
+}
+
+function ipToLong(ip) {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  return parts.reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+}
+
+function matchCidr(ip, cidr) {
+  try {
+    const [range, bits = 32] = cidr.split('/');
+    const mask = ~(Math.pow(2, 32 - parseInt(bits, 10)) - 1);
+    const ipInt = ipToLong(ip);
+    const rangeInt = ipToLong(range);
+    if (ipInt !== null && rangeInt !== null) {
+      return (ipInt & mask) === (rangeInt & mask);
+    }
+  } catch (e) {}
+  return false;
+}
+
+function isIpWhitelisted(ip) {
+  const whitelistStr = getConfig('login_ip_whitelist', '');
+  if (!whitelistStr || !whitelistStr.trim()) return false;
+
+  const cleanIp = (ip || '').replace(/^::ffff:/, '').trim();
+  const entries = whitelistStr.split(/[\n,\s]+/).map(e => e.trim()).filter(Boolean);
+
+  for (const entry of entries) {
+    const cleanEntry = entry.replace(/^::ffff:/, '').trim();
+    if (!cleanEntry) continue;
+
+    if (cleanIp === cleanEntry) return true;
+
+    if (cleanEntry.includes('*')) {
+      const regexPattern = '^' + cleanEntry.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$';
+      if (new RegExp(regexPattern).test(cleanIp)) return true;
+    }
+
+    if (cleanEntry.includes('/')) {
+      if (matchCidr(cleanIp, cleanEntry)) return true;
+    }
+  }
+
+  return false;
+}
 
 function getIpLockStatus(ip) {
+  if (isIpWhitelisted(ip)) {
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: 9999, isWhitelisted: true };
+  }
+
+  const maxAttempts = getMaxLoginAttempts();
   const record = ipLoginAttempts.get(ip);
   if (!record) {
-    return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_LOGIN_ATTEMPTS };
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: maxAttempts, isWhitelisted: false };
   }
 
   const now = Date.now();
   if (record.lockUntil && now < record.lockUntil) {
     const remainingSeconds = Math.ceil((record.lockUntil - now) / 1000);
-    return { isLocked: true, remainingSeconds, attemptsLeft: 0 };
+    return { isLocked: true, remainingSeconds, attemptsLeft: 0, isWhitelisted: false };
   }
 
   if (record.lockUntil && now >= record.lockUntil) {
     ipLoginAttempts.delete(ip);
-    return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_LOGIN_ATTEMPTS };
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: maxAttempts, isWhitelisted: false };
   }
 
-  const remainingAttempts = Math.max(0, MAX_LOGIN_ATTEMPTS - record.attempts);
-  return { isLocked: false, remainingSeconds: 0, attemptsLeft: remainingAttempts };
+  const remainingAttempts = Math.max(0, maxAttempts - record.attempts);
+  return { isLocked: false, remainingSeconds: 0, attemptsLeft: remainingAttempts, isWhitelisted: false };
 }
 
 function recordFailedLogin(ip) {
+  if (isIpWhitelisted(ip)) {
+    console.log(`[RateLimiter] IP ${ip} ist auf der Whitelist. Sperre für Schul-IPs übersprungen.`);
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: 9999, isWhitelisted: true };
+  }
+
+  const maxAttempts = getMaxLoginAttempts();
+  const lockoutMs = getLockoutDurationMs();
   const now = Date.now();
   let record = ipLoginAttempts.get(ip);
+
   if (!record || (record.lockUntil && now >= record.lockUntil)) {
     record = { attempts: 0, lockUntil: null, lastAttempt: now };
   }
@@ -111,14 +178,16 @@ function recordFailedLogin(ip) {
   record.attempts += 1;
   record.lastAttempt = now;
 
-  if (record.attempts >= MAX_LOGIN_ATTEMPTS) {
-    record.lockUntil = now + LOCKOUT_DURATION_MS;
+  if (record.attempts >= maxAttempts) {
+    record.lockUntil = now + lockoutMs;
     ipLoginAttempts.set(ip, record);
-    return { isLocked: true, remainingSeconds: 300, attemptsLeft: 0 };
+    const lockSecs = Math.ceil(lockoutMs / 1000);
+    logEvent('warn', 'login_ip_locked', `IP-Adresse ${ip} aufgrund von ${record.attempts} Fehlversuchen für ${Math.ceil(lockoutMs/60000)} Min. gesperrt.`, { ip: ip, attempts: record.attempts });
+    return { isLocked: true, remainingSeconds: lockSecs, attemptsLeft: 0, isWhitelisted: false };
   }
 
   ipLoginAttempts.set(ip, record);
-  return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_LOGIN_ATTEMPTS - record.attempts };
+  return { isLocked: false, remainingSeconds: 0, attemptsLeft: maxAttempts - record.attempts, isWhitelisted: false };
 }
 
 function resetFailedLogin(ip) {
@@ -236,9 +305,11 @@ router.post('/login', async (req, res) => {
       if (ldapEnabled && localUser.is_ldap === 1) {
         console.warn(`LDAP-Authentifizierung für LDAP-Konto ${username} fehlgeschlagen.`);
         const failStatus = recordFailedLogin(clientIp);
+        const maxAttempts = getMaxLoginAttempts();
         if (failStatus.isLocked) {
+          const lockMin = Math.ceil(failStatus.remainingSeconds / 60);
           return res.status(429).json({
-            error: `Zu viele fehlgeschlagene Anmeldeversuche (5 von 5). Diese IP wurde für 5 Minuten für die Anmeldung gesperrt.`,
+            error: `Zu viele fehlgeschlagene Anmeldeversuche (${maxAttempts} von ${maxAttempts}). Diese IP wurde für ${lockMin} Minuten für die Anmeldung gesperrt.`,
             locked: true,
             remaining_seconds: failStatus.remainingSeconds,
             attempts_left: 0
@@ -278,9 +349,12 @@ router.post('/login', async (req, res) => {
     // Wenn beide fehlschlagen
     logEvent('warn', 'login_failed', `Fehlgeschlagener Login-Versuch für: ${username}`, null, clientIp);
     const failStatus = recordFailedLogin(clientIp);
+    const maxAttempts = getMaxLoginAttempts();
+
     if (failStatus.isLocked) {
+      const lockMin = Math.ceil(failStatus.remainingSeconds / 60);
       return res.status(429).json({
-        error: `Zu viele fehlgeschlagene Anmeldeversuche (5 von 5). Diese IP wurde für 5 Minuten für die Anmeldung gesperrt.`,
+        error: `Zu viele fehlgeschlagene Anmeldeversuche (${maxAttempts} von ${maxAttempts}). Diese IP wurde für ${lockMin} Minuten für die Anmeldung gesperrt.`,
         locked: true,
         remaining_seconds: failStatus.remainingSeconds,
         attempts_left: 0
@@ -288,7 +362,9 @@ router.post('/login', async (req, res) => {
     }
 
     res.status(401).json({
-      error: `Ungültiger Benutzername oder Passwort. Verbleibende Anmeldeversuche: ${failStatus.attemptsLeft} von 5.`,
+      error: failStatus.isWhitelisted 
+        ? `Ungültiger Benutzername oder Passwort.`
+        : `Ungültiger Benutzername oder Passwort. Verbleibende Anmeldeversuche: ${failStatus.attemptsLeft} von ${maxAttempts}.`,
       locked: false,
       attempts_left: failStatus.attemptsLeft
     });

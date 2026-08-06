@@ -60,6 +60,9 @@ router.get('/config', (req, res) => {
        disable_student_check: getConfig('disable_student_check', '0'),
        platform_name: getConfig('platform_name', 'MSO Cloud'),
        platform_logo: getConfig('platform_logo', ''),
+       login_max_attempts: getConfig('login_max_attempts', '5'),
+       login_lockout_duration_min: getConfig('login_lockout_duration_min', '15'),
+       login_ip_whitelist: getConfig('login_ip_whitelist', ''),
        card_primary_color: getConfig('card_primary_color', '#3b82f6'),
        card_secondary_color: getConfig('card_secondary_color', '#8b5cf6'),
        card_guilloche_pattern: getConfig('card_guilloche_pattern', 'waves'),
@@ -95,6 +98,7 @@ router.post('/config', async (req, res) => {
       'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_from',
       'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database',
       'impressum_url', 'disable_student_check', 'platform_name', 'platform_logo',
+      'login_max_attempts', 'login_lockout_duration_min', 'login_ip_whitelist',
       'card_primary_color', 'card_secondary_color', 'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_guilloche_density', 'card_install_instructions', 'card_school_name', 'card_principal_name', 'card_principal_gender', 'card_logo', 'card_signature', 'card_pwa_logging', 'card_pwa_icon', 'card_seal'
     ];
 

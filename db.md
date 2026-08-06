@@ -28,6 +28,9 @@ Speichert alle globalen Konfigurationswerte der Anwendung (LDAP, SMTP, Setup-Sta
 * `smtp_from`: `'no-reply@mso-hef.de'`
 * `impressum_url`: `'https://www.mso-hef.de/impressum'` (Standardwert, vom Admin konfigurierbar)
 * `card_principal_gender`: `'male'` (Schulleiter) oder `'female'` (Schulleiterin)
+* `login_max_attempts`: `'5'` (Maximale Fehlversuche vor IP-Sperre, vom Admin konfigurierbar)
+* `login_lockout_duration_min`: `'15'` (Sperrdauer in Minuten, vom Admin konfigurierbar)
+* `login_ip_whitelist`: `''` (Komma-/Zeilen-getrennte IPs oder CIDR-Subnetze wie `10.0.0.0/8`, die niemals gesperrt werden)
 
 ---
 
