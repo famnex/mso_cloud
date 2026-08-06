@@ -183,6 +183,14 @@ router.get('/sso/:id', (req, res) => {
       return res.status(403).send(`Zugriff verweigert. Dieser Dienst ist momentan zeitlich gesperrt. Er ist nur von ${tile.time_limit_start} bis ${tile.time_limit_end} Uhr aktiv.`);
     }
 
+    // Revisionssicheres Log-Event im System-Protokoll ablegen (garantiert für ALLE Kachelaufrufe, inkl. SPH & Booking Autologin)
+    if (typeof logEvent === 'function' && user) {
+      const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
+        ? `127.0.0.1 (${tile.title})` 
+        : `${req.ip} (${tile.title})`;
+      logEvent('info', 'sso_tile_redirect', `SSO Aufruf für User: ${user.username} (Dienst: ${tile.title})`, { tileId: tile.id, title: tile.title, sso_type: tile.sso_type }, clientIpDisplay);
+    }
+
     // SSO Logik anwenden
     let redirectUrl = tile.link;
 
@@ -397,14 +405,6 @@ router.get('/sso/:id', (req, res) => {
           redirectUrl = `${redirectUrl}${separator}login_hint=${encodeURIComponent(hint)}`;
         }
       }
-    }
-
-    // Revisionssicheres Log-Event im System-Protokoll ablegen
-    if (typeof logEvent === 'function' && user) {
-      const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
-        ? `127.0.0.1 (${tile.title})` 
-        : `${req.ip} (${tile.title})`;
-      logEvent('info', 'sso_tile_redirect', `SSO Aufruf für User: ${user.username} (Dienst: ${tile.title})`, { tileId: tile.id, title: tile.title, sso_type: tile.sso_type }, clientIpDisplay);
     }
 
     // Redirect ausführen
