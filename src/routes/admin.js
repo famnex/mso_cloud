@@ -616,6 +616,7 @@ router.put('/users/:id', (req, res) => {
         SET email = ?, role = ?, groups = ?, password_hash = ?, display_name = ?
         WHERE id = ?
       `).run(email.trim(), role, groupsJson, hash, displayName, id);
+      db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(id);
       logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert (inkl. Passwortänderung)`, { userId: id, role, email: email.trim() }, req.ip);
     } else {
       db.prepare(`

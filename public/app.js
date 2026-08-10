@@ -3873,8 +3873,8 @@ async function loadStudentProfile() {
     const msoPwdToggle = document.getElementById('student-mso-password-toggle');
     
     if (msoPwdText && msoPwdToggle) {
-      if (!profile.start_password || profile.start_password === 'geändert' || profile.start_password === '-') {
-        msoPwdText.innerHTML = '<span style="font-size:0.8rem; color:var(--text-secondary); font-family:sans-serif; font-weight:normal;">Bereits geändert</span>';
+      if (!profile.start_password || profile.start_password === 'geändert' || profile.start_password === '-' || profile.start_password.toLowerCase().includes('geändert') || profile.start_password.toLowerCase().includes('benutzerdefiniert')) {
+        msoPwdText.innerHTML = '<span style="font-size:0.82rem; color:var(--text-secondary); font-family:sans-serif; font-weight:500;"><i class="fa-solid fa-lock" style="color:var(--accent-color); margin-right:4px;"></i> Ein eigenes Passwort wurde bereits vergeben.</span>';
         msoPwdText.style.letterSpacing = 'normal';
         msoPwdToggle.style.display = 'none';
         currentMsoPassword = '';

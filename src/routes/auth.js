@@ -540,7 +540,10 @@ router.post('/reset-password', async (req, res) => {
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(password, salt);
 
-    const userRow = db.prepare('SELECT id FROM users WHERE dn = ?').get(reset.user_dn);
+    let userRow = db.prepare('SELECT id FROM users WHERE dn = ?').get(reset.user_dn);
+    if (!userRow && reset.email_hash) {
+      userRow = db.prepare('SELECT id FROM users WHERE email = ?').get(reset.email_hash);
+    }
     if (userRow) {
       db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userRow.id);
       db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(userRow.id);
