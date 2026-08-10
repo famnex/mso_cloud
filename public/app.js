@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 3. Kacheln laden und rendern
   await loadTiles();
+  startTileHeartbeat();
 
   // News-Nachrichten laden und rendern
   await loadActiveMessages();
@@ -364,31 +365,46 @@ async function handleLogout() {
 /* ==========================================================================
    3. Kacheln laden & rendern
    ========================================================================== */
-async function loadTiles() {
-  console.log('[MSO Tiles] Starte Abruf von api/tiles...');
-  tilesContainer.innerHTML = `
-    <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
-      <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: var(--accent-color);"></i>
-      <p style="margin-top: 15px;">Lade Dienste...</p>
-    </div>
-  `;
+let lastTilesHash = '';
+let tileHeartbeatTimer = null;
+
+async function loadTiles(isSilentHeartbeat = false) {
+  if (!isSilentHeartbeat) {
+    console.log('[MSO Tiles] Starte Abruf von api/tiles...');
+    tilesContainer.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
+        <i class="fa-solid fa-spinner fa-spin fa-2xl" style="color: var(--accent-color);"></i>
+        <p style="margin-top: 15px;">Lade Dienste...</p>
+      </div>
+    `;
+  }
 
   try {
     const res = await fetch('api/tiles');
     if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[MSO Tiles Error] HTTP ${res.status} beim Kachel-Abruf:`, errText);
-      tilesContainer.innerHTML = `
-        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--error-color);">
-          <i class="fa-solid fa-triangle-exclamation fa-2xl" style="margin-bottom: 10px;"></i>
-          <p style="font-size: 1.1rem; font-weight: bold;">Fehler beim Laden der Dienste (HTTP ${res.status})</p>
-          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">${errText}</p>
-        </div>
-      `;
+      if (!isSilentHeartbeat) {
+        const errText = await res.text();
+        console.error(`[MSO Tiles Error] HTTP ${res.status} beim Kachel-Abruf:`, errText);
+        tilesContainer.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--error-color);">
+            <i class="fa-solid fa-triangle-exclamation fa-2xl" style="margin-bottom: 10px;"></i>
+            <p style="font-size: 1.1rem; font-weight: bold;">Fehler beim Laden der Dienste (HTTP ${res.status})</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">${errText}</p>
+          </div>
+        `;
+      }
       return;
     }
 
     const tiles = await res.json();
+    const newHash = JSON.stringify(tiles.map(t => ({ id: t.id, title: t.title, is_time_locked: t.is_time_locked, icon: t.icon, allowed_groups: t.allowed_groups })));
+
+    if (isSilentHeartbeat && newHash === lastTilesHash) {
+      // Keine Änderungen an den freigeschalteten Kacheln -> DOM nicht berühren
+      return;
+    }
+
+    lastTilesHash = newHash;
     console.log(`[MSO Tiles] ${tiles.length} Dienste erfolgreich geladen.`);
 
     if (!Array.isArray(tiles) || tiles.length === 0) {
@@ -477,14 +493,39 @@ async function loadTiles() {
     });
 
   } catch (err) {
-    tilesContainer.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--error-color);">
-        <i class="fa-solid fa-triangle-exclamation fa-2xl"></i>
-        <p style="margin-top: 15px;">Fehler beim Laden der Kacheln: ${err.message}</p>
-      </div>
-    `;
+    if (!isSilentHeartbeat) {
+      tilesContainer.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--error-color);">
+          <i class="fa-solid fa-triangle-exclamation fa-2xl"></i>
+          <p style="margin-top: 15px;">Fehler beim Laden der Kacheln: ${err.message}</p>
+        </div>
+      `;
+    }
   }
 }
+
+/**
+ * Startet den Hintergrund-Heartbeat zur regelmäßigen Re-Evaluierung der Kacheln & Gruppen.
+ */
+function startTileHeartbeat() {
+  if (tileHeartbeatTimer) clearInterval(tileHeartbeatTimer);
+  
+  // Heartbeat alle 45 Sekunden
+  tileHeartbeatTimer = setInterval(async () => {
+    if (mainView && mainView.style.display !== 'none') {
+      console.log('[MSO Heartbeat] Prüfe im Hintergrund auf neue Kacheln & aktualisierte Benutzergruppen...');
+      await loadTiles(true);
+    }
+  }, 45000);
+}
+
+// Bei Wiedererlangen des Tab-Fokus sofort im Hintergrund Kacheln & Gruppen aktualisieren
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && mainView && mainView.style.display !== 'none') {
+    console.log('[MSO Heartbeat] Tab wieder aktiv -> Prüfe auf neue Kacheln...');
+    loadTiles(true);
+  }
+});
 
 /**
  * Prüft die Erreichbarkeit einer Kachel asynchron über das MSO Cloud Prüfskript.

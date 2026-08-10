@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { db, logEvent } = require('../db');
+const { db, logEvent, getConfig } = require('../db');
 const ldap = require('../ldap');
 
 /**
@@ -164,10 +164,48 @@ function evaluateTileVisibility(tile, user) {
 
 /**
  * Ruft alle für den aktuellen Benutzer sichtbaren Kacheln ab.
+ * Aktualisiert vorab die Benutzergruppen des Benutzers (aus DB & LDAP).
  */
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const user = req.session.user;
+    let user = req.session.user;
+    
+    // Live-Aktualisierung der Benutzergruppen vor der Kachelauswertung
+    if (user && user.id) {
+      try {
+        const freshUser = db.prepare('SELECT id, username, email, role, groups, is_ldap FROM users WHERE id = ?').get(user.id);
+        if (freshUser) {
+          let userGroups = [];
+          try {
+            userGroups = typeof freshUser.groups === 'string' ? JSON.parse(freshUser.groups || '[]') : (freshUser.groups || []);
+          } catch (e) {
+            userGroups = [];
+          }
+
+          // Bei LDAP-Konten: Falls LDAP aktiv ist, Gruppen aus LDAP/AD live aktualisieren
+          const ldapEnabled = getConfig('ldap_enabled', '0') === '1';
+          if (freshUser.is_ldap === 1 && ldapEnabled) {
+            try {
+              const ldapStatus = await ldap.isUserActiveInLdap(freshUser.username);
+              if (ldapStatus && ldapStatus.groups && Array.isArray(ldapStatus.groups)) {
+                userGroups = ldapStatus.groups;
+                db.prepare('UPDATE users SET groups = ? WHERE id = ?').run(JSON.stringify(userGroups), freshUser.id);
+              }
+            } catch (ldapErr) {
+              console.warn(`[MSO Server Tiles] Live-LDAP-Gruppenprüfung für ${freshUser.username} übersprungen:`, ldapErr.message);
+            }
+          }
+
+          req.session.user.groups = userGroups;
+          req.session.user.role = freshUser.role;
+          req.session.user.isLdap = freshUser.is_ldap === 1;
+          user = req.session.user;
+        }
+      } catch (userErr) {
+        console.warn('[MSO Server Tiles] Fehler bei Live-Aktualisierung der Benutzergruppen:', userErr.message);
+      }
+    }
+
     console.log(`[MSO Server Tiles] Abruf /api/tiles für Benutzer: ${user ? user.username : 'Gästemodus (unangemeldet)'}`);
     
     // Alle Kacheln aus der Datenbank holen
