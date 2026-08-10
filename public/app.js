@@ -454,11 +454,14 @@ async function loadTiles(isSilentHeartbeat = false) {
         }
       }
 
-      let statusBannerHtml = '';
+      let badgeHtml = '';
+      let reasonHtml = '';
       if (isLocked) {
-        statusBannerHtml = `<div class="tile-status-banner time-locked-banner"><i class="fa-solid fa-clock"></i> Im Sperrzeitraum gesperrt</div>`;
+        badgeHtml = `<span class="tile-badge badge-locked" title="Aktuell im gesperrten Zeitraum"><i class="fa-solid fa-clock"></i> Gesperrt</span>`;
+        reasonHtml = `<div class="tile-status-reason locked-reason"><i class="fa-solid fa-clock"></i> Im Sperrzeitraum gesperrt</div>`;
       } else {
-        statusBannerHtml = `<div class="tile-status-banner offline-banner" id="tile-status-banner-${tile.id}" style="display: none;"><i class="fa-solid fa-triangle-exclamation"></i> Aktuell nicht erreichbar</div>`;
+        badgeHtml = `<span class="tile-badge badge-offline" id="tile-badge-${tile.id}" style="display: none;"><i class="fa-solid fa-triangle-exclamation"></i> Offline</span>`;
+        reasonHtml = `<div class="tile-status-reason offline-reason" id="tile-status-reason-${tile.id}" style="display: none;"></div>`;
       }
       
       tileCard.innerHTML = `
@@ -466,15 +469,17 @@ async function loadTiles(isSilentHeartbeat = false) {
           <div class="tile-icon-wrapper">
             ${renderIcon(tile.icon)}
           </div>
-          <div style="display: flex; align-items: center; gap: 10px; z-index: 5;">
+          <div class="tile-header-actions">
             ${keyBtnHtml}
+            ${badgeHtml}
+            <span class="status-dot ${isLocked ? '' : 'checking'}" id="status-dot-${tile.id}" title="${isLocked ? 'Im gesperrten Zeitraum' : 'Prüfe Status...'}"></span>
           </div>
         </div>
         <div class="tile-body">
           <h4 class="tile-title">${tile.title}</h4>
           <div class="tile-bottom-content">
             <p class="tile-description">${tile.description || ''}</p>
-            ${statusBannerHtml}
+            ${reasonHtml}
           </div>
         </div>
         <div class="tile-bg-glow"></div>
@@ -544,7 +549,8 @@ document.addEventListener('visibilitychange', () => {
 function checkTileStatus(tileId, link) {
   const dot = document.getElementById(`status-dot-${tileId}`);
   const card = document.getElementById(`tile-card-${tileId}`);
-  const banner = document.getElementById(`tile-status-banner-${tileId}`);
+  const badge = document.getElementById(`tile-badge-${tileId}`);
+  const reason = document.getElementById(`tile-status-reason-${tileId}`);
   const keyBtn = document.getElementById(`tile-key-btn-${tileId}`);
 
   let pingLink = link;
@@ -560,15 +566,20 @@ function checkTileStatus(tileId, link) {
           dot.className = 'status-dot online';
           dot.setAttribute('title', result.reason || 'Erreichbar');
         }
-        if (banner) banner.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        if (reason) reason.style.display = 'none';
       } else {
         if (dot) {
           dot.className = 'status-dot offline';
           dot.setAttribute('title', result.reason || 'Dienst aktuell nicht erreichbar');
         }
-        if (banner) {
-          banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(result.reason || 'Aktuell nicht erreichbar')}`;
-          banner.style.display = 'inline-flex';
+        if (badge) {
+          badge.style.display = 'inline-flex';
+          badge.setAttribute('title', result.reason || 'Dienst aktuell nicht erreichbar');
+        }
+        if (reason) {
+          reason.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(result.reason || 'Aktuell nicht erreichbar')}`;
+          reason.style.display = 'block';
         }
         disableTileCard(card, keyBtn);
       }
@@ -579,9 +590,13 @@ function checkTileStatus(tileId, link) {
         dot.className = 'status-dot offline';
         dot.setAttribute('title', 'Verbindungsfehler bei der Prüfung');
       }
-      if (banner) {
-        banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Verbindung fehlgeschlagen`;
-        banner.style.display = 'inline-flex';
+      if (badge) {
+        badge.style.display = 'inline-flex';
+        badge.setAttribute('title', 'Verbindung fehlgeschlagen');
+      }
+      if (reason) {
+        reason.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Verbindung fehlgeschlagen`;
+        reason.style.display = 'block';
       }
       disableTileCard(card, keyBtn);
     });
