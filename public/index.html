@@ -1802,20 +1802,20 @@
           </p>
         </div>
 
-        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+        <div class="ob-card-box">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-            <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+            <span class="ob-card-label">
               <i class="fa-solid fa-id-card"></i> Dein MSO-Benutzername (Login-ID)
             </span>
             <button type="button" class="btn btn-secondary btn-sm" onclick="copyOnboardingValue('ob-username', this)" style="padding: 4px 10px; font-size: 0.76rem;">
               <i class="fa-solid fa-copy"></i> Kopieren
             </button>
           </div>
-          <div id="ob-username" style="font-size: 1.4rem; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 1px; word-break: break-all; margin: 4px 0 10px 0;">
+          <div id="ob-username" class="ob-value-display">
             -
           </div>
-          <div style="font-size: 0.81rem; color: var(--text-color); line-height: 1.45; background: rgba(0,0,0,0.2); padding: 9px 12px; border-radius: 8px; border-left: 3px solid #f59e0b;">
-            <strong style="color: #f59e0b;"><i class="fa-solid fa-triangle-exclamation"></i> Wichtiger Hinweis:</strong><br>
+          <div class="ob-callout-box warn">
+            <strong style="color: #d97706;"><i class="fa-solid fa-triangle-exclamation"></i> Wichtiger Hinweis:</strong><br>
             Deine E-Mail-Adresse ist <u>nicht</u> dein Benutzername! Für die Anmeldung am Schul-PC, WLAN-Zugang und MSO Cloud musst du genau diesen Benutzernamen verwenden.
           </div>
         </div>
@@ -1835,9 +1835,9 @@
           </p>
         </div>
 
-        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+        <div class="ob-card-box">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-            <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+            <span class="ob-card-label">
               <i class="fa-solid fa-key"></i> Dein MSO-Startpasswort
             </span>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
@@ -1849,11 +1849,11 @@
               </button>
             </div>
           </div>
-          <div id="ob-password-masked" style="font-size: 1.4rem; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 2px; margin: 4px 0 10px 0;">
+          <div id="ob-password-masked" class="ob-value-display">
             ••••••••
           </div>
           <input type="hidden" id="ob-password-raw" value="">
-          <div style="font-size: 0.81rem; color: var(--text-secondary); line-height: 1.45; background: rgba(0,0,0,0.2); padding: 9px 12px; border-radius: 8px;">
+          <div class="ob-callout-box">
             <i class="fa-solid fa-wifi" style="color: var(--accent-color); margin-right: 4px;"></i>
             Mit dieser Benutzername/Passwort-Kombination meldest du dich auch im <strong>Schul-WLAN</strong> und an den <strong>Rechnern in den Computerräumen</strong> an. Bitte merke dir die Daten gut!
           </div>
@@ -1874,8 +1874,8 @@
           </p>
         </div>
 
-        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
-          <h4 style="font-size: 0.9rem; font-weight: 700; color: #f59e0b; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+        <div class="ob-card-box" style="border-color: rgba(245, 158, 11, 0.35);">
+          <h4 style="font-size: 0.9rem; font-weight: 700; color: #d97706; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-circle-info"></i> Eigenes System mit eigenen Logins
           </h4>
           <p style="font-size: 0.83rem; color: var(--text-color); line-height: 1.5; margin: 0;" id="ob-sph-text">

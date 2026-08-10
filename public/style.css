@@ -258,6 +258,19 @@ html[data-theme="light"] .dropdown-user-name,
   transform: translateY(-2px);
 }
 
+[data-theme="light"] .btn-secondary {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0259c4 !important;
+}
+
 .btn-danger {
   background: var(--error-color);
   color: #fff;
@@ -1936,10 +1949,124 @@ html, body {
     height: 26px !important;
     font-size: 0.75rem !important;
   }
-  .news-always-show-label {
+}
+
+/* ==========================================================================
+   Onboarding Wizard & Light Mode Modal High-Contrast Styling
+   ========================================================================== */
+.ob-card-box {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+[data-theme="light"] .ob-card-box {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+}
+
+.ob-card-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #60a5fa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-theme="light"] .ob-card-label {
+  color: #0259c4 !important;
+}
+
+.ob-value-display {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: monospace;
+  letter-spacing: 1px;
+  word-break: break-all;
+  margin: 6px 0 12px 0;
+}
+
+[data-theme="light"] .ob-value-display {
+  color: #0f172a !important;
+}
+
+.ob-callout-box {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  line-height: 1.45;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+[data-theme="light"] .ob-callout-box {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+.ob-callout-box.warn {
+  border-left: 3.5px solid #f59e0b !important;
+}
+
+[data-theme="light"] .ob-callout-box.warn {
+  border-left: 3.5px solid #d97706 !important;
+  background: #fffbeb !important;
+  color: #78350f !important;
+}
+
+#ob-step-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.15);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+[data-theme="light"] #ob-step-badge {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+[data-theme="light"] .modal-content {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18) !important;
+}
+
+[data-theme="light"] .modal-content h3,
+[data-theme="light"] .modal-content h4 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .modal-content p,
+[data-theme="light"] .modal-content span,
+[data-theme="light"] .modal-content div {
+  color: #334155;
+}
+
+[data-theme="light"] .ob-dot {
+  background: #cbd5e1 !important;
+}
+
+[data-theme="light"] .ob-dot.active {
+  background: #0259c4 !important;
+}
+
+.news-always-show-label {
     font-size: 0.78rem !important;
     padding: 6px 10px !important;
   }
 }
-
-
