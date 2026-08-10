@@ -1366,8 +1366,8 @@
   </div>
 
   <!-- Login Modal -->
-  <div id="login-modal" class="pwa-prompt-overlay" style="display: none; justify-content: center; align-items: center; z-index: 2100;">
-    <div class="pwa-prompt-card" style="max-width: 340px; padding: 25px;">
+  <div id="login-modal" class="pwa-prompt-overlay" style="display: none; justify-content: center; align-items: center; z-index: 2100; overflow-y: auto; padding: 15px 10px; box-sizing: border-box;">
+    <div class="pwa-prompt-card" style="max-width: 340px; max-height: calc(100dvh - 30px); overflow-y: auto; padding: 25px; box-sizing: border-box;">
       <button class="pwa-close-btn" onclick="closeLoginModal()"><i class="fa-solid fa-xmark"></i></button>
       <div class="pwa-icon-logo" style="margin-bottom: 15px;"><i class="fa-solid fa-user-lock"></i></div>
       
@@ -1376,7 +1376,7 @@
         Bitte melden Sie sich mit Ihren MSO-Zugangsdaten an, um Ihren Schülerausweis zu aktualisieren.
       </p>
 
-      <div id="login-modal-alert" class="alert alert-danger" style="display: none; padding: 10px; font-size: 0.8rem; margin-bottom: 15px; border-radius: 8px; text-align: center; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5;"></div>
+      <div id="login-modal-alert" class="alert alert-danger" style="display: none; padding: 10px; font-size: 0.8rem; margin-bottom: 15px; border-radius: 8px; text-align: center; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; max-height: 170px; overflow-y: auto; overscroll-behavior: contain;"></div>
 
       <form id="login-modal-form" onsubmit="handleModalLogin(event)" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
         <div style="display: flex; flex-direction: column; gap: 5px; text-align: left;">

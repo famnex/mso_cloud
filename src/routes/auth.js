@@ -832,7 +832,7 @@ router.post('/student-link', async (req, res) => {
       return res.json({ 
         success: true, 
         pending: true, 
-        message: 'Ihre Anmeldung ist noch in Bearbeitung. Sie erhalten eine E-Mail mit weiteren Informationen.' 
+        message: 'Ihre Anmeldung ist noch in Bearbeitung. Sie erhalten eine E-Mail mit weiteren Informationen, sobald Ihr Konto angelegt wurde.' 
       });
     }
 

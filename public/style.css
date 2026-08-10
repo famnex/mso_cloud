@@ -546,15 +546,20 @@ main {
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.3s ease;
+  overflow-y: auto;
+  padding: 20px 10px;
+  box-sizing: border-box;
 }
 
 .modal-content {
   width: 100%;
   max-width: 500px;
+  max-height: calc(100dvh - 40px);
   max-height: 90vh;
   overflow-y: auto;
-  padding: 40px;
+  padding: 35px 30px;
   position: relative;
+  box-sizing: border-box;
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -855,6 +860,13 @@ input:checked + .slider:before {
   color: var(--warn-color);
 }
 
+.modal .alert {
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -1049,10 +1061,17 @@ html, body {
   }
 
   .modal-content {
-    padding: 25px 15px !important;
-    width: 94% !important;
-    max-width: 94% !important;
+    padding: 22px 16px !important;
+    width: 96% !important;
+    max-width: 96% !important;
+    max-height: calc(100dvh - 20px) !important;
     box-sizing: border-box !important;
+  }
+
+  .modal .alert {
+    max-height: 160px !important;
+    padding: 10px 12px !important;
+    font-size: 0.84rem !important;
   }
 }
 
