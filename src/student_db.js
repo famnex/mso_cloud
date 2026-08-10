@@ -210,16 +210,20 @@ async function getStudentProfile(user) {
         }
       }
       
-      // 2. Sekundär nach E-Mail (Feld 18) suchen
+      // 2. Sekundär nach E-Mail (Feld 18) suchen (aktive Anträge mit Status >= 10 bevorzugen)
       if (!applicationId && user && user.email) {
         const email = user.email.trim();
         if (email && email.includes('@')) {
-          const [emailRows] = await pool.query(
-            'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
-            [email]
-          );
+          const [emailRows] = await pool.query(`
+            SELECT fv.application, app.status 
+            FROM fieldvalues fv
+            JOIN applications app ON fv.application = app.ID
+            WHERE fv.field = 18 AND LOWER(fv.value) = LOWER(?)
+            ORDER BY app.status DESC
+          `, [email]);
           if (emailRows.length > 0) {
-            applicationId = emailRows[0].application;
+            const activeApp = emailRows.find(r => r.status === 10 || r.status >= 10) || emailRows[0];
+            applicationId = activeApp.application;
           }
         }
       }
@@ -286,15 +290,19 @@ async function getApplicationId(userId, email) {
       }
     }
 
-    // 2. Sekundär über die E-Mail suchen (nur wenn valide)
+    // 2. Sekundär über die E-Mail suchen (nur wenn valide, aktive Anträge mit Status >= 10 bevorzugen)
     const trimmedEmail = (email || '').trim();
     if (trimmedEmail && trimmedEmail.includes('@')) {
-      const [rows] = await pool.query(
-        'SELECT application FROM fieldvalues WHERE field = 18 AND value = ?',
-        [trimmedEmail]
-      );
+      const [rows] = await pool.query(`
+        SELECT fv.application, app.status 
+        FROM fieldvalues fv
+        JOIN applications app ON fv.application = app.ID
+        WHERE fv.field = 18 AND LOWER(fv.value) = LOWER(?)
+        ORDER BY app.status DESC
+      `, [trimmedEmail]);
       if (rows.length > 0) {
-        return rows[0].application;
+        const activeApp = rows.find(r => r.status === 10 || r.status >= 10) || rows[0];
+        return activeApp.application;
       }
     }
   }
@@ -580,14 +588,18 @@ async function getStudentByEmail(email) {
         FROM fieldvalues fv
         JOIN applications app ON fv.application = app.ID
         WHERE fv.field = 18 AND LOWER(fv.value) = LOWER(?)
+        ORDER BY app.status DESC
       `, [trimmedEmail]);
       
       if (rows.length > 0) {
-        const app = rows[0];
+        // Falls mindestens eine Anmeldung mit Status 10 (oder >= 10) existiert, gilt das Konto als freigeschaltet (Altanträge/Papierkorb ignorieren!)
+        const activeApp = rows.find(r => r.status === 10 || r.status >= 10);
+        const selectedApp = activeApp || rows[0];
+
         return {
           exists: true,
-          application_id: app.application_id,
-          account_status: app.status === 10 ? 'true' : 'false'
+          application_id: selectedApp.application_id,
+          account_status: (selectedApp.status === 10 || selectedApp.status >= 10) ? 'true' : 'false'
         };
       }
     } catch (err) {
@@ -596,18 +608,19 @@ async function getStudentByEmail(email) {
   }
 
   // SQLite Fallback
-  const row = db.prepare(`
+  const rows = db.prepare(`
     SELECT u.id, sp.account_status 
     FROM users u 
     JOIN student_profiles sp ON u.id = sp.user_id 
     WHERE LOWER(u.email) = LOWER(?)
-  `).get(email.trim());
+  `).all(email.trim());
 
-  if (row) {
+  if (rows.length > 0) {
+    const activeRow = rows.find(r => r.account_status === 'true') || rows[0];
     return {
       exists: true,
-      id: row.id,
-      account_status: row.account_status
+      id: activeRow.id,
+      account_status: activeRow.account_status
     };
   }
   return null;
@@ -622,12 +635,17 @@ async function createStudentToken(email, token, ip) {
   
   if (pool && trimmedEmail && trimmedEmail.includes('@')) {
     try {
-      const [rows] = await pool.query(
-        'SELECT application FROM fieldvalues WHERE field = 18 AND LOWER(value) = LOWER(?)',
-        [trimmedEmail]
-      );
+      const [rows] = await pool.query(`
+        SELECT fv.application, app.status 
+        FROM fieldvalues fv
+        JOIN applications app ON fv.application = app.ID
+        WHERE fv.field = 18 AND LOWER(fv.value) = LOWER(?)
+        ORDER BY app.status DESC
+      `, [trimmedEmail]);
+
       if (rows.length > 0) {
-        const applicationId = rows[0].application;
+        const activeApp = rows.find(r => r.status === 10 || r.status >= 10) || rows[0];
+        const applicationId = activeApp.application;
         
         // Versuchen, das Token auch in MySQL zu loggen, damit andere Altsysteme synchron sind.
         try {
