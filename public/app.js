@@ -3971,6 +3971,10 @@ async function handleStudentTokenLogin(token) {
       await loadTiles();
       await loadActiveMessages();
       openStudentView();
+      // Onboarding Overlay mit klaren Benutzernamen/WLAN-Hinweisen öffnen
+      setTimeout(() => {
+        openOnboardingCredentialsModal();
+      }, 450);
     } else {
       alert(data.error || 'Anmeldelink ungültig oder abgelaufen.');
     }
@@ -3978,6 +3982,89 @@ async function handleStudentTokenLogin(token) {
     console.error('Fehler bei Token-Login:', err);
     alert('Serverfehler während des Login-Vorgangs.');
   }
+}
+
+/* --- ONBOARDING & ERSTLOGIN HINWEIS OVERLAY --- */
+let isOnboardingPassRevealed = false;
+
+function openOnboardingCredentialsModal() {
+  if (!currentUser) return;
+
+  const usernameEl = document.getElementById('ob-username');
+  const passMaskedEl = document.getElementById('ob-password-masked');
+  const passRawEl = document.getElementById('ob-password-raw');
+  const passEyeBtn = document.getElementById('ob-pass-eye-btn');
+  const sphTextEl = document.getElementById('ob-sph-text');
+
+  if (usernameEl) usernameEl.innerText = currentUser.username || '-';
+
+  isOnboardingPassRevealed = false;
+  if (passRawEl) passRawEl.value = currentMsoPassword || '';
+
+  if (passMaskedEl) {
+    if (!currentMsoPassword || currentMsoPassword === 'geändert' || currentMsoPassword === '-' || currentMsoPassword.toLowerCase().includes('geändert') || currentMsoPassword.toLowerCase().includes('benutzerdefiniert')) {
+      passMaskedEl.innerHTML = '<span style="font-size:0.88rem; color:var(--text-secondary); font-family:sans-serif; font-weight:500;"><i class="fa-solid fa-lock" style="color:var(--accent-color); margin-right:4px;"></i> Ein eigenes Passwort wurde bereits vergeben.</span>';
+      passMaskedEl.style.letterSpacing = 'normal';
+      if (passEyeBtn) passEyeBtn.style.display = 'none';
+    } else {
+      passMaskedEl.textContent = '••••••••';
+      passMaskedEl.style.letterSpacing = '2px';
+      if (passEyeBtn) {
+        passEyeBtn.style.display = 'inline-flex';
+        passEyeBtn.innerHTML = '<i class="fa-solid fa-eye" id="ob-pass-eye-icon"></i> Einblenden';
+      }
+    }
+  }
+
+  if (sphTextEl) {
+    const sphUsername = document.getElementById('student-sph-username-display')?.innerText;
+    if (sphUsername && sphUsername !== '-') {
+      sphTextEl.innerHTML = `Das Schulportal Hessen (SPH) ist ein externes System mit eigenen Zugangsdaten. Für dein Konto sind SPH-Zugangsdaten hinterlegt als: <strong style="color:var(--accent-color);">${escapeHtml(sphUsername)}</strong>. Sobald du dieses Fenster schließt, findest du unter "Zugänge" deine Schulportal-Daten sowie Hilfe zum Passwort-Reset.`;
+    } else {
+      sphTextEl.innerHTML = `Das Schulportal Hessen (SPH) ist ein externes System und besitzt eigene Zugangsdaten. Sobald du dieses Fenster schließt, findest du direkt unter <strong>"Zugänge"</strong> Möglichkeiten, deine Schulportal-Daten einzutragen oder zurückzusetzen.`;
+    }
+  }
+
+  openModal('onboarding-credentials-modal');
+}
+
+function toggleOnboardingPass() {
+  const passMaskedEl = document.getElementById('ob-password-masked');
+  const passEyeBtn = document.getElementById('ob-pass-eye-btn');
+
+  if (!passMaskedEl || !currentMsoPassword) return;
+
+  isOnboardingPassRevealed = !isOnboardingPassRevealed;
+  if (isOnboardingPassRevealed) {
+    passMaskedEl.textContent = currentMsoPassword;
+    passMaskedEl.style.letterSpacing = 'normal';
+    if (passEyeBtn) passEyeBtn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Verbergen';
+  } else {
+    passMaskedEl.textContent = '••••••••';
+    passMaskedEl.style.letterSpacing = '2px';
+    if (passEyeBtn) passEyeBtn.innerHTML = '<i class="fa-solid fa-eye"></i> Einblenden';
+  }
+}
+
+function copyOnboardingValue(elementId, btnEl) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  const valToCopy = el.value || el.innerText || '';
+  if (!valToCopy || valToCopy === '-' || valToCopy.includes('Ein eigenes Passwort')) {
+    alert('Kein kopierbarer Wert vorhanden.');
+    return;
+  }
+
+  navigator.clipboard.writeText(valToCopy).then(() => {
+    if (btnEl) {
+      const origHtml = btnEl.innerHTML;
+      btnEl.innerHTML = '<i class="fa-solid fa-check" style="color:var(--success-color);"></i> Kopiert!';
+      setTimeout(() => { btnEl.innerHTML = origHtml; }, 2000);
+    }
+  }).catch(() => {
+    alert('Kopieren fehlgeschlagen.');
+  });
 }
 
 function openStudentView() {
