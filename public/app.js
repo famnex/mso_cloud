@@ -446,10 +446,19 @@ async function loadTiles(isSilentHeartbeat = false) {
       }
       
       let keyBtnHtml = '';
-      if (currentUser) {
-        if (isSph) {
-          keyBtnHtml = `<button class="tile-key-btn" onclick="openSphCredentialsModal(event, ${tile.id}, ${tile.open_in_new_tab === 1})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
+      if (currentUser && isSph) {
+        if (isLocked) {
+          keyBtnHtml = `<button class="tile-key-btn disabled" disabled onclick="event.preventDefault(); event.stopPropagation(); return false;" title="Schulportal ist im gesperrten Zeitraum nicht verfügbar"><i class="fa-solid fa-link-slash"></i></button>`;
+        } else {
+          keyBtnHtml = `<button class="tile-key-btn" id="tile-key-btn-${tile.id}" onclick="openSphCredentialsModal(event, ${tile.id}, ${tile.open_in_new_tab === 1})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
         }
+      }
+
+      let statusBannerHtml = '';
+      if (isLocked) {
+        statusBannerHtml = `<div class="tile-status-banner time-locked-banner"><i class="fa-solid fa-clock"></i> Im Sperrzeitraum gesperrt</div>`;
+      } else {
+        statusBannerHtml = `<div class="tile-status-banner offline-banner" id="tile-status-banner-${tile.id}" style="display: none;"><i class="fa-solid fa-triangle-exclamation"></i> Aktuell nicht erreichbar</div>`;
       }
       
       tileCard.innerHTML = `
@@ -465,6 +474,7 @@ async function loadTiles(isSilentHeartbeat = false) {
           <h4 class="tile-title">${tile.title}</h4>
           <div class="tile-bottom-content">
             <p class="tile-description">${tile.description || ''}</p>
+            ${statusBannerHtml}
           </div>
         </div>
         <div class="tile-bg-glow"></div>
@@ -472,7 +482,7 @@ async function loadTiles(isSilentHeartbeat = false) {
 
       tilesContainer.appendChild(tileCard);
 
-      // Statusprüfung asynchron starten (CORS-gesichert über MSO-Cloud Checker)
+      // Statusprüfung asynchron starten
       if (isLocked) {
         const dot = document.getElementById(`status-dot-${tile.id}`);
         if (dot) {
@@ -528,90 +538,68 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /**
- * Prüft die Erreichbarkeit einer Kachel asynchron über das MSO Cloud Prüfskript.
+ * Prüft die Erreichbarkeit einer Kachel asynchron über den MSO Cloud Server-Checker.
+ * Erkennt auch Verbindungsabbrüche (ERR_CONNECTION_CLOSED / ECONNRESET).
  */
 function checkTileStatus(tileId, link) {
   const dot = document.getElementById(`status-dot-${tileId}`);
   const card = document.getElementById(`tile-card-${tileId}`);
-  let requestCompleted = false;
+  const banner = document.getElementById(`tile-status-banner-${tileId}`);
+  const keyBtn = document.getElementById(`tile-key-btn-${tileId}`);
 
-  // Falls der Link ein direkter Moodle OAuth2-Login-Link ist, pinge das Moodle-Hauptverzeichnis an
-  // (da der direkte Login-Link ohne Session-Kontext zu einem Redirect/Fehler im externen Checker führt)
   let pingLink = link;
   if (link && link.includes('/auth/oauth2/login.php')) {
     pingLink = link.split('/auth/oauth2/login.php')[0] + '/';
   }
 
-  // Verwende dieselbe API wie im Original, aber mit vollem Pfad gegen CORS (oder Proxy)
-  const checkerUrl = `https://cloud.mso-hef.de/launcher/check_links.php?link=${encodeURIComponent(pingLink)}`;
-
-  // AJAX-Request zur Statusprüfung
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', checkerUrl, true);
-  xhr.timeout = 10000; // 10s Timeout
-
-  xhr.onload = function() {
-    requestCompleted = true;
-    if (xhr.status === 200) {
-      try {
-        const result = JSON.parse(xhr.responseText);
-        if (dot) dot.className = 'status-dot';
-        
-        if (result.color === 'a3e77f') {
-          // Online
-          if (dot) {
-            dot.classList.add('online');
-            dot.setAttribute('title', result.reason);
-          }
-        } else {
-          // Offline (e77f7f)
-          if (dot) {
-            dot.classList.add('offline');
-            dot.setAttribute('title', result.reason);
-          }
-          disableTileCard(card);
-        }
-      } catch (e) {
-        // Fallback bei JSON Parsefehler
+  fetch(`api/tiles/check-status?link=${encodeURIComponent(pingLink)}`)
+    .then(res => res.json())
+    .then(result => {
+      if (result.online) {
         if (dot) {
           dot.className = 'status-dot online';
-          dot.setAttribute('title', 'Erreichbar');
+          dot.setAttribute('title', result.reason || 'Erreichbar');
         }
+        if (banner) banner.style.display = 'none';
+      } else {
+        if (dot) {
+          dot.className = 'status-dot offline';
+          dot.setAttribute('title', result.reason || 'Dienst aktuell nicht erreichbar');
+        }
+        if (banner) {
+          banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(result.reason || 'Aktuell nicht erreichbar')}`;
+          banner.style.display = 'inline-flex';
+        }
+        disableTileCard(card, keyBtn);
       }
-    } else {
+    })
+    .catch(err => {
+      console.warn(`[MSO Status Check] Direct-Backend Check failed for tile ${tileId}:`, err.message);
       if (dot) {
         dot.className = 'status-dot offline';
-        dot.setAttribute('title', 'Prüfung fehlgeschlagen');
+        dot.setAttribute('title', 'Verbindungsfehler bei der Prüfung');
       }
-      disableTileCard(card);
-    }
-  };
-
-  xhr.onerror = function() {
-    requestCompleted = true;
-    if (dot) {
-      dot.className = 'status-dot offline';
-      dot.setAttribute('title', 'Netzwerkfehler bei Prüfung');
-    }
-    disableTileCard(card);
-  };
-
-  xhr.ontimeout = function() {
-    requestCompleted = true;
-    if (dot) {
-      dot.className = 'status-dot timeout';
-      dot.setAttribute('title', 'Timeout: Keine Antwort nach 10s');
-    }
-    disableTileCard(card);
-  };
-
-  xhr.send();
+      if (banner) {
+        banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Verbindung fehlgeschlagen`;
+        banner.style.display = 'inline-flex';
+      }
+      disableTileCard(card, keyBtn);
+    });
 }
 
-function disableTileCard(card) {
-  card.classList.add('disabled');
-  card.removeAttribute('href'); // Klick blockieren
-  card.onclick = function(e) { e.preventDefault(); return false; };
+function disableTileCard(card, keyBtn) {
+  if (card) {
+    card.classList.add('offline-card');
+    card.removeAttribute('href');
+    card.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+  }
+  if (keyBtn) {
+    keyBtn.style.display = 'none';
+  }
 }
 
 /* ==========================================================================
@@ -3442,6 +3430,22 @@ function renderModalNewsCarousel() {
   if (activeMessages[currentMessageIndex]) {
     markMessageAsSeen(activeMessages[currentMessageIndex].id);
   }
+
+  setTimeout(adjustNewsModalHeight, 50);
+}
+
+function adjustNewsModalHeight() {
+  const container = document.getElementById('modal-news-carousel-container');
+  if (!container) return;
+  
+  const slides = container.querySelectorAll('.news-slide');
+  if (slides && slides[currentMessageIndex]) {
+    const currentSlide = slides[currentMessageIndex];
+    const targetHeight = currentSlide.offsetHeight;
+    if (targetHeight > 0) {
+      container.style.height = `${targetHeight + 35}px`;
+    }
+  }
 }
 
 function prevNewsSlide() {
@@ -3482,6 +3486,8 @@ function updateNewsSlidePosition() {
   if (activeMessages[currentMessageIndex]) {
     markMessageAsSeen(activeMessages[currentMessageIndex].id);
   }
+  
+  setTimeout(adjustNewsModalHeight, 50);
 }
 
 async function toggleMessageConfirmation(event, messageId) {

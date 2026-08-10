@@ -2,8 +2,67 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 const { db, logEvent, getConfig } = require('../db');
 const ldap = require('../ldap');
+
+/**
+ * Native Backend Status-Checker Endpoint: Prüft die Erreichbarkeit einer Kachel-URL vom Server aus.
+ * Erkennt auch Verbindungsabbrüche (ERR_CONNECTION_CLOSED / ECONNRESET / ETIMEDOUT).
+ */
+router.get('/check-status', async (req, res) => {
+  const targetUrl = req.query.link;
+  if (!targetUrl) {
+    return res.status(400).json({ online: false, reason: 'Keine URL angegeben' });
+  }
+
+  try {
+    const parsedUrl = new URL(targetUrl);
+    const protocol = parsedUrl.protocol === 'https:' ? https : http;
+
+    const requestOptions = {
+      method: 'HEAD',
+      host: parsedUrl.hostname,
+      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+      path: parsedUrl.pathname + parsedUrl.search,
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MSO-Cloud-Checker/1.0',
+        'Accept': '*/*'
+      }
+    };
+
+    const checkReq = protocol.request(requestOptions, (checkRes) => {
+      // Status 2xx, 3xx (Redirects) gelten als erreichbar/online
+      const isOnline = checkRes.statusCode >= 200 && checkRes.statusCode < 400;
+      if (isOnline) {
+        return res.json({ online: true, statusCode: checkRes.statusCode, reason: 'Erreichbar (Online)' });
+      } else {
+        return res.json({ online: false, statusCode: checkRes.statusCode, reason: `Dienst meldet Status HTTP ${checkRes.statusCode}` });
+      }
+    });
+
+    checkReq.on('timeout', () => {
+      checkReq.destroy();
+      return res.json({ online: false, reason: 'Zeitüberschreitung (Timeout nach 5s)' });
+    });
+
+    checkReq.on('error', (err) => {
+      console.warn(`[MSO Status-Checker] Verbindung fehlgeschlagen für ${targetUrl}: ${err.code || err.message}`);
+      return res.json({ 
+        online: false, 
+        errorCode: err.code || 'CONNECTION_ERROR', 
+        reason: 'Dienst nicht erreichbar (Verbindung fehlgeschlagen / Server geschlossen)' 
+      });
+    });
+
+    checkReq.end();
+  } catch (err) {
+    return res.json({ online: false, reason: 'Ungültige URL oder Netzwerkfehler: ' + err.message });
+  }
+});
 
 /**
  * Prüft, ob eine Kachel aktuell zeitlich gesperrt ist.
