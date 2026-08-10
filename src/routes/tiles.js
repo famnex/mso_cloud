@@ -35,12 +35,14 @@ router.get('/check-status', async (req, res) => {
     };
 
     const checkReq = protocol.request(requestOptions, (checkRes) => {
-      // Status 2xx, 3xx (Redirects) gelten als erreichbar/online
-      const isOnline = checkRes.statusCode >= 200 && checkRes.statusCode < 400;
+      // Alle Statuscodes von 200 bis 499 bedeuten, dass der Webserver aktiv antwortet und erreichbar ist
+      // (z. B. 200 OK, 302 Redirect, 400 Bad Request bei fehlenden Params, 401/403 Login-Schutz, 405 Method Not Allowed)
+      const isOnline = checkRes.statusCode >= 200 && checkRes.statusCode < 500;
       if (isOnline) {
-        return res.json({ online: true, statusCode: checkRes.statusCode, reason: 'Erreichbar (Online)' });
+        return res.json({ online: true, statusCode: checkRes.statusCode, reason: `Erreichbar (HTTP ${checkRes.statusCode})` });
       } else {
-        return res.json({ online: false, statusCode: checkRes.statusCode, reason: `Dienst meldet Status HTTP ${checkRes.statusCode}` });
+        // Status 5xx (500, 502 Bad Gateway, 503 Service Unavailable, 504 Timeout) bedeuten echten Serverausfall
+        return res.json({ online: false, statusCode: checkRes.statusCode, reason: `Dienst meldet Serverfehler (HTTP ${checkRes.statusCode})` });
       }
     });
 
