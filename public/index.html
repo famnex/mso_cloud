@@ -1150,8 +1150,8 @@
       
       <!-- Login Tabs (Umschaltbar zwischen Normal- & Erstlogin) -->
       <div class="login-tabs" style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 25px;">
-        <button type="button" class="login-tab-btn active" id="login-tab-credentials-btn" onclick="switchLoginTab('credentials')">Mit Zugangsdaten</button>
-        <button type="button" class="login-tab-btn" id="login-tab-email-btn" onclick="switchLoginTab('email')">Erstlogin (Neuer Schüler)</button>
+        <button type="button" class="login-tab-btn active" id="login-tab-credentials-btn" onclick="switchLoginTab('credentials')">Passwort-Login</button>
+        <button type="button" class="login-tab-btn" id="login-tab-email-btn" onclick="switchLoginTab('email')">Anmeldelink (E-Mail)</button>
       </div>
       
       <div id="login-alert" class="alert alert-danger" style="display:none;"></div>
@@ -1176,11 +1176,15 @@
         </button>
       </form>
 
-      <!-- FORM 2: EMAIL LOGIN (Erstlogin) -->
+      <!-- FORM 2: EMAIL LOGIN (Anmeldelink) -->
       <form id="student-email-form" onsubmit="handleStudentLinkRequest(event)" style="display: none;">
-        <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px; text-align: left;">
-          Benutzerkonten inklusive Passwörter und weitere Daten können über das Benutzerprofil & Zugänge abgefragt werden. Tragen Sie bitte Ihre bei der Schulanmeldung hinterlegte E-Mail-Adresse ein.<br><br>
-          Sie erhalten kurz darauf einen sicheren Anmeldelink per E-Mail, der <strong>einmalig verwendbar</strong> und <strong>20 Minuten</strong> lang gültig ist und Sie direkt in das System einloggt.
+        <div style="margin-bottom: 18px; text-align: left;">
+          <h4 style="font-weight: 700; font-size: 0.98rem; color: var(--text-color); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-color);"></i> Neu hier oder Passwort vergessen?
+          </h4>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+            Gib deine E-Mail-Adresse ein, die bei der Schulanmeldung angegeben wurde. Wir schicken dir einen Login-Link.
+          </p>
         </div>
         
         <div class="form-group">

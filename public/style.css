@@ -619,6 +619,21 @@ main {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+.form-control::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+[data-theme="dark"] .form-control::placeholder {
+  color: rgba(255, 255, 255, 0.65);
+  opacity: 1;
+}
+
+[data-theme="light"] .form-control::placeholder {
+  color: rgba(0, 0, 0, 0.55);
+  opacity: 1;
+}
+
 /* Setup Wizard Panel */
 .setup-container {
   display: flex;

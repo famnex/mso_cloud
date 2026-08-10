@@ -925,6 +925,14 @@ function openModal(id) {
   document.getElementById(id).style.display = 'flex';
   if (id === 'login-modal') {
     checkMainLoginLockStatus();
+    setTimeout(() => {
+      const emailForm = document.getElementById('student-email-form');
+      if (emailForm && emailForm.style.display !== 'none') {
+        document.getElementById('student-email')?.focus();
+      } else {
+        document.getElementById('login-username')?.focus();
+      }
+    }, 100);
   }
 }
 
@@ -3883,11 +3891,13 @@ function switchLoginTab(tab) {
     emailBtn.classList.remove('active');
     loginForm.style.display = 'block';
     emailForm.style.display = 'none';
+    setTimeout(() => { document.getElementById('login-username')?.focus(); }, 50);
   } else if (tab === 'email') {
     emailBtn.classList.add('active');
     credentialsBtn.classList.remove('active');
     loginForm.style.display = 'none';
     emailForm.style.display = 'block';
+    setTimeout(() => { document.getElementById('student-email')?.focus(); }, 50);
   }
 }
 
