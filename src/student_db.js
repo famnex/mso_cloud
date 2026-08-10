@@ -888,7 +888,7 @@ async function verifyStudentToken(token, ip) {
     }
   }
 
-  return { success: false, error: 'Der Anmeldelink ist ungültig oder abgelaufen (20 Minuten Gültigkeit).' };
+  return { success: false, error: 'Der Anmeldelink ist ungültig, bereits verwendet oder abgelaufen (Anmeldelinks sind nur 1x verwendbar und max. 20 Minuten gültig).' };
 }
 
 module.exports = {

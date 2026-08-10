@@ -859,7 +859,7 @@ router.post('/student-link', async (req, res) => {
       vielen Dank, dass Sie sich mit dieser E-Mail-Adresse beim Schülerportal der Modellschule Obersberg in Bad Hersfeld angemeldet haben.<br><br>
       Um sich im System anzumelden, können Sie folgenden Link nutzen:<br>
       <a href="${loginLink}"><b>Schülerportal MSO Cloud</b></a><br><br>
-      Dieser Link ist für 20 Minuten gültig. Sollte er abgelaufen sein, dann können Sie sich erneut über die Anmeldeseite der MSO Cloud anmelden.<br><br>
+      Dieser Link ist <b>einmalig verwendbar</b> und für <b>20 Minuten</b> gültig. Sollte der Link bereits verwendet worden oder abgelaufen sein, können Sie über die Anmeldeseite der MSO Cloud jederzeit einen neuen Link anfordern.<br><br>
       Mit freundlichen Grüßen<br>
       Modellschule Obersberg<br><br>
       <i>Diese E-Mail wurde automatisch erstellt.</i>

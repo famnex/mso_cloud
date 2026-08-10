@@ -3976,7 +3976,7 @@ async function handleStudentTokenLogin(token) {
         openOnboardingCredentialsModal();
       }, 450);
     } else {
-      alert(data.error || 'Anmeldelink ungültig oder abgelaufen.');
+      alert(data.error || 'Der Anmeldelink ist ungültig, bereits verwendet oder abgelaufen (Anmeldelinks sind nur 1x verwendbar und max. 20 Minuten gültig).');
     }
   } catch (err) {
     console.error('Fehler bei Token-Login:', err);
