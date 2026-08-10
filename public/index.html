@@ -931,11 +931,14 @@
               <tr>
                 <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);">Schulportal (SPH) Startpasswort</td>
                 <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-family:monospace; vertical-align: middle;">
-                  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; box-sizing: border-box; min-width: 0;">
-                    <span id="student-sph-password-display-text" style="letter-spacing: 2px; word-break: break-all; overflow-wrap: anywhere; min-width: 0;">••••••••</span>
-                    <button type="button" class="btn btn-secondary password-toggle-btn" onclick="togglePasswordVisibility('student-sph-password')" id="student-sph-password-toggle">
-                      <i class="fa-solid fa-eye" id="student-sph-password-eye"></i>
-                    </button>
+                  <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; box-sizing: border-box; min-width: 0;">
+                      <span id="student-sph-password-display-text" style="letter-spacing: 2px; word-break: break-all; overflow-wrap: anywhere; min-width: 0;">••••••••</span>
+                      <button type="button" class="btn btn-secondary password-toggle-btn" onclick="togglePasswordVisibility('student-sph-password')" id="student-sph-password-toggle">
+                        <i class="fa-solid fa-eye" id="student-sph-password-eye"></i>
+                      </button>
+                    </div>
+                    <a href="#" onclick="openSphPasswordHelpModal(event)" style="font-size:0.75rem; color: var(--accent-color); text-decoration:none; margin-top:2px; display: inline-flex; align-items: center; gap: 4px;" id="change-pwd-link-sph"><i class="fa-solid fa-key"></i> Schulportal-Passwort ändern / zurücksetzen</a>
                   </div>
                 </td>
               </tr>
@@ -1635,9 +1638,14 @@
           Für dein MSO-Cloud Konto sind aktuell Zugangsdaten für das Schulportal Hessen hinterlegt als:
           <strong id="sph-credentials-username-display" style="color: var(--accent-color); font-size: 1.15rem; display: block; margin-top: 8px;"></strong>
         </p>
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 25px;">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 15px;">
           Bei Klick auf die Schulportal-Kachel wirst du automatisch mit diesen Daten angemeldet.
         </p>
+        <div style="margin-bottom: 20px;">
+          <a href="#" onclick="openSphPasswordHelpModal(event)" style="color: #60a5fa; font-size: 0.86rem; font-weight: 600; text-decoration: underline; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-key"></i> Schulportal-Passwort geändert oder vergessen? Hilfe & Anleitung
+          </a>
+        </div>
         <button type="button" class="btn btn-danger" onclick="deleteSphCredentials()" style="width: 100%;">
           <i class="fa-solid fa-trash"></i> Zugangsdaten löschen
         </button>
@@ -1654,9 +1662,15 @@
           <input type="text" id="sph_user" class="form-control" required placeholder="z.B. max.mustermann">
         </div>
 
-        <div class="form-group" style="margin-bottom: 25px;">
+        <div class="form-group" style="margin-bottom: 10px;">
           <label for="sph_password">Schulportal Passwort</label>
           <input type="password" id="sph_password" class="form-control" required placeholder="Dein Schulportal Passwort">
+        </div>
+
+        <div style="margin-bottom: 25px; text-align: right;">
+          <a href="#" onclick="openSphPasswordHelpModal(event)" style="color: #60a5fa; font-size: 0.82rem; font-weight: 600; text-decoration: underline; display: inline-flex; align-items: center; gap: 5px;">
+            <i class="fa-solid fa-key"></i> Passwort im Schulportal ändern / zurücksetzen?
+          </a>
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:15px;">
@@ -1664,6 +1678,69 @@
           <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Speichern</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SCHULPORTAL PASSWORT ANLEITUNG & HILFE -->
+  <div class="modal" id="sph-password-help-modal">
+    <div class="modal-content glass-panel" style="max-width: 620px; padding: 25px;">
+      <span class="close-btn" onclick="closeModal('sph-password-help-modal')"><i class="fa-solid fa-xmark"></i></span>
+      <h3 style="font-weight:700; font-size:1.35rem; margin-bottom:20px; display:flex; align-items:center; gap:10px; color: var(--accent-color);">
+        <i class="fa-solid fa-key"></i> Schulportal-Passwort ändern oder zurücksetzen
+      </h3>
+      
+      <div style="display: flex; flex-direction: column; gap: 16px; font-size: 0.92rem; line-height: 1.55;">
+        
+        <!-- Option 1: Im SPH angemeldet -->
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 16px;">
+          <h4 style="font-size: 0.98rem; font-weight: 700; color: #60a5fa; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-user-gear"></i> Option 1: Du bist aktuell im Schulportal angemeldet
+          </h4>
+          <p style="color: var(--text-color); margin-bottom: 8px;">
+            Wenn du dein Schulportal-Passwort ändern möchtest und noch angemeldet bist:
+          </p>
+          <ol style="margin: 0 0 0 20px; padding: 0; color: var(--text-secondary);">
+            <li>Klicke oben rechts im blauen Header des Schulportals auf deinen Namen (z.&nbsp;B. <em>Fleischer (FLEI)</em>).</li>
+            <li>Wähle im Dropdown-Menü den Punkt <strong><i class="fa-solid fa-key"></i> Passwort ändern</strong> aus.</li>
+          </ol>
+        </div>
+
+        <!-- Option 2: Passwort vergessen (Online) -->
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 16px;">
+          <h4 style="font-size: 0.98rem; font-weight: 700; color: #f59e0b; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-unlock-keyhole"></i> Option 2: Passwort vergessen (Online zurücksetzen)
+          </h4>
+          <p style="color: var(--text-color); margin-bottom: 8px;">
+            Wenn du dein Passwort vergessen hast und dich nicht mehr anmelden kannst:
+          </p>
+          <ol style="margin: 0 0 0 20px; padding: 0; color: var(--text-secondary); margin-bottom: 10px;">
+            <li>Gehe zur Anmeldeseite: <a href="https://login.schulportal.hessen.de/?i=9743" target="_blank" style="color: #60a5fa; text-decoration: underline; font-weight: 600;">login.schulportal.hessen.de</a></li>
+            <li>Klicke unter dem Login-Formular auf den Button <strong>🔑 Passwort zurücksetzen</strong>.</li>
+          </ol>
+          <div style="background: rgba(245, 158, 11, 0.12); border-left: 3px solid #f59e0b; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; color: var(--text-color);">
+            <i class="fa-solid fa-circle-info" style="color: #f59e0b; margin-right: 5px;"></i>
+            <strong>Wichtiger Hinweis:</strong> Das Online-Zurücksetzen funktioniert <em>nur</em>, wenn du zuvor manuell deine eigene E-Mail-Adresse im Schulportal (unter <em>Profil ➔ E-Mail & Benachrichtigungen</em>) hinterlegt hast.
+          </div>
+        </div>
+
+        <!-- Option 3: Keine E-Mail hinterlegt / IT-Abteilung -->
+        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 10px; padding: 16px;">
+          <h4 style="font-size: 0.98rem; font-weight: 700; color: #f87171; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-headset"></i> Option 3: Keine E-Mail hinterlegt oder Zurücksetzen schlägt fehl
+          </h4>
+          <p style="color: var(--text-color); margin-bottom: 12px;">
+            Falls keine E-Mail-Adresse im Schulportal hinterlegt ist oder das Zurücksetzen nicht klappt, kann dein Passwort <strong>nur über eine Fachlehrkraft</strong> oder die <strong>IT-Abteilung</strong> zurückgesetzt werden.
+          </p>
+          <a href="https://cloud.mso-hef.de/termin/#/book/2" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; width: auto; font-size: 0.88rem; padding: 8px 14px; text-decoration: none;">
+            <i class="fa-solid fa-calendar-check"></i> Termin bei der IT-Abteilung buchen
+          </a>
+        </div>
+
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:22px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('sph-password-help-modal')">Schließen</button>
+      </div>
     </div>
   </div>
 

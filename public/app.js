@@ -2875,6 +2875,14 @@ async function deleteSphCredentials() {
   }
 }
 
+function openSphPasswordHelpModal(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  openModal('sph-password-help-modal');
+}
+
 async function handleSphClick(e, tileId, openInNewTab) {
   // 1. Wenn nicht eingeloggt in der MSO Cloud, ganz normale Weiterleitung erlauben
   if (!currentUser) {
