@@ -27,6 +27,142 @@ function isTileTimeLocked(tile) {
 }
 
 /**
+ * ZENTRALER EVALUIERUNGS-ALGORITHMUS FÜR DIE KACHELSICHTBARKEIT.
+ * Identischer Algorithmus für Live-Auslieferung und Admin-Diagnose.
+ */
+function evaluateTileVisibility(tile, user) {
+  // 1. Öffentlich sichtbare Kacheln
+  if (tile.visibility === 'public') {
+    return {
+      visible: true,
+      reason: 'Öffentlich: Diese Kachel ist für alle Personen (angemeldet & unangemeldet) sichtbar.',
+      code: 'PUBLIC'
+    };
+  }
+
+  // 2. Nur öffentlich (nur für unangemeldete Benutzer)
+  if (tile.visibility === 'only_public') {
+    const isGuest = !user;
+    return {
+      visible: isGuest,
+      reason: isGuest 
+        ? 'Nur-Öffentlich: Benutzer ist unangemeldet (Gastmodus) -> Kachel ist sichtbar.' 
+        : 'Nur-Öffentlich: Diese Kachel ist ausschließlich für unangemeldete Gäste sichtbar (Benutzer ist angemeldet -> ausgeblendet).',
+      code: 'ONLY_PUBLIC'
+    };
+  }
+
+  // Für alle weiteren Optionen muss ein Benutzerkontext vorliegen
+  if (!user) {
+    return {
+      visible: false,
+      reason: 'Anmeldung erforderlich: Benutzer ist unangemeldet.',
+      code: 'LOGIN_REQUIRED'
+    };
+  }
+
+  // Administrator sieht grundsätzlich alle Kacheln
+  if (user.role === 'admin') {
+    return {
+      visible: true,
+      reason: 'Admin-Sonderrecht: Benutzer hat die Rolle "admin" und sieht daher unabhängig von Gruppen alle Kacheln.',
+      code: 'ADMIN_BYPASS'
+    };
+  }
+
+  // 3. Sichtbarkeit für alle angemeldeten Benutzer
+  if (tile.visibility === 'logged_in') {
+    return {
+      visible: true,
+      reason: 'Angemeldet: Kachel ist für jeden angemeldeten Benutzer freigeschaltet.',
+      code: 'LOGGED_IN'
+    };
+  }
+
+  // 4. Sichtbarkeit eingeschränkt auf bestimmte Sicherheitsgruppen
+  if (tile.visibility === 'groups') {
+    let allowedGroups = [];
+    try {
+      allowedGroups = typeof tile.allowed_groups === 'string' ? JSON.parse(tile.allowed_groups || '[]') : (tile.allowed_groups || []);
+    } catch (e) {
+      allowedGroups = [];
+    }
+
+    if (!Array.isArray(allowedGroups) || allowedGroups.length === 0) {
+      return {
+        visible: false,
+        reason: 'Einschränkung auf Gruppen: Es wurden keine erlaubten Gruppen auf der Kachel definiert.',
+        code: 'NO_ALLOWED_GROUPS'
+      };
+    }
+
+    const userGroups = user.groups || [];
+    let effectiveGroups = [...userGroups];
+    if (user.isLdap) {
+      const mapped = ldap.mapLdapGroupsToLocal(userGroups);
+      effectiveGroups = effectiveGroups.concat(mapped);
+    }
+
+    const normalizeGroup = (g) => {
+      if (!g) return '';
+      let name = String(g);
+      const match = name.match(/cn=([^,]+)/i);
+      if (match) name = match[1];
+      return name.trim().toLowerCase()
+        .normalize('NFC')
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+        .replace(/\s+/g, ' ');
+    };
+
+    const normalizedUserGroups = effectiveGroups.map(g => ({ original: g, norm: normalizeGroup(g) }));
+    
+    let matchedAllowedGroup = null;
+    let matchedUserGroup = null;
+
+    const hasAccess = allowedGroups.some(group => {
+      const normAllowed = normalizeGroup(group);
+      const found = normalizedUserGroups.find(ug => ug.norm === normAllowed);
+      if (found) {
+        matchedAllowedGroup = group;
+        matchedUserGroup = found.original;
+        return true;
+      }
+      return false;
+    });
+
+    if (hasAccess) {
+      return {
+        visible: true,
+        reason: `Gruppen-Übereinstimmung: Benutzergruppe "${matchedUserGroup}" entspricht der geforderten Kachel-Gruppe "${matchedAllowedGroup}".`,
+        code: 'GROUP_MATCH',
+        details: {
+          matchedUserGroup,
+          matchedAllowedGroup,
+          userGroups: effectiveGroups,
+          allowedGroups
+        }
+      };
+    } else {
+      return {
+        visible: false,
+        reason: `Gruppen-Fehlstreffer: Keine der Gruppen des Benutzers [${effectiveGroups.join(', ') || 'keine'}] stimmt mit den geforderten Kachel-Gruppen [${allowedGroups.join(', ')}] überein.`,
+        code: 'GROUP_MISMATCH',
+        details: {
+          userGroups: effectiveGroups,
+          allowedGroups
+        }
+      };
+    }
+  }
+
+  return {
+    visible: false,
+    reason: `Unbekannte Sichtbarkeitseinstellung "${tile.visibility}".`,
+    code: 'UNKNOWN_VISIBILITY'
+  };
+}
+
+/**
  * Ruft alle für den aktuellen Benutzer sichtbaren Kacheln ab.
  */
 router.get('/', (req, res) => {
@@ -36,65 +172,7 @@ router.get('/', (req, res) => {
     
     // Alle Kacheln aus der Datenbank holen
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
-        const visibleTiles = allTiles.filter(tile => {
-      // 1. Öffentlich sichtbare Kacheln
-      if (tile.visibility === 'public') {
-        return true;
-      }
-      
-      // 2. Nur öffentlich (nur für unangemeldete Benutzer)
-      if (tile.visibility === 'only_public') {
-        return !user;
-      }
-      
-      // Für alle anderen Sichtbarkeiten muss der User eingeloggt sein
-      if (!user) {
-        return false;
-      }
-
-      // Admin sieht grundsätzlich alles
-      if (user.role === 'admin') {
-        return true;
-      }
-      
-      // 2. Sichtbarkeit für alle angemeldeten Benutzer
-      if (tile.visibility === 'logged_in') {
-        return true;
-      }
-      
-      // 3. Sichtbarkeit eingeschränkt auf bestimmte Sicherheitsgruppen
-      if (tile.visibility === 'groups') {
-        const allowedGroups = JSON.parse(tile.allowed_groups || '[]');
-        const userGroups = user.groups || [];
-        
-        let effectiveGroups = [...userGroups];
-        if (user.isLdap) {
-          const mapped = ldap.mapLdapGroupsToLocal(userGroups);
-          effectiveGroups = effectiveGroups.concat(mapped);
-        }
-
-        const normalizeGroup = (g) => {
-          if (!g) return '';
-          let name = String(g);
-          const match = name.match(/cn=([^,]+)/i);
-          if (match) name = match[1];
-          return name.trim().toLowerCase()
-            .normalize('NFC')
-            .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
-            .replace(/\s+/g, ' ');
-        };
-
-        const normalizedUserGroups = effectiveGroups.map(g => normalizeGroup(g));
-        
-        const hasAccess = allowedGroups.some(group => {
-          const normAllowed = normalizeGroup(group);
-          return normalizedUserGroups.some(normUg => normUg === normAllowed);
-        });
-        return hasAccess;
-      }
-      
-      return false;
-    });
+    const visibleTiles = allTiles.filter(tile => evaluateTileVisibility(tile, user).visible);
 
     // Zeitsperren-Flag dynamisch anfügen
     const mappedTiles = visibleTiles.map(tile => {
@@ -109,6 +187,82 @@ router.get('/', (req, res) => {
   } catch (error) {
     console.error('Fehler beim Abrufen der Kacheln:', error);
     res.status(500).json({ error: 'Fehler beim Laden der Dienste: ' + error.message });
+  }
+});
+
+/**
+ * Admin-Diagnose-Endpunkt: Prüft Kachelrechte für einen bestimmten Benutzer
+ * auf Basis des exakt identischen Evaluierungs-Algorithmus.
+ */
+router.get('/check-user/:userId', (req, res) => {
+  const adminUser = req.session.user;
+  if (!adminUser || adminUser.role !== 'admin') {
+    return res.status(403).json({ error: 'Nur Administratoren haben Zugriff auf das Kachel-Diagnose-Tool.' });
+  }
+
+  const { userId } = req.params;
+  try {
+    const userRow = db.prepare('SELECT id, username, email, role, groups, is_ldap, display_name FROM users WHERE id = ?').get(userId);
+    if (!userRow) {
+      return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    }
+
+    let parsedGroups = [];
+    try {
+      parsedGroups = typeof userRow.groups === 'string' ? JSON.parse(userRow.groups || '[]') : (userRow.groups || []);
+    } catch (e) {
+      parsedGroups = [];
+    }
+
+    let effectiveGroups = [...parsedGroups];
+    if (userRow.is_ldap === 1) {
+      const mapped = ldap.mapLdapGroupsToLocal(parsedGroups);
+      effectiveGroups = effectiveGroups.concat(mapped);
+    }
+
+    const targetUser = {
+      id: userRow.id,
+      username: userRow.username,
+      email: userRow.email,
+      role: userRow.role,
+      groups: parsedGroups,
+      effectiveGroups: Array.from(new Set(effectiveGroups)),
+      isLdap: userRow.is_ldap === 1,
+      displayName: userRow.display_name
+    };
+
+    // Alle Kacheln laden
+    const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
+
+    const evaluations = allTiles.map(tile => {
+      const evalResult = evaluateTileVisibility(tile, targetUser);
+      const isTimeLocked = isTileTimeLocked(tile);
+      return {
+        id: tile.id,
+        title: tile.title,
+        icon: tile.icon,
+        url: tile.url,
+        category: tile.category,
+        visibility: tile.visibility,
+        allowed_groups: tile.allowed_groups,
+        is_time_locked: isTimeLocked ? 1 : 0,
+        time_limit_enabled: tile.time_limit_enabled,
+        time_limit_start: tile.time_limit_start,
+        time_limit_end: tile.time_limit_end,
+        evaluation: evalResult
+      };
+    });
+
+    res.json({
+      user: targetUser,
+      tilesCount: evaluations.length,
+      visibleCount: evaluations.filter(e => e.evaluation.visible).length,
+      hiddenCount: evaluations.filter(e => !e.evaluation.visible).length,
+      evaluations
+    });
+  } catch (err) {
+    console.error('Fehler bei der Kachel-Rechteprüfung:', err);
+    res.status(500).json({ error: 'Fehler bei der Kachel-Rechteprüfung: ' + err.message });
   }
 });
 

@@ -2189,48 +2189,259 @@ async function deleteLdapMapping(id) {
 }
 
 /* --- TAB: Benutzerverwaltung --- */
+let allAdminUsers = [];
+let currentUtcData = null;
+let currentUtcFilter = 'all';
+
 async function loadAdminUsers() {
   const tbody = document.getElementById('admin-users-table-body');
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> Lade Benutzer...</td></tr>';
 
   try {
     const res = await fetch('api/admin/users');
-    const users = await res.json();
-
-    tbody.innerHTML = '';
-    users.forEach(user => {
-      const typeLabel = user.is_ldap === 1 
-        ? '<span class="user-badge" style="font-size:0.75rem; background:rgba(251,191,36,0.1); color:var(--warn-color);"><i class="fa-solid fa-network-wired"></i> LDAP</span>' 
-        : '<span class="user-badge" style="font-size:0.75rem; background:rgba(74,222,128,0.1); color:var(--success-color);"><i class="fa-solid fa-database"></i> Lokal</span>';
-      
-      const roleLabel = user.role === 'admin' 
-        ? '<strong style="color:var(--error-color);">Admin</strong>' 
-        : 'Benutzer';
-
-      // Nur gemappte Gruppen anzeigen (für LDAP) bzw. lokale Gruppen (für lokale User)
-      const groupsStr = user.is_ldap === 1 
-        ? (user.mapped_groups || []).join(', ') 
-        : (user.groups || []).join(', ');
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><strong>${user.username}</strong></td>
-        <td>${user.email || ''}</td>
-        <td>${typeLabel}</td>
-        <td>${roleLabel}</td>
-        <td><span style="font-size:0.85rem; color:var(--text-secondary);">${groupsStr || 'keine'}</span></td>
-        <td style="font-size:0.8rem; color:var(--text-secondary);">${new Date(user.created_at).toLocaleDateString('de-DE')}</td>
-        <td class="actions-cell">
-          <button class="btn btn-secondary btn-icon" onclick="openUserForm(${JSON.stringify(user).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-user-pen"></i></button>
-          <button class="btn btn-secondary btn-icon" onclick="syncLdapGroups(${user.id}, '${(user.username || '').replace(/'/g, "\\'")}')" title="Im LDAP/AD suchen, als LDAP-Konto übernehmen & Gruppen synchronisieren" style="color: var(--warn-color);"><i class="fa-solid fa-arrows-rotate"></i></button>
-          <button class="btn btn-danger btn-icon" onclick="deleteUser(${user.id})" title="Löschen" ${currentUser.id === user.id ? 'disabled' : ''}><i class="fa-solid fa-user-xmark"></i></button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
+    allAdminUsers = await res.json();
+    filterAdminUserTable();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--error-color);">Fehler beim Laden: ${err.message}</td></tr>`;
   }
+}
+
+function filterAdminUserTable() {
+  const query = (document.getElementById('admin-user-search-input')?.value || '').trim().toLowerCase();
+  if (!query) {
+    renderAdminUserTable(allAdminUsers);
+    return;
+  }
+
+  const filtered = allAdminUsers.filter(user => {
+    const username = (user.username || '').toLowerCase();
+    const email = (user.email || '').toLowerCase();
+    const displayName = (user.display_name || '').toLowerCase();
+    const role = (user.role || '').toLowerCase();
+    const type = user.is_ldap === 1 ? 'ldap' : 'lokal';
+    const groupsStr = user.is_ldap === 1 
+      ? (user.mapped_groups || []).join(' ').toLowerCase() 
+      : (user.groups || []).join(' ').toLowerCase();
+
+    return username.includes(query) || 
+           email.includes(query) || 
+           displayName.includes(query) || 
+           role.includes(query) || 
+           type.includes(query) || 
+           groupsStr.includes(query);
+  });
+
+  renderAdminUserTable(filtered);
+}
+
+function renderAdminUserTable(users) {
+  const tbody = document.getElementById('admin-users-table-body');
+  const countBadge = document.getElementById('admin-user-search-count');
+  
+  if (countBadge) {
+    countBadge.innerText = `${users.length} von ${allAdminUsers.length} Benutzern`;
+  }
+
+  tbody.innerHTML = '';
+
+  if (users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-secondary); padding: 25px;">Keine passenden Benutzer gefunden.</td></tr>';
+    return;
+  }
+
+  users.forEach(user => {
+    const typeLabel = user.is_ldap === 1 
+      ? '<span class="user-badge" style="font-size:0.75rem; background:rgba(251,191,36,0.1); color:var(--warn-color);"><i class="fa-solid fa-network-wired"></i> LDAP</span>' 
+      : '<span class="user-badge" style="font-size:0.75rem; background:rgba(74,222,128,0.1); color:var(--success-color);"><i class="fa-solid fa-database"></i> Lokal</span>';
+    
+    const roleLabel = user.role === 'admin' 
+      ? '<strong style="color:var(--error-color);">Admin</strong>' 
+      : 'Benutzer';
+
+    const groupsStr = user.is_ldap === 1 
+      ? (user.mapped_groups || []).join(', ') 
+      : (user.groups || []).join(', ');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(user.username)}</strong>${user.display_name ? `<br><small style="color:var(--text-secondary);">${escapeHtml(user.display_name)}</small>` : ''}</td>
+      <td>${escapeHtml(user.email || '')}</td>
+      <td>${typeLabel}</td>
+      <td>${roleLabel}</td>
+      <td><span style="font-size:0.85rem; color:var(--text-secondary);">${escapeHtml(groupsStr || 'keine')}</span></td>
+      <td style="font-size:0.8rem; color:var(--text-secondary);">${user.created_at ? new Date(user.created_at).toLocaleDateString('de-DE') : '-'}</td>
+      <td class="actions-cell">
+        <button class="btn btn-secondary btn-icon" onclick="openUserTilesCheckModal(${user.id})" title="🔍 Kachel-Sichtbarkeit & Zugriffsrechte prüfen" style="color: var(--accent-color);"><i class="fa-solid fa-layer-group"></i></button>
+        <button class="btn btn-secondary btn-icon" onclick="openUserForm(${JSON.stringify(user).replace(/"/g, '&quot;')})" title="Bearbeiten"><i class="fa-solid fa-user-pen"></i></button>
+        <button class="btn btn-secondary btn-icon" onclick="syncLdapGroups(${user.id}, '${(user.username || '').replace(/'/g, "\\'")}')" title="Im LDAP/AD suchen & Gruppen synchronisieren" style="color: var(--warn-color);"><i class="fa-solid fa-arrows-rotate"></i></button>
+        <button class="btn btn-danger btn-icon" onclick="deleteUser(${user.id})" title="Löschen" ${currentUser.id === user.id ? 'disabled' : ''}><i class="fa-solid fa-user-xmark"></i></button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* --- KACHEL-ZUGRIFFSRECHTE DIAGNOSE TOOL --- */
+async function openUserTilesCheckModal(userId) {
+  openModal('user-tiles-check-modal');
+  document.getElementById('user-tiles-check-loading').style.display = 'block';
+  document.getElementById('user-tiles-check-body').style.display = 'none';
+  const searchInput = document.getElementById('utc-tile-search');
+  if (searchInput) searchInput.value = '';
+  currentUtcFilter = 'all';
+
+  try {
+    const res = await fetch(`api/tiles/check-user/${userId}`);
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Fehler beim Abrufen der Kachel-Rechte.');
+    }
+
+    currentUtcData = await res.json();
+    const user = currentUtcData.user;
+
+    // Header Info
+    document.getElementById('utc-username').innerText = `${user.username}${user.displayName ? ` (${user.displayName})` : ''}`;
+    document.getElementById('utc-type-role').innerHTML = `${user.isLdap ? '<span style="color:var(--warn-color); font-weight:600;"><i class="fa-solid fa-network-wired"></i> LDAP</span>' : '<span style="color:var(--success-color); font-weight:600;"><i class="fa-solid fa-database"></i> Lokal</span>'} &bull; Rolle: <strong>${user.role}</strong>`;
+
+    const groupsEl = document.getElementById('utc-groups');
+    groupsEl.innerHTML = '';
+    const groups = user.effectiveGroups || [];
+    if (groups.length === 0) {
+      groupsEl.innerHTML = '<span style="color:var(--text-secondary); font-style:italic;">Keine Gruppen vorhanden</span>';
+    } else {
+      groups.forEach(g => {
+        const badge = document.createElement('span');
+        badge.className = 'user-badge';
+        badge.style.cssText = 'font-size:0.75rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);';
+        badge.innerText = g;
+        groupsEl.appendChild(badge);
+      });
+    }
+
+    // Counts
+    document.getElementById('utc-count-all').innerText = currentUtcData.tilesCount;
+    document.getElementById('utc-count-visible').innerText = currentUtcData.visibleCount;
+    document.getElementById('utc-count-hidden').innerText = currentUtcData.hiddenCount;
+
+    filterUtcTiles('all');
+    
+    document.getElementById('user-tiles-check-loading').style.display = 'none';
+    document.getElementById('user-tiles-check-body').style.display = 'block';
+  } catch (err) {
+    document.getElementById('user-tiles-check-loading').innerHTML = `
+      <div style="color:var(--error-color); font-weight:600;">
+        <i class="fa-solid fa-triangle-exclamation fa-2xl"></i>
+        <p style="margin-top:15px;">${escapeHtml(err.message)}</p>
+      </div>
+    `;
+  }
+}
+
+function filterUtcTiles(filter) {
+  currentUtcFilter = filter;
+  ['all', 'visible', 'hidden'].forEach(f => {
+    const btn = document.getElementById(`utc-filter-${f}`);
+    if (btn) {
+      if (f === filter) {
+        btn.classList.add('active-utc-filter');
+        btn.style.background = 'var(--accent-color)';
+        btn.style.color = '#fff';
+      } else {
+        btn.classList.remove('active-utc-filter');
+        btn.style.background = '';
+        btn.style.color = '';
+      }
+    }
+  });
+  renderUtcTilesList();
+}
+
+function renderUtcTilesList() {
+  if (!currentUtcData) return;
+  const container = document.getElementById('utc-tiles-list');
+  const searchQuery = (document.getElementById('utc-tile-search')?.value || '').trim().toLowerCase();
+
+  let list = currentUtcData.evaluations;
+
+  if (currentUtcFilter === 'visible') {
+    list = list.filter(item => item.evaluation.visible);
+  } else if (currentUtcFilter === 'hidden') {
+    list = list.filter(item => !item.evaluation.visible);
+  }
+
+  if (searchQuery) {
+    list = list.filter(item => {
+      const title = (item.title || '').toLowerCase();
+      const cat = (item.category || '').toLowerCase();
+      const reason = (item.evaluation.reason || '').toLowerCase();
+      return title.includes(searchQuery) || cat.includes(searchQuery) || reason.includes(searchQuery);
+    });
+  }
+
+  container.innerHTML = '';
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:20px; font-size:0.9rem;">Keine Kacheln entsprechen den Filterkriterien.</div>';
+    return;
+  }
+
+  list.forEach(item => {
+    const ev = item.evaluation;
+    const isVisible = ev.visible;
+
+    const card = document.createElement('div');
+    card.style.cssText = `
+      background: ${isVisible ? 'rgba(74, 222, 128, 0.06)' : 'rgba(239, 68, 68, 0.06)'};
+      border: 1px solid ${isVisible ? 'rgba(74, 222, 128, 0.25)' : 'rgba(239, 68, 68, 0.25)'};
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    `;
+
+    let visSettingLabel = item.visibility;
+    if (item.visibility === 'public') visSettingLabel = 'Öffentlich';
+    else if (item.visibility === 'only_public') visSettingLabel = 'Nur öffentlich (Gäste)';
+    else if (item.visibility === 'logged_in') visSettingLabel = 'Alle angemeldeten Benutzer';
+    else if (item.visibility === 'groups') {
+      let allowed = [];
+      try { allowed = typeof item.allowed_groups === 'string' ? JSON.parse(item.allowed_groups) : item.allowed_groups; } catch(e){}
+      visSettingLabel = `Gruppen: [${(allowed || []).join(', ')}]`;
+    }
+
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:34px; height:34px; border-radius:8px; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:1.1rem; color:var(--accent-color);">
+            <i class="${item.icon || 'fa-solid fa-cube'}"></i>
+          </div>
+          <div>
+            <strong style="font-size:0.98rem; color:var(--text-color);">${escapeHtml(item.title)}</strong>
+            <span style="font-size:0.78rem; color:var(--text-secondary); margin-left:8px; background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:4px;">${escapeHtml(item.category || 'Allgemein')}</span>
+          </div>
+        </div>
+        
+        <div>
+          ${isVisible 
+            ? '<span class="user-badge" style="background:rgba(74,222,128,0.2); color:#4ade80; border:1px solid rgba(74,222,128,0.4); font-weight:700;"><i class="fa-solid fa-check"></i> SICHTBAR</span>' 
+            : '<span class="user-badge" style="background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.4); font-weight:700;"><i class="fa-solid fa-eye-slash"></i> AUSGEBLENDET</span>'}
+        </div>
+      </div>
+
+      <div style="font-size:0.85rem; line-height:1.45; color:${isVisible ? 'var(--text-color)' : '#fca5a5'}; background:rgba(0,0,0,0.15); padding:8px 12px; border-radius:6px;">
+        <strong>Regel / Erläuterung:</strong> ${escapeHtml(ev.reason)}
+      </div>
+
+      <div style="font-size:0.78rem; color:var(--text-secondary); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <span>Konfiguriert als: <strong>${escapeHtml(visSettingLabel)}</strong></span>
+        ${item.is_time_locked === 1 ? '<span style="color:#f59e0b;"><i class="fa-solid fa-clock"></i> Aktuell zeitsperrt</span>' : ''}
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
 }
 
 function openUserForm(user = null) {
