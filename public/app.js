@@ -429,7 +429,11 @@ async function loadTiles(isSilentHeartbeat = false) {
       
       if (isLocked) {
         tileCard.className = 'tile-card glass-panel time-locked';
-        tileCard.onclick = function(e) { e.preventDefault(); return false; };
+        tileCard.onclick = function(e) {
+          e.preventDefault();
+          openTileStatusInfoModal('time-locked', tile.title, tile.time_limit_start, tile.time_limit_end, '');
+          return false;
+        };
       } else {
         tileCard.className = 'tile-card glass-panel';
         // SSO-Gateway Link als Href nutzen
@@ -448,20 +452,17 @@ async function loadTiles(isSilentHeartbeat = false) {
       let keyBtnHtml = '';
       if (currentUser && isSph) {
         if (isLocked) {
-          keyBtnHtml = `<button class="tile-key-btn disabled" disabled onclick="event.preventDefault(); event.stopPropagation(); return false;" title="Schulportal ist im gesperrten Zeitraum nicht verfügbar"><i class="fa-solid fa-link-slash"></i></button>`;
+          keyBtnHtml = `<button class="tile-key-btn disabled" disabled onclick="event.preventDefault(); event.stopPropagation(); return false;" title="Schulportal ist während der Zeitsperre nicht verfügbar"><i class="fa-solid fa-link-slash"></i></button>`;
         } else {
           keyBtnHtml = `<button class="tile-key-btn" id="tile-key-btn-${tile.id}" onclick="openSphCredentialsModal(event, ${tile.id}, ${tile.open_in_new_tab === 1})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
         }
       }
 
       let badgeHtml = '';
-      let reasonHtml = '';
       if (isLocked) {
-        badgeHtml = `<span class="tile-badge badge-locked" title="Aktuell im gesperrten Zeitraum"><i class="fa-solid fa-clock"></i> Gesperrt</span>`;
-        reasonHtml = `<div class="tile-status-reason locked-reason"><i class="fa-solid fa-clock"></i> Im Sperrzeitraum gesperrt</div>`;
+        badgeHtml = `<span class="tile-badge badge-locked" title="Aktivierte Zeitsperre"><i class="fa-solid fa-clock"></i> Zeitsperre</span>`;
       } else {
         badgeHtml = `<span class="tile-badge badge-offline" id="tile-badge-${tile.id}" style="display: none;"><i class="fa-solid fa-triangle-exclamation"></i> Offline</span>`;
-        reasonHtml = `<div class="tile-status-reason offline-reason" id="tile-status-reason-${tile.id}" style="display: none;"></div>`;
       }
       
       tileCard.innerHTML = `
@@ -472,14 +473,13 @@ async function loadTiles(isSilentHeartbeat = false) {
           <div class="tile-header-actions">
             ${keyBtnHtml}
             ${badgeHtml}
-            <span class="status-dot ${isLocked ? '' : 'checking'}" id="status-dot-${tile.id}" title="${isLocked ? 'Im gesperrten Zeitraum' : 'Prüfe Status...'}"></span>
+            <span class="status-dot ${isLocked ? '' : 'checking'}" id="status-dot-${tile.id}" title="${isLocked ? 'Aktivierte Zeitsperre' : 'Prüfe Status...'}"></span>
           </div>
         </div>
         <div class="tile-body">
           <h4 class="tile-title">${tile.title}</h4>
           <div class="tile-bottom-content">
             <p class="tile-description">${tile.description || ''}</p>
-            ${reasonHtml}
           </div>
         </div>
         <div class="tile-bg-glow"></div>
@@ -492,7 +492,7 @@ async function loadTiles(isSilentHeartbeat = false) {
         const dot = document.getElementById(`status-dot-${tile.id}`);
         if (dot) {
           dot.className = 'status-dot';
-          dot.setAttribute('title', 'Dienst aktuell im gesperrten Zeitraum');
+          dot.setAttribute('title', 'Aktivierte Zeitsperre');
         }
       } else {
         if (tile.disable_status_check === 1) {
@@ -502,7 +502,7 @@ async function loadTiles(isSilentHeartbeat = false) {
             dot.setAttribute('title', 'Statusprüfung deaktiviert (Standardmäßig erreichbar)');
           }
         } else {
-          checkTileStatus(tile.id, tile.link);
+          checkTileStatus(tile.id, tile.link, tile.title);
         }
       }
     });
@@ -546,11 +546,10 @@ document.addEventListener('visibilitychange', () => {
  * Prüft die Erreichbarkeit einer Kachel asynchron über den MSO Cloud Server-Checker.
  * Erkennt auch Verbindungsabbrüche (ERR_CONNECTION_CLOSED / ECONNRESET).
  */
-function checkTileStatus(tileId, link) {
+function checkTileStatus(tileId, link, tileTitle) {
   const dot = document.getElementById(`status-dot-${tileId}`);
   const card = document.getElementById(`tile-card-${tileId}`);
   const badge = document.getElementById(`tile-badge-${tileId}`);
-  const reason = document.getElementById(`tile-status-reason-${tileId}`);
   const keyBtn = document.getElementById(`tile-key-btn-${tileId}`);
 
   let pingLink = link;
@@ -567,7 +566,6 @@ function checkTileStatus(tileId, link) {
           dot.setAttribute('title', result.reason || 'Erreichbar');
         }
         if (badge) badge.style.display = 'none';
-        if (reason) reason.style.display = 'none';
       } else {
         if (dot) {
           dot.className = 'status-dot offline';
@@ -577,11 +575,7 @@ function checkTileStatus(tileId, link) {
           badge.style.display = 'inline-flex';
           badge.setAttribute('title', result.reason || 'Dienst aktuell nicht erreichbar');
         }
-        if (reason) {
-          reason.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(result.reason || 'Aktuell nicht erreichbar')}`;
-          reason.style.display = 'block';
-        }
-        disableTileCard(card, keyBtn);
+        disableTileCard(card, keyBtn, tileTitle, result.reason);
       }
     })
     .catch(err => {
@@ -594,27 +588,94 @@ function checkTileStatus(tileId, link) {
         badge.style.display = 'inline-flex';
         badge.setAttribute('title', 'Verbindung fehlgeschlagen');
       }
-      if (reason) {
-        reason.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Verbindung fehlgeschlagen`;
-        reason.style.display = 'block';
-      }
-      disableTileCard(card, keyBtn);
+      disableTileCard(card, keyBtn, tileTitle, 'Verbindung fehlgeschlagen');
     });
 }
 
-function disableTileCard(card, keyBtn) {
+function disableTileCard(card, keyBtn, tileTitle, reason) {
   if (card) {
     card.classList.add('offline-card');
     card.removeAttribute('href');
     card.onclick = function(e) {
       e.preventDefault();
       e.stopPropagation();
+      openTileStatusInfoModal('offline', tileTitle, '', '', reason);
       return false;
     };
   }
   if (keyBtn) {
     keyBtn.style.display = 'none';
   }
+}
+
+/**
+ * Öffnet das Status-Info Modal (Zeitsperre & Offline Erläuterung).
+ */
+function openTileStatusInfoModal(type, tileTitle, timeStart, timeEnd, reason) {
+  const iconWrapper = document.getElementById('tile-info-icon-wrapper');
+  const icon = document.getElementById('tile-info-icon');
+  const title = document.getElementById('tile-info-title');
+  const serviceName = document.getElementById('tile-info-service-name');
+  const messageBox = document.getElementById('tile-info-message-box');
+
+  if (!iconWrapper || !title || !messageBox) return;
+
+  serviceName.innerText = tileTitle || 'Dienst';
+
+  if (type === 'time-locked') {
+    // ZEITSPERRE
+    iconWrapper.style.background = 'rgba(245, 158, 11, 0.15)';
+    iconWrapper.style.border = '2px solid #f59e0b';
+    icon.className = 'fa-solid fa-clock fa-2xl';
+    icon.style.color = '#f59e0b';
+
+    title.innerText = '⏳ Aktivierte Zeitsperre';
+
+    let timeNotice = '';
+    if (timeStart && timeEnd) {
+      timeNotice = `Der Dienst ist regulär im Zeitraum von <strong>${timeStart} Uhr</strong> bis <strong>${timeEnd} Uhr</strong> freigeschaltet.`;
+    } else {
+      timeNotice = 'Dieser Dienst ist im aktuellen Zeitraum zeitlich gesperrt.';
+    }
+
+    messageBox.style.background = 'rgba(245, 158, 11, 0.1)';
+    messageBox.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+    messageBox.style.color = 'var(--text-primary)';
+    messageBox.innerHTML = `
+      <div style="margin-bottom: 8px; font-weight: 700; color: var(--warn-color); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-clock"></i> Aktuell außerhalb der Nutzungszeit
+      </div>
+      <div>
+        Dieser Dienst ist derzeit aufgrund einer aktiven Zeitsperre deaktiviert.<br><br>
+        ${timeNotice}<br><br>
+        Bitte komme außerhalb der Sperrzeit wieder, um den Dienst zu nutzen.
+      </div>
+    `;
+  } else if (type === 'offline') {
+    // OFFLINE
+    iconWrapper.style.background = 'rgba(239, 68, 68, 0.15)';
+    iconWrapper.style.border = '2px solid #ef4444';
+    icon.className = 'fa-solid fa-triangle-exclamation fa-2xl';
+    icon.style.color = '#ef4444';
+
+    title.innerText = '⚠️ Dienst aktuell nicht erreichbar';
+
+    messageBox.style.background = 'rgba(239, 68, 68, 0.1)';
+    messageBox.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+    messageBox.style.color = 'var(--text-primary)';
+    messageBox.innerHTML = `
+      <div style="margin-bottom: 8px; font-weight: 700; color: var(--error-color); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-server"></i> Server / Verbindung getrennt
+      </div>
+      <div>
+        Derzeit steht dieser Dienst leider nicht zur Verfügung (${escapeHtml(reason || 'Verbindung fehlgeschlagen')}).<br><br>
+        <strong>Die System-Administratoren sind bereits informiert.</strong><br><br>
+        Du musst aktuell nichts weiter tun. Bitte versuche es zu einem späteren Zeitpunkt erneut.
+      </div>
+    `;
+  }
+
+  openModal('tile-status-info-modal');
 }
 
 /* ==========================================================================
