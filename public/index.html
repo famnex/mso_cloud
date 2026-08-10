@@ -1759,86 +1759,133 @@
     </div>
   </div>
 
-  <!-- MODAL: ONBOARDING ERSTLOGIN ZUGANGSDATEN HINWEIS -->
+  <!-- MODAL: ONBOARDING ERSTLOGIN ASSISTENT (SCHRITT FÜR SCHRITT WIZARD) -->
   <div class="modal" id="onboarding-credentials-modal">
-    <div class="modal-content glass-panel" style="max-width: 620px; padding: 28px;">
-      <span class="close-btn" onclick="closeModal('onboarding-credentials-modal')"><i class="fa-solid fa-xmark"></i></span>
+    <div class="modal-content glass-panel" style="max-width: 520px; padding: 22px 20px; max-height: calc(100dvh - 30px); overflow-y: auto; box-sizing: border-box;">
       
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); border: 1.5px solid var(--accent-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);">
-          <i class="fa-solid fa-key fa-2xl" style="color: var(--accent-color);"></i>
+      <!-- Progress Bar / Step Indicators -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+        <span id="ob-step-badge" style="font-size: 0.8rem; font-weight: 700; color: var(--accent-color); background: rgba(59,130,246,0.15); padding: 4px 10px; border-radius: 20px;">
+          Schritt <span id="ob-step-num">1</span> von 3
+        </span>
+        
+        <!-- Step Dots -->
+        <div style="display: flex; gap: 6px;" id="ob-step-dots">
+          <span class="ob-dot active" id="ob-dot-1" style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-color); display: inline-block; transition: all 0.3s;"></span>
+          <span class="ob-dot" id="ob-dot-2" style="width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-block; transition: all 0.3s;"></span>
+          <span class="ob-dot" id="ob-dot-3" style="width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-block; transition: all 0.3s;"></span>
         </div>
-        <h3 style="font-weight:800; font-size:1.45rem; color: var(--text-color); margin-bottom: 6px;">
-          Wichtig: Das sind deine Zugangsdaten!
-        </h3>
-        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; max-width: 520px; margin: 0 auto;">
-          Der Erstlogin per E-Mail dient nur zur Einrichtung. Für den täglichen Login an <strong>Schul-PCs, im WLAN (WLAN-Zugang)</strong> und im <strong>MSO-Cloud Portal</strong> benötigst du folgende Benutzerdaten:
-        </p>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        
-        <!-- Box 1: MSO Benutzername -->
-        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 0.8rem; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
-              <i class="fa-solid fa-user"></i> Dein MSO-Benutzername (Login-ID)
+      <!-- SCHRITT 1: BENUTZERNAME -->
+      <div id="ob-step-1-content" class="ob-wizard-step" style="display: block;">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); border: 1.5px solid var(--accent-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+            <i class="fa-solid fa-user-gear fa-xl" style="color: var(--accent-color);"></i>
+          </div>
+          <h3 style="font-weight:800; font-size:1.3rem; color: var(--text-color); margin-bottom: 4px;">
+            Schritt 1: Dein MSO-Benutzername
+          </h3>
+          <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+            Der Erstlogin per E-Mail dient nur zur Registrierung. Für den täglichen Login benötigst du deinen persönlichen Benutzernamen:
+          </p>
+        </div>
+
+        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-id-card"></i> Dein MSO-Benutzername (Login-ID)
             </span>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="copyOnboardingValue('ob-username', this)" style="padding: 3px 10px; font-size: 0.78rem;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="copyOnboardingValue('ob-username', this)" style="padding: 4px 10px; font-size: 0.76rem;">
               <i class="fa-solid fa-copy"></i> Kopieren
             </button>
           </div>
-          <div id="ob-username" style="font-size: 1.35rem; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 1px; word-break: break-all;">
+          <div id="ob-username" style="font-size: 1.4rem; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 1px; word-break: break-all; margin: 4px 0 10px 0;">
             -
           </div>
-          <div style="margin-top: 10px; font-size: 0.82rem; color: var(--text-color); line-height: 1.45; background: rgba(0,0,0,0.18); padding: 9px 12px; border-radius: 8px; border-left: 3px solid #f59e0b;">
+          <div style="font-size: 0.81rem; color: var(--text-color); line-height: 1.45; background: rgba(0,0,0,0.2); padding: 9px 12px; border-radius: 8px; border-left: 3px solid #f59e0b;">
             <strong style="color: #f59e0b;"><i class="fa-solid fa-triangle-exclamation"></i> Wichtiger Hinweis:</strong><br>
-            Deine E-Mail-Adresse ist <u>nicht</u> dein Benutzername! Bitte verwende für alle Logins (Anmeldung am Schul-PC, WLAN-Zugang und MSO Cloud) genau diesen Benutzernamen.
+            Deine E-Mail-Adresse ist <u>nicht</u> dein Benutzername! Für die Anmeldung am Schul-PC, WLAN-Zugang und MSO Cloud musst du genau diesen Benutzernamen verwenden.
           </div>
         </div>
+      </div>
 
-        <!-- Box 2: MSO Startpasswort -->
-        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 0.8rem; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
-              <i class="fa-solid fa-lock"></i> Dein MSO-Passwort (Startpasswort)
+      <!-- SCHRITT 2: PASSWORT & WLAN -->
+      <div id="ob-step-2-content" class="ob-wizard-step" style="display: none;">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); border: 1.5px solid var(--accent-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+            <i class="fa-solid fa-lock fa-xl" style="color: var(--accent-color);"></i>
+          </div>
+          <h3 style="font-weight:800; font-size:1.3rem; color: var(--text-color); margin-bottom: 4px;">
+            Schritt 2: Dein MSO-Passwort & WLAN
+          </h3>
+          <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+            Das ist dein persönliches Passwort für das Schulnetzwerk, die Schul-PCs und das MSO-Cloud Portal:
+          </p>
+        </div>
+
+        <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-key"></i> Dein MSO-Startpasswort
             </span>
-            <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOnboardingPass()" id="ob-pass-eye-btn" style="padding: 3px 10px; font-size: 0.78rem;">
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOnboardingPass()" id="ob-pass-eye-btn" style="padding: 4px 10px; font-size: 0.76rem;">
                 <i class="fa-solid fa-eye" id="ob-pass-eye-icon"></i> Einblenden
               </button>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="copyOnboardingValue('ob-password-raw', this)" style="padding: 3px 10px; font-size: 0.78rem;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="copyOnboardingValue('ob-password-raw', this)" style="padding: 4px 10px; font-size: 0.76rem;">
                 <i class="fa-solid fa-copy"></i> Kopieren
               </button>
             </div>
           </div>
-          <div id="ob-password-masked" style="font-size: 1.35rem; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 2px;">
+          <div id="ob-password-masked" style="font-size: 1.4rem; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 2px; margin: 4px 0 10px 0;">
             ••••••••
           </div>
           <input type="hidden" id="ob-password-raw" value="">
-          <div style="margin-top: 10px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45; background: rgba(0,0,0,0.18); padding: 9px 12px; border-radius: 8px;">
+          <div style="font-size: 0.81rem; color: var(--text-secondary); line-height: 1.45; background: rgba(0,0,0,0.2); padding: 9px 12px; border-radius: 8px;">
             <i class="fa-solid fa-wifi" style="color: var(--accent-color); margin-right: 4px;"></i>
-            Mit dieser Benutzername/Passwort-Kombination kommst du auch ins <strong>Schul-WLAN</strong> und an die <strong>Rechner in den Computerräumen</strong>. Bitte merke dir die Daten gut!
+            Mit dieser Benutzername/Passwort-Kombination meldest du dich auch im <strong>Schul-WLAN</strong> und an den <strong>Rechnern in den Computerräumen</strong> an. Bitte merke dir die Daten gut!
           </div>
         </div>
+      </div>
 
-        <!-- Box 3: Schulportal Hessen (SPH) Hinweis -->
-        <div id="ob-sph-box" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 16px;">
-          <h4 style="font-size: 0.92rem; font-weight: 700; color: #f59e0b; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-graduation-cap"></i> Hinweis zum Schulportal Hessen (SPH)
-          </h4>
-          <p style="font-size: 0.83rem; color: var(--text-color); line-height: 1.45; margin: 0;" id="ob-sph-text">
-            Das Schulportal Hessen ist ein externes System und besitzt eigene Zugangsdaten. Sobald du dieses Fenster schließt, findest du direkt unter "Zugänge" deine hinterlegten SPH-Daten sowie Anleitungen.
+      <!-- SCHRITT 3: SCHULPORTAL HESSEN (SPH) & ABSCHLUSS -->
+      <div id="ob-step-3-content" class="ob-wizard-step" style="display: none;">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); border: 1.5px solid #f59e0b; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+            <i class="fa-solid fa-graduation-cap fa-xl" style="color: #f59e0b;"></i>
+          </div>
+          <h3 style="font-weight:800; font-size:1.3rem; color: var(--text-color); margin-bottom: 4px;">
+            Schritt 3: Schulportal Hessen (SPH)
+          </h3>
+          <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+            Hinweis zum Schulportal Hessen:
           </p>
         </div>
 
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+          <h4 style="font-size: 0.9rem; font-weight: 700; color: #f59e0b; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-info"></i> Eigenes System mit eigenen Logins
+          </h4>
+          <p style="font-size: 0.83rem; color: var(--text-color); line-height: 1.5; margin: 0;" id="ob-sph-text">
+            Das Schulportal Hessen ist ein externes System und besitzt eigene Zugangsdaten. Sobald du diesen Assistenten beendest, findest du direkt unter <strong>"Zugänge"</strong> deine hinterlegten SPH-Daten sowie Anleitungen zum Passwort-Reset.
+          </p>
+        </div>
       </div>
 
-      <div style="display:flex; justify-content:center; margin-top:22px;">
-        <button type="button" class="btn btn-primary" onclick="closeModal('onboarding-credentials-modal')" style="padding: 12px 28px; font-size: 0.98rem; font-weight: 700; width: 100%; justify-content: center;">
-          <i class="fa-solid fa-circle-check"></i> Ich habe mir meine Zugangsdaten gemerkt
+      <!-- FOOTER NAVIGATION BUTTONS -->
+      <div style="display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary" id="ob-btn-prev" onclick="changeOnboardingStep(-1)" style="display: none; flex: 1; padding: 10px 14px; font-weight: 600; font-size: 0.9rem;">
+          <i class="fa-solid fa-arrow-left"></i> Zurück
+        </button>
+        <button type="button" class="btn btn-primary" id="ob-btn-next" onclick="changeOnboardingStep(1)" style="flex: 2; padding: 10px 14px; font-weight: 700; font-size: 0.9rem; justify-content: center;">
+          Weiter zu Schritt 2 <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button type="button" class="btn btn-primary" id="ob-btn-finish" onclick="closeModal('onboarding-credentials-modal')" style="display: none; flex: 2; padding: 10px 14px; font-weight: 700; font-size: 0.9rem; background: var(--success-color); border-color: var(--success-color); justify-content: center;">
+          <i class="fa-solid fa-circle-check"></i> Ich habe mir alles gemerkt
         </button>
       </div>
+
     </div>
   </div>
 

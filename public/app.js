@@ -3984,8 +3984,9 @@ async function handleStudentTokenLogin(token) {
   }
 }
 
-/* --- ONBOARDING & ERSTLOGIN HINWEIS OVERLAY --- */
+/* --- ONBOARDING & ERSTLOGIN ASSISTENT (WIZARD) --- */
 let isOnboardingPassRevealed = false;
+let currentOnboardingStep = 1;
 
 function openOnboardingCredentialsModal() {
   if (!currentUser) return;
@@ -4019,13 +4020,77 @@ function openOnboardingCredentialsModal() {
   if (sphTextEl) {
     const sphUsername = document.getElementById('student-sph-username-display')?.innerText;
     if (sphUsername && sphUsername !== '-') {
-      sphTextEl.innerHTML = `Das Schulportal Hessen (SPH) ist ein externes System mit eigenen Zugangsdaten. Für dein Konto sind SPH-Zugangsdaten hinterlegt als: <strong style="color:var(--accent-color);">${escapeHtml(sphUsername)}</strong>. Sobald du dieses Fenster schließt, findest du unter "Zugänge" deine Schulportal-Daten sowie Hilfe zum Passwort-Reset.`;
+      sphTextEl.innerHTML = `Das Schulportal Hessen (SPH) ist ein externes System mit eigenen Zugangsdaten. Für dein Konto sind SPH-Zugangsdaten hinterlegt als: <strong style="color:var(--accent-color);">${escapeHtml(sphUsername)}</strong>. Sobald du diesen Assistenten beendest, findest du unter "Zugänge" deine Schulportal-Daten sowie Hilfe zum Passwort-Reset.`;
     } else {
-      sphTextEl.innerHTML = `Das Schulportal Hessen (SPH) ist ein externes System und besitzt eigene Zugangsdaten. Sobald du dieses Fenster schließt, findest du direkt unter <strong>"Zugänge"</strong> Möglichkeiten, deine Schulportal-Daten einzutragen oder zurückzusetzen.`;
+      sphTextEl.innerHTML = `Das Schulportal Hessen (SPH) ist ein externes System und besitzt eigene Zugangsdaten. Sobald du diesen Assistenten beendest, findest du direkt unter <strong>"Zugänge"</strong> Möglichkeiten, deine Schulportal-Daten einzutragen oder zurückzusetzen.`;
     }
   }
 
+  // Auf Schritt 1 zurücksetzen
+  setOnboardingStep(1);
+
   openModal('onboarding-credentials-modal');
+}
+
+function setOnboardingStep(step) {
+  currentOnboardingStep = step;
+  if (currentOnboardingStep < 1) currentOnboardingStep = 1;
+  if (currentOnboardingStep > 3) currentOnboardingStep = 3;
+
+  // Inhalte umschalten
+  const step1 = document.getElementById('ob-step-1-content');
+  const step2 = document.getElementById('ob-step-2-content');
+  const step3 = document.getElementById('ob-step-3-content');
+
+  if (step1) step1.style.display = currentOnboardingStep === 1 ? 'block' : 'none';
+  if (step2) step2.style.display = currentOnboardingStep === 2 ? 'block' : 'none';
+  if (step3) step3.style.display = currentOnboardingStep === 3 ? 'block' : 'none';
+
+  // Badge & Dots
+  const stepNumEl = document.getElementById('ob-step-num');
+  if (stepNumEl) stepNumEl.innerText = currentOnboardingStep;
+
+  [1, 2, 3].forEach(i => {
+    const dot = document.getElementById(`ob-dot-${i}`);
+    if (dot) {
+      if (i === currentOnboardingStep) {
+        dot.style.background = 'var(--accent-color)';
+        dot.style.transform = 'scale(1.2)';
+      } else {
+        dot.style.background = 'rgba(255,255,255,0.2)';
+        dot.style.transform = 'scale(1)';
+      }
+    }
+  });
+
+  // Buttons umschalten
+  const prevBtn = document.getElementById('ob-btn-prev');
+  const nextBtn = document.getElementById('ob-btn-next');
+  const finishBtn = document.getElementById('ob-btn-finish');
+
+  if (currentOnboardingStep === 1) {
+    if (prevBtn) prevBtn.style.display = 'none';
+    if (nextBtn) {
+      nextBtn.style.display = 'inline-flex';
+      nextBtn.innerHTML = 'Weiter zu Schritt 2 <i class="fa-solid fa-arrow-right" style="margin-left: 6px;"></i>';
+    }
+    if (finishBtn) finishBtn.style.display = 'none';
+  } else if (currentOnboardingStep === 2) {
+    if (prevBtn) prevBtn.style.display = 'inline-flex';
+    if (nextBtn) {
+      nextBtn.style.display = 'inline-flex';
+      nextBtn.innerHTML = 'Weiter zu Schritt 3 <i class="fa-solid fa-arrow-right" style="margin-left: 6px;"></i>';
+    }
+    if (finishBtn) finishBtn.style.display = 'none';
+  } else if (currentOnboardingStep === 3) {
+    if (prevBtn) prevBtn.style.display = 'inline-flex';
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (finishBtn) finishBtn.style.display = 'inline-flex';
+  }
+}
+
+function changeOnboardingStep(delta) {
+  setOnboardingStep(currentOnboardingStep + delta);
 }
 
 function toggleOnboardingPass() {
