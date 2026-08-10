@@ -18,6 +18,13 @@ router.get('/check-status', async (req, res) => {
     return res.status(400).json({ online: false, reason: 'Keine URL angegeben' });
   }
 
+  let hasResponded = false;
+  const sendResult = (data) => {
+    if (hasResponded || res.headersSent) return;
+    hasResponded = true;
+    return res.json(data);
+  };
+
   try {
     const parsedUrl = new URL(targetUrl);
     const protocol = parsedUrl.protocol === 'https:' ? https : http;
@@ -36,24 +43,23 @@ router.get('/check-status', async (req, res) => {
 
     const checkReq = protocol.request(requestOptions, (checkRes) => {
       // Alle Statuscodes von 200 bis 499 bedeuten, dass der Webserver aktiv antwortet und erreichbar ist
-      // (z. B. 200 OK, 302 Redirect, 400 Bad Request bei fehlenden Params, 401/403 Login-Schutz, 405 Method Not Allowed)
       const isOnline = checkRes.statusCode >= 200 && checkRes.statusCode < 500;
       if (isOnline) {
-        return res.json({ online: true, statusCode: checkRes.statusCode, reason: `Erreichbar (HTTP ${checkRes.statusCode})` });
+        sendResult({ online: true, statusCode: checkRes.statusCode, reason: `Erreichbar (HTTP ${checkRes.statusCode})` });
       } else {
         // Status 5xx (500, 502 Bad Gateway, 503 Service Unavailable, 504 Timeout) bedeuten echten Serverausfall
-        return res.json({ online: false, statusCode: checkRes.statusCode, reason: `Dienst meldet Serverfehler (HTTP ${checkRes.statusCode})` });
+        sendResult({ online: false, statusCode: checkRes.statusCode, reason: `Dienst meldet Serverfehler (HTTP ${checkRes.statusCode})` });
       }
     });
 
     checkReq.on('timeout', () => {
       checkReq.destroy();
-      return res.json({ online: false, reason: 'Zeitüberschreitung (Timeout nach 5s)' });
+      sendResult({ online: false, reason: 'Zeitüberschreitung (Timeout nach 5s)' });
     });
 
     checkReq.on('error', (err) => {
       console.warn(`[MSO Status-Checker] Verbindung fehlgeschlagen für ${targetUrl}: ${err.code || err.message}`);
-      return res.json({ 
+      sendResult({ 
         online: false, 
         errorCode: err.code || 'CONNECTION_ERROR', 
         reason: 'Dienst nicht erreichbar (Verbindung fehlgeschlagen / Server geschlossen)' 
@@ -62,7 +68,7 @@ router.get('/check-status', async (req, res) => {
 
     checkReq.end();
   } catch (err) {
-    return res.json({ online: false, reason: 'Ungültige URL oder Netzwerkfehler: ' + err.message });
+    sendResult({ online: false, reason: 'Ungültige URL oder Netzwerkfehler: ' + err.message });
   }
 });
 
