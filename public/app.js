@@ -1579,7 +1579,9 @@ async function loadAdminConfig() {
     }
     const loginIpWhitelistInput = document.getElementById('login_ip_whitelist');
     if (loginIpWhitelistInput) {
-      loginIpWhitelistInput.value = cfg.login_ip_whitelist || '';
+      const rawWhitelist = cfg.login_ip_whitelist || '';
+      const formattedIps = rawWhitelist.split(/[\r\n,\s]+/).map(ip => ip.trim()).filter(Boolean);
+      loginIpWhitelistInput.value = formattedIps.join('\n');
     }
 
     // Schülerausweis Felder befüllen
@@ -2006,7 +2008,9 @@ async function saveGeneralConfig(e) {
     platform_logo: document.getElementById('platform_logo').value,
     login_max_attempts: document.getElementById('login_max_attempts') ? document.getElementById('login_max_attempts').value.trim() : '5',
     login_lockout_duration_min: document.getElementById('login_lockout_duration_min') ? document.getElementById('login_lockout_duration_min').value.trim() : '15',
-    login_ip_whitelist: document.getElementById('login_ip_whitelist') ? document.getElementById('login_ip_whitelist').value.trim() : ''
+    login_ip_whitelist: document.getElementById('login_ip_whitelist') 
+      ? document.getElementById('login_ip_whitelist').value.trim().split(/[\r\n,\s]+/).map(ip => ip.trim()).filter(Boolean).join('\n') 
+      : ''
   };
 
   try {

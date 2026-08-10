@@ -567,9 +567,9 @@
 
               <div class="form-group" style="margin-bottom: 20px;">
                 <label for="login_ip_whitelist">IP-Whitelist (Ausnahmen)</label>
-                <textarea id="login_ip_whitelist" class="form-control" rows="3" placeholder="z. B. 127.0.0.1, 10.0.0.0/8, 192.168.1.0/24 (IPs oder Subnetze durch Komma oder Zeilenumbruch getrennt)"></textarea>
-                <small style="color: var(--text-secondary); font-size: 0.78rem; line-height: 1.3; display: block; margin-top: 5px;">
-                  <i class="fa-solid fa-circle-info" style="color: var(--accent-color);"></i> IP-Adressen oder Subnetze auf der Whitelist (z. B. Schulnetzwerk-Gateway) werden <strong>niemals gesperrt</strong>. Dadurch wird verhindert, dass einzelne Fehlversuche den Zugang für die gesamte Schule blockieren.
+                <textarea id="login_ip_whitelist" class="form-control" rows="5" placeholder="127.0.0.1&#10;10.0.0.0/8&#10;192.168.1.0/24" style="font-family: monospace; line-height: 1.4;"></textarea>
+                <small style="color: var(--text-secondary); font-size: 0.78rem; line-height: 1.35; display: block; margin-top: 5px;">
+                  <i class="fa-solid fa-circle-info" style="color: var(--accent-color);"></i> Trage <strong>jede IP-Adresse oder jedes Subnetz in eine eigene Zeile</strong> ein. IP-Adressen auf der Whitelist (z. B. Schulnetzwerk-Gateway) werden <strong>niemals gesperrt</strong>.
                 </small>
               </div>
 
