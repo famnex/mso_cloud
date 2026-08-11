@@ -16,23 +16,16 @@ function buildUserClaims(user, firstname, lastname, userRole, cleanGroups = []) 
 
   const claims = {
     sub: String(user.id),
-    username: user.username,
     preferred_username: user.username,
     email: user.email || '',
     name: fullName,
+    firstname: firstname,
+    lastname: lastname,
     fullname: fullName,
-    full_name: fullName,
-    display_name: displayName,
     displayname: displayName,
     untis_name: untisName,
     given_name: firstname,
     family_name: lastname,
-    givenName: firstname,
-    sn: lastname,
-    firstname: firstname,
-    lastname: lastname,
-    first_name: firstname,
-    last_name: lastname,
     user_role: userRole
   };
 
