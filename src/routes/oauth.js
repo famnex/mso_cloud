@@ -7,6 +7,46 @@ const studentDb = require('../student_db');
 const { getOrCreateOidcKeys, getOidcBaseUrl, openidConfigurationHandler, jwksHandler } = require('../oidcHelper');
 
 /**
+ * Baut ein sauberes, strukturiertes Claims-Objekt mit allen Standard- und Alias-Attributen auf.
+ */
+function buildUserClaims(user, firstname, lastname, userRole, cleanGroups = []) {
+  const fullName = `${firstname} ${lastname}`.trim();
+  const displayName = `${lastname}, ${firstname}`.trim();
+  const untisName = `${lastname} ${firstname}`.trim();
+
+  const claims = {
+    sub: String(user.id),
+    username: user.username,
+    preferred_username: user.username,
+    email: user.email || '',
+    name: fullName,
+    fullname: fullName,
+    full_name: fullName,
+    display_name: displayName,
+    displayname: displayName,
+    untis_name: untisName,
+    given_name: firstname,
+    family_name: lastname,
+    givenName: firstname,
+    sn: lastname,
+    firstname: firstname,
+    lastname: lastname,
+    first_name: firstname,
+    last_name: lastname,
+    user_role: userRole
+  };
+
+  if (user.role) {
+    claims.role = user.role;
+  }
+  if (cleanGroups && cleanGroups.length > 0) {
+    claims.groups = cleanGroups;
+  }
+
+  return claims;
+}
+
+/**
  * Normalisiert eine URI für robusten Vergleich (entfernt trailing Slashes, gleicht http/https an).
  */
 function normalizeUri(uri) {
@@ -366,27 +406,10 @@ router.post('/token', async (req, res) => {
 
       const payload = {
         iss: issuer,
-        sub: String(user.id),
         aud: clientId,
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
-        name: `${firstname} ${lastname}`,
-        display_name: `${lastname}, ${firstname}`,
-        displayname: `${lastname}, ${firstname}`,
-        fullname: `${firstname} ${lastname}`,
-        full_name: `${firstname} ${lastname}`,
-        untis_name: `${lastname} ${firstname}`,
-        given_name: firstname,
-        family_name: lastname,
-        givenName: firstname,
-        sn: lastname,
-        firstname: firstname,
-        lastname: lastname,
-        first_name: firstname,
-        last_name: lastname,
-        email: user.email || '',
-        preferred_username: user.username,
-        user_role: userRole
+        ...buildUserClaims(user, firstname, lastname, userRole)
       };
 
       console.log(`[OIDC DEBUG] Token Claims für ${user.username} (${clientName}): given_name="${firstname}", family_name="${lastname}", user_role="${userRole}"`);
@@ -470,30 +493,7 @@ router.get('/userinfo', async (req, res) => {
     });
 
     const userRole = await determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
-
-    const claims = {
-      sub: String(user.id),
-      username: user.username,
-      preferred_username: user.username,
-      email: user.email || '',
-      name: `${firstname} ${lastname}`,
-      display_name: `${lastname}, ${firstname}`,
-      displayname: `${lastname}, ${firstname}`,
-      fullname: `${firstname} ${lastname}`,
-      full_name: `${firstname} ${lastname}`,
-      untis_name: `${lastname} ${firstname}`,
-      given_name: firstname,
-      family_name: lastname,
-      givenName: firstname,
-      sn: lastname,
-      firstname: firstname,
-      lastname: lastname,
-      first_name: firstname,
-      last_name: lastname,
-      role: user.role,
-      groups: cleanGroups,
-      user_role: userRole
-    };
+    const claims = buildUserClaims(user, firstname, lastname, userRole, cleanGroups);
 
     // Client-Name des anfragenenden SSO-Systems für das Log auflösen
     let clientName = 'Unbekanntes SSO-System';
