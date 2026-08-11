@@ -2624,10 +2624,10 @@
 
     function navigateToProfileUpload(event) {
       if (event) event.preventDefault();
-      if (window.parent && window.parent !== window && typeof window.parent.triggerUploadFromReminder === 'function') {
-        window.parent.triggerUploadFromReminder(event);
+      if (window.parent && window.parent !== window && typeof window.parent.showPhotoReminderModalExplicitly === 'function') {
+        window.parent.showPhotoReminderModalExplicitly();
       } else {
-        window.location.href = 'index.html?autoUpload=true#profile';
+        window.location.href = 'index.html?showPhotoReminder=true';
       }
     }
 
