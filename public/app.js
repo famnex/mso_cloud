@@ -1116,13 +1116,12 @@ async function checkAndRunPostLoginModals() {
     if (!res.ok) return;
     const profile = await res.json();
 
-    if (!profile || profile.is_preview) return; // Nicht bei Admin-Vorschau erzeugen
+    if (profile.is_preview) return; // Nicht bei Admin-Vorschau erzeugen
 
-    // Kriterien: Wenn das Bild weder genehmigt noch aktuell in Prüfung eingereicht ist
-    const isApproved = profile.card_status === 'Bild genehmigt' || profile.card_status === 'genehmigt' || ['1132', '1133'].includes(profile.card_status_code);
-    const isSubmitted = profile.card_status === 'Bild eingereicht' || profile.card_status_code === '1131';
+    const noImage = !profile.card_image || ['1130'].includes(profile.card_status_code) || profile.card_status === 'Bild ungeprüft / Kein Bild';
+    const rejectedImage = ['1134'].includes(profile.card_status_code) || profile.card_status === 'Bild abgelehnt';
 
-    if (!isApproved && !isSubmitted) {
+    if (noImage || rejectedImage) {
       showPhotoReminderModalExplicitly();
     }
   } catch (e) {
@@ -1133,12 +1132,7 @@ async function checkAndRunPostLoginModals() {
 // Schließen per Klick außerhalb des Modals oder Dropdowns
 window.onclick = function(event) {
   if (event.target.classList.contains('modal')) {
-    const modalId = event.target.id;
     event.target.style.display = 'none';
-
-    if (modalId === 'news-view-modal' || modalId === 'onboarding-credentials-modal' || modalId === 'sph-info-modal') {
-      setTimeout(checkAndRunPostLoginModals, 350);
-    }
   }
   
   // User Dropdown schließen bei Klick außerhalb
