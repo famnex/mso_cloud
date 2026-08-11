@@ -1940,23 +1940,18 @@
         Schülerausweisbild fehlt
       </h3>
       
-      <p id="photo-reminder-desc" style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.65; margin-bottom: 22px;">
+      <p id="photo-reminder-desc" style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.65; margin-bottom: 25px;">
         Für deinen Schülerausweis ist noch kein Foto hinterlegt. Bitte lade <a href="#" onclick="triggerUploadFromReminder(event)" style="color: var(--accent-color); font-weight: 700; text-decoration: underline;">hier</a> ein passendes Foto hoch, damit dein digitaler Schülerausweis verifiziert und freigeschaltet werden kann.
       </p>
 
-      <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
         <button type="button" class="btn btn-primary" onclick="triggerUploadFromReminder(event)" style="width: 100%; justify-content: center; padding: 13px; font-size: 0.98rem; font-weight: 700; border-radius: 12px; gap: 10px;">
           <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.1rem;"></i>
           <span>Jetzt Foto in Benutzerprofil & Zugänge hochladen</span>
         </button>
-        <div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 4px;">
-          <button type="button" class="btn btn-secondary" onclick="dismissPhotoReminderModal()" style="flex: 1; justify-content: center; padding: 10px; font-size: 0.85rem; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); cursor: pointer;">
-            <i class="fa-solid fa-clock" style="margin-right: 4px;"></i> Später erinnern
-          </button>
-          <button type="button" class="btn btn-secondary" onclick="neverShowPhotoReminderAgain()" style="flex: 1; justify-content: center; padding: 10px; font-size: 0.85rem; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--warn-color, #f59e0b); cursor: pointer;">
-            <i class="fa-solid fa-bell-slash" style="margin-right: 4px;"></i> Nicht mehr erinnern
-          </button>
-        </div>
+        <button type="button" class="btn btn-secondary" onclick="dismissPhotoReminderModal()" style="width: 100%; justify-content: center; padding: 8px; font-size: 0.88rem; border-radius: 10px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;">
+          Später erinnern
+        </button>
       </div>
     </div>
   </div>

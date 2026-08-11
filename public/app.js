@@ -1057,12 +1057,6 @@ function dismissPhotoReminderModal() {
   closeModal('photo-reminder-modal');
 }
 
-function neverShowPhotoReminderAgain() {
-  localStorage.setItem('mso_photo_reminder_never_show', 'true');
-  sessionStorage.setItem('mso_photo_reminder_dismissed', 'true');
-  closeModal('photo-reminder-modal');
-}
-
 async function checkAndRunPostLoginModals() {
   if (!currentUser) return;
 
@@ -1074,8 +1068,7 @@ async function checkAndRunPostLoginModals() {
   const obModal = document.getElementById('onboarding-credentials-modal');
   if (obModal && obModal.style.display === 'flex') return;
 
-  // 3. Wurde die Foto-Erinnerung in dieser Session oder dauerhaft ("Nicht mehr erinnern") quittiert?
-  if (localStorage.getItem('mso_photo_reminder_never_show') === 'true') return;
+  // 3. Wurde die Foto-Erinnerung in dieser Session bereits quittiert?
   if (sessionStorage.getItem('mso_photo_reminder_dismissed') === 'true') return;
 
   // 4. Prüfe, ob es sich um einen Schüler / Ausweisinhaber handelt und kein Bild vorhanden oder abgelehnt ist
