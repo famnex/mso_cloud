@@ -2622,6 +2622,15 @@
     });
     setInterval(loadCardData, 15 * 60 * 1000); // Proaktiv alle 15 Minuten refreshen
 
+    function navigateToProfileUpload(event) {
+      if (event) event.preventDefault();
+      if (window.parent && window.parent !== window && typeof window.parent.triggerUploadFromReminder === 'function') {
+        window.parent.triggerUploadFromReminder(event);
+      } else {
+        window.location.href = 'index.html?autoUpload=true#profile';
+      }
+    }
+
     // Simple Markdown subset renderer (bold, italic, links, list items, line breaks)
     function renderMarkdown(md) {
       if (!md) return '';
@@ -2995,13 +3004,27 @@
         overlayIcon.className = "fa-solid fa-image-portrait revoked-icon";
         overlayIcon.style.color = "var(--accent)";
         overlayTitle.innerText = translations[currentLang].noPhotoTitle;
-        overlayDesc.innerText = reasonPrefix + translations[currentLang].noPhotoDesc;
+        const uploadLinkBtn = `
+          <div style="margin-top: 18px; pointer-events: auto;">
+            <button onclick="navigateToProfileUpload(event)" style="display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 22px; background: var(--accent, #ff6f00); color: #ffffff; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 18px rgba(0,0,0,0.35); cursor: pointer; transition: transform 0.2s ease;">
+              <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.1rem;"></i>
+              <span>Foto in Benutzerprofil & Zugänge hochladen</span>
+            </button>
+          </div>`;
+        overlayDesc.innerHTML = (reasonPrefix + translations[currentLang].noPhotoDesc) + uploadLinkBtn;
         overlay.style.display = 'flex';
       } else if (isRejected) {
         overlayIcon.className = "fa-solid fa-circle-xmark revoked-icon";
         overlayIcon.style.color = "var(--danger)";
         overlayTitle.innerText = translations[currentLang].photoRejectedTitle;
-        overlayDesc.innerText = reasonPrefix + translations[currentLang].photoRejectedDesc;
+        const uploadLinkBtn = `
+          <div style="margin-top: 18px; pointer-events: auto;">
+            <button onclick="navigateToProfileUpload(event)" style="display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 22px; background: var(--accent, #ff6f00); color: #ffffff; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 18px rgba(0,0,0,0.35); cursor: pointer; transition: transform 0.2s ease;">
+              <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.1rem;"></i>
+              <span>Neues Foto in Benutzerprofil & Zugänge hochladen</span>
+            </button>
+          </div>`;
+        overlayDesc.innerHTML = (reasonPrefix + translations[currentLang].photoRejectedDesc) + uploadLinkBtn;
         overlay.style.display = 'flex';
       } else if (isNotVerified) {
         overlayIcon.className = "fa-solid fa-user-clock revoked-icon";
