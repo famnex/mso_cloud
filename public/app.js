@@ -1063,38 +1063,6 @@ function neverShowPhotoReminderAgain() {
   closeModal('photo-reminder-modal');
 }
 
-async function showPhotoReminderModalExplicitly() {
-  if (!currentUser) return;
-  try {
-    const res = await fetch('api/auth/student-profile');
-    if (!res.ok) {
-      openModal('photo-reminder-modal');
-      return;
-    }
-    const profile = await res.json();
-    if (profile.is_preview) return;
-
-    const rejectedImage = ['1134'].includes(profile.card_status_code) || profile.card_status === 'Bild abgelehnt';
-    const titleEl = document.getElementById('photo-reminder-title');
-    const descEl = document.getElementById('photo-reminder-desc');
-    const btnTextEl = document.getElementById('photo-reminder-btn-text');
-
-    if (rejectedImage) {
-      if (titleEl) titleEl.innerText = 'Schülerausweisbild wurde abgelehnt';
-      if (descEl) descEl.innerHTML = 'Dein hochgeladenes Passbild wurde abgelehnt. Bitte lade <a href="#" onclick="triggerUploadFromReminder(event)" style="color: var(--accent-color); font-weight: 700; text-decoration: underline;">hier</a> ein neues passendes Foto für deinen Schülerausweis hoch.';
-      if (btnTextEl) btnTextEl.innerText = 'Neues Foto in Benutzerprofil & Zugänge hochladen';
-    } else {
-      if (titleEl) titleEl.innerText = 'Schülerausweisbild fehlt';
-      if (descEl) descEl.innerHTML = 'Für deinen Schülerausweis ist noch kein Foto hinterlegt. Bitte lade <a href="#" onclick="triggerUploadFromReminder(event)" style="color: var(--accent-color); font-weight: 700; text-decoration: underline;">hier</a> ein passendes Foto hoch, damit dein digitaler Schülerausweis verifiziert und freigeschaltet werden kann.';
-      if (btnTextEl) btnTextEl.innerText = 'Jetzt Foto in Benutzerprofil & Zugänge hochladen';
-    }
-
-    openModal('photo-reminder-modal');
-  } catch (e) {
-    openModal('photo-reminder-modal');
-  }
-}
-
 async function checkAndRunPostLoginModals() {
   if (!currentUser) return;
 
@@ -1122,7 +1090,8 @@ async function checkAndRunPostLoginModals() {
     const rejectedImage = ['1134'].includes(profile.card_status_code) || profile.card_status === 'Bild abgelehnt';
 
     if (noImage || rejectedImage) {
-      showPhotoReminderModalExplicitly();
+      sessionStorage.setItem('mso_photo_reminder_dismissed', 'true');
+      openProfileAndStartUpload();
     }
   } catch (e) {
     console.error('Fehler beim Prüfen des Ausweis-Bildstatus für Login-Hinweis:', e);
