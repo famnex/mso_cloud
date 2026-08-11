@@ -9,10 +9,11 @@ const { getOrCreateOidcKeys, getOidcBaseUrl, openidConfigurationHandler, jwksHan
 /**
  * Baut ein sauberes, strukturiertes Claims-Objekt mit allen Standard- und Alias-Attributen auf.
  */
-function buildUserClaims(user, firstname, lastname, userRole, cleanGroups = []) {
+function buildUserClaims(user, firstname, lastname, userRole, cleanGroups = [], untisUsername = '') {
   const fullName = `${firstname} ${lastname}`.trim();
   const displayName = `${lastname}, ${firstname}`.trim();
   const untisName = `${lastname} ${firstname}`.trim();
+  const finalUntisUsername = (untisUsername && untisUsername.trim()) ? untisUsername.trim() : user.username;
 
   const claims = {
     sub: String(user.id),
@@ -24,6 +25,7 @@ function buildUserClaims(user, firstname, lastname, userRole, cleanGroups = []) 
     fullname: fullName,
     displayname: displayName,
     untis_name: untisName,
+    untis_username: finalUntisUsername,
     given_name: firstname,
     family_name: lastname,
     user_role: userRole
@@ -58,8 +60,9 @@ function normalizeUri(uri) {
 async function resolveUserNames(user) {
   let firstname = user.first_name ? String(user.first_name).trim() : '';
   let lastname = user.last_name ? String(user.last_name).trim() : '';
+  let untisUsername = user.untis_username ? String(user.untis_username).trim() : '';
 
-  // 1. Primär: Schüler-Profil über student_db abfragen (MySQL dynamic fieldvalues: field 1 = first_name, field 2 = last_name)
+  // 1. Primär: Schüler-Profil über student_db abfragen (MySQL dynamic fieldvalues: field 1 = first_name, field 2 = last_name, field 167 = untis_username)
   if (user && (user.id || user.username || user.email)) {
     try {
       const studentProf = await studentDb.getStudentProfile(user);
@@ -69,6 +72,9 @@ async function resolveUserNames(user) {
         }
         if (studentProf.last_name && studentProf.last_name.trim()) {
           lastname = String(studentProf.last_name).trim();
+        }
+        if (studentProf.untis_username && studentProf.untis_username.trim()) {
+          untisUsername = String(studentProf.untis_username).trim();
         }
       }
     } catch (e) {
@@ -121,7 +127,7 @@ async function resolveUserNames(user) {
     lastname = 'Administrator';
   }
 
-  return { firstname, lastname };
+  return { firstname, lastname, untisUsername };
 }
 
 /**
@@ -385,7 +391,7 @@ router.post('/token', async (req, res) => {
     const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn, first_name, last_name FROM users WHERE id = ?').get(codeRow.user_id);
     
     if (user) {
-      const { firstname, lastname } = await resolveUserNames(user);
+      const { firstname, lastname, untisUsername } = await resolveUserNames(user);
       const issuer = getOidcBaseUrl(req);
       const { privateKeyPem } = getOrCreateOidcKeys();
       const userRole = await determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
@@ -402,7 +408,7 @@ router.post('/token', async (req, res) => {
         aud: clientId,
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
-        ...buildUserClaims(user, firstname, lastname, userRole)
+        ...buildUserClaims(user, firstname, lastname, userRole, [], untisUsername)
       };
 
       console.log(`[OIDC DEBUG] Token Claims für ${user.username} (${clientName}): given_name="${firstname}", family_name="${lastname}", user_role="${userRole}"`);
@@ -476,7 +482,7 @@ router.get('/userinfo', async (req, res) => {
     }
 
     // 3. Vornamen und Nachnamen intelligent bestimmen (unter Nutzung von student_db für MySQL / Schulanmeldung)
-    const { firstname, lastname } = await resolveUserNames(user);
+    const { firstname, lastname, untisUsername } = await resolveUserNames(user);
 
     // 4. Standard-OIDC Claims zurückgeben (CNs aus den LDAP-DNs extrahieren für saubere Übergabe)
     const rawGroups = JSON.parse(user.groups || '[]');
@@ -486,7 +492,7 @@ router.get('/userinfo', async (req, res) => {
     });
 
     const userRole = await determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
-    const claims = buildUserClaims(user, firstname, lastname, userRole, cleanGroups);
+    const claims = buildUserClaims(user, firstname, lastname, userRole, cleanGroups, untisUsername);
 
     // Client-Name des anfragenenden SSO-Systems für das Log auflösen
     let clientName = 'Unbekanntes SSO-System';

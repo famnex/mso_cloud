@@ -234,10 +234,11 @@ Wenn WebUntis `UnidentifiedPersonException ERR_UNIDENTIFIED_PERSON` ausgibt, war
   * WebUntis kann automatisch neue *Benutzerkonten* anlegen, aber keine neuen *Personen* in den Stammdaten erzeugen. Die Person muss vorab in WebUntis angelegt sein.
 
 ### D. Namensauflösung über MySQL (Schulanmeldungs-DB) & LDAP Rollen-Mappings
-Das MSO Cloud Backend löst Namen und Rollen in `src/routes/oauth.js` wie folgt auf:
+Das MSO Cloud Backend löst Namen, Rollen und den Untis-Benutzernamen in `src/routes/oauth.js` wie folgt auf:
 * **MySQL Schulanmeldungs-Datenbank (student_db)**: 
   * OIDC greift für Schüler primär auf `studentDb.getStudentProfile()` zu – genau wie die Seite *Benutzerprofil & Zugänge*.
-  * Feld 1 der Schulanmeldung wird als `given_name` (z. B. `Hazim Alaa Hadi`) und Feld 2 als `family_name` (z. B. `Al-Gburi`) an OIDC / WebUntis geliefert.
+  * Feld 1 der Schulanmeldung wird als `given_name` / `firstname` (z. B. `Hazim Alaa Hadi`) und Feld 2 als `family_name` / `lastname` (z. B. `Al-Gburi`) an OIDC / WebUntis geliefert.
+  * **Feld 167 (Untis Username)**: Der Wert aus Feld 167 wird direkt als OIDC Claim `untis_username` ausgeliefert (Fallback: MSO-Benutzername `user.username`).
 * **LDAP Gruppen-Mappings & Custom Claim Rollen**:
   * `determineUserRole()` prüft primär die in den **LDAP-Gruppen-Mappings** konfigurierten Regeln. Ist die LDAP-Gruppe des Benutzers gemappt, wird exakt der dort eingetragene Wert für *Custom Claim Rolle* (`user_role`) an OIDC geliefert.
 * **Prüfung über Systemprotokolle**:

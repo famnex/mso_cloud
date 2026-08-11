@@ -122,6 +122,7 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
       case 145: profile.mediothek_number = val; break;
       case 165: profile.sph_username = val; break;
       case 164: profile.sph_password = val; break;
+      case 167: profile.untis_username = val; break;
       case 150: profile.account_status = val; break;
       case 158: {
         const lowerVal = val.toLowerCase();
