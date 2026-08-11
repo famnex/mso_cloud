@@ -13,6 +13,7 @@ function buildUserClaims(user, firstname, lastname, userRole, cleanGroups = []) 
   const fullName = `${firstname} ${lastname}`.trim();
   const displayName = `${lastname}, ${firstname}`.trim();
   const untisName = `${lastname} ${firstname}`.trim();
+  const commaName = `${lastname},${firstname}`;
 
   const claims = {
     sub: String(user.id),
@@ -26,6 +27,10 @@ function buildUserClaims(user, firstname, lastname, userRole, cleanGroups = []) 
     untis_name: untisName,
     given_name: firstname,
     family_name: lastname,
+    "family_name,given_name": commaName,
+    "lastname,firstname": commaName,
+    "family_name given_name": untisName,
+    "lastname firstname": untisName,
     user_role: userRole
   };
 
