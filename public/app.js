@@ -1063,6 +1063,38 @@ function neverShowPhotoReminderAgain() {
   closeModal('photo-reminder-modal');
 }
 
+async function showPhotoReminderModalExplicitly() {
+  if (!currentUser) return;
+  try {
+    const res = await fetch('api/auth/student-profile');
+    if (!res.ok) {
+      openModal('photo-reminder-modal');
+      return;
+    }
+    const profile = await res.json();
+    if (profile.is_preview) return;
+
+    const rejectedImage = ['1134'].includes(profile.card_status_code) || profile.card_status === 'Bild abgelehnt';
+    const titleEl = document.getElementById('photo-reminder-title');
+    const descEl = document.getElementById('photo-reminder-desc');
+    const btnTextEl = document.getElementById('photo-reminder-btn-text');
+
+    if (rejectedImage) {
+      if (titleEl) titleEl.innerText = 'Schülerausweisbild wurde abgelehnt';
+      if (descEl) descEl.innerHTML = 'Dein hochgeladenes Passbild wurde abgelehnt. Bitte lade <a href="#" onclick="triggerUploadFromReminder(event)" style="color: var(--accent-color); font-weight: 700; text-decoration: underline;">hier</a> ein neues passendes Foto für deinen Schülerausweis hoch.';
+      if (btnTextEl) btnTextEl.innerText = 'Neues Foto in Benutzerprofil & Zugänge hochladen';
+    } else {
+      if (titleEl) titleEl.innerText = 'Schülerausweisbild fehlt';
+      if (descEl) descEl.innerHTML = 'Für deinen Schülerausweis ist noch kein Foto hinterlegt. Bitte lade <a href="#" onclick="triggerUploadFromReminder(event)" style="color: var(--accent-color); font-weight: 700; text-decoration: underline;">hier</a> ein passendes Foto hoch, damit dein digitaler Schülerausweis verifiziert und freigeschaltet werden kann.';
+      if (btnTextEl) btnTextEl.innerText = 'Jetzt Foto in Benutzerprofil & Zugänge hochladen';
+    }
+
+    openModal('photo-reminder-modal');
+  } catch (e) {
+    openModal('photo-reminder-modal');
+  }
+}
+
 async function checkAndRunPostLoginModals() {
   if (!currentUser) return;
 
@@ -1084,29 +1116,14 @@ async function checkAndRunPostLoginModals() {
     if (!res.ok) return;
     const profile = await res.json();
 
-    if (profile.is_preview) return; // Nicht bei Admin-Vorschau erzeugen
+    if (!profile || profile.is_preview) return; // Nicht bei Admin-Vorschau erzeugen
 
-    const noImage = !profile.card_image || ['1130'].includes(profile.card_status_code) || profile.card_status === 'Bild ungeprüft / Kein Bild';
-    const rejectedImage = ['1134'].includes(profile.card_status_code) || profile.card_status === 'Bild abgelehnt';
+    // Kriterien: Wenn das Bild weder genehmigt noch aktuell in Prüfung eingereicht ist
+    const isApproved = profile.card_status === 'Bild genehmigt' || profile.card_status === 'genehmigt' || ['1132', '1133'].includes(profile.card_status_code);
+    const isSubmitted = profile.card_status === 'Bild eingereicht' || profile.card_status_code === '1131';
 
-    if (noImage || rejectedImage) {
-      const titleEl = document.getElementById('photo-reminder-title');
-      const descEl = document.getElementById('photo-reminder-desc');
-      const btnTextEl = document.getElementById('photo-reminder-btn-text');
-
-      if (rejectedImage) {
-        if (titleEl) titleEl.innerText = 'Schülerausweisbild wurde abgelehnt';
-        if (descEl) descEl.innerHTML = 'Dein hochgeladenes Passbild wurde abgelehnt. Bitte lade <a href="#" onclick="triggerUploadFromReminder(event)" style="color: var(--accent-color); font-weight: 700; text-decoration: underline;">hier</a> ein neues passendes Foto für deinen Schülerausweis hoch.';
-        if (btnTextEl) btnTextEl.innerText = 'Neues Foto in Benutzerprofil & Zugänge hochladen';
-      } else {
-        if (titleEl) titleEl.innerText = 'Schülerausweisbild fehlt';
-        if (descEl) descEl.innerHTML = 'Für deinen Schülerausweis ist noch kein Foto hinterlegt. Bitte lade <a href="#" onclick="triggerUploadFromReminder(event)" style="color: var(--accent-color); font-weight: 700; text-decoration: underline;">hier</a> ein passendes Foto hoch, damit dein digitaler Schülerausweis verifiziert und freigeschaltet werden kann.';
-        if (btnTextEl) btnTextEl.innerText = 'Jetzt Foto in Benutzerprofil & Zugänge hochladen';
-      }
-
-      setTimeout(() => {
-        openModal('photo-reminder-modal');
-      }, 350);
+    if (!isApproved && !isSubmitted) {
+      showPhotoReminderModalExplicitly();
     }
   } catch (e) {
     console.error('Fehler beim Prüfen des Ausweis-Bildstatus für Login-Hinweis:', e);
@@ -1116,7 +1133,12 @@ async function checkAndRunPostLoginModals() {
 // Schließen per Klick außerhalb des Modals oder Dropdowns
 window.onclick = function(event) {
   if (event.target.classList.contains('modal')) {
+    const modalId = event.target.id;
     event.target.style.display = 'none';
+
+    if (modalId === 'news-view-modal' || modalId === 'onboarding-credentials-modal' || modalId === 'sph-info-modal') {
+      setTimeout(checkAndRunPostLoginModals, 350);
+    }
   }
   
   // User Dropdown schließen bei Klick außerhalb
