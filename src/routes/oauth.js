@@ -3,6 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { db, getConfig, setConfig, logEvent } = require('../db');
+const studentDb = require('../student_db');
 const { getOrCreateOidcKeys, getOidcBaseUrl, openidConfigurationHandler, jwksHandler } = require('../oidcHelper');
 
 /**
@@ -17,7 +18,81 @@ function normalizeUri(uri) {
 }
 
 /**
- * Ermittelt die Benutzerrolle (lehrer, schueler, forbidden) anhand von Gruppen, E-Mail-Suffix und Profilen.
+ * Ermittelt intelligent Vor- und Nachname eines Benutzers für OIDC Claims (given_name, family_name).
+ * Greift primär auf student_db zu (MySQL Schulanmeldungs-Datenbank mit SQLite-Fallback),
+ * genau wie das Benutzerprofil.
+ */
+async function resolveUserNames(user) {
+  let firstname = user.first_name ? String(user.first_name).trim() : '';
+  let lastname = user.last_name ? String(user.last_name).trim() : '';
+
+  // 1. Primär: Schüler-Profil über student_db abfragen (MySQL dynamic fieldvalues: field 1 = first_name, field 2 = last_name)
+  if (user && (user.id || user.username || user.email)) {
+    try {
+      const studentProf = await studentDb.getStudentProfile(user);
+      if (studentProf) {
+        if (studentProf.first_name && studentProf.first_name.trim()) {
+          firstname = String(studentProf.first_name).trim();
+        }
+        if (studentProf.last_name && studentProf.last_name.trim()) {
+          lastname = String(studentProf.last_name).trim();
+        }
+      }
+    } catch (e) {
+      // Ignorieren falls studentDb-Abfrage nicht möglich
+    }
+  }
+
+  // 2. Sekundär: Falls immer noch leer, aus display_name auflösen
+  if (!firstname && !lastname) {
+    if (user.display_name && user.display_name.trim()) {
+      const dName = user.display_name.trim();
+      if (dName.includes(',')) {
+        // Format: "Nachname, Vorname"
+        const parts = dName.split(',');
+        lastname = parts[0].trim();
+        firstname = parts.slice(1).join(',').trim();
+      } else {
+        // Format: "Vorname ... Nachname" (z. B. "Hazim Alaa Hadi Al-Gburi")
+        const parts = dName.split(/\s+/);
+        if (parts.length === 1) {
+          firstname = parts[0];
+          lastname = parts[0];
+        } else {
+          // Das letzte Wort ist der Nachname, alle vorherigen Wörter bilden den Vornamen
+          lastname = parts[parts.length - 1];
+          firstname = parts.slice(0, parts.length - 1).join(' ');
+        }
+      }
+    } else if (user.username && user.username.includes('.')) {
+      const parts = user.username.split('.');
+      firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      lastname = parts.slice(1).join(' ');
+      lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+    } else if (user.email && user.email.includes('@')) {
+      const prefix = user.email.split('@')[0];
+      if (prefix.includes('.')) {
+        const parts = prefix.split('.');
+        firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        lastname = parts.slice(1).join(' ');
+        lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
+      }
+    }
+  }
+
+  if (!firstname) firstname = user.username || 'User';
+  if (!lastname) lastname = firstname;
+
+  if (user.username && user.username.toLowerCase() === 'admin') {
+    firstname = 'System';
+    lastname = 'Administrator';
+  }
+
+  return { firstname, lastname };
+}
+
+/**
+ * Ermittelt die Benutzerrolle (lehrer, schueler, forbidden) anhand von LDAP-Gruppen-Mappings, Schülerprofilen, E-Mail-Suffix etc.
  */
 function getCNfromDN(dn) {
   if (!dn) return '';
@@ -25,21 +100,15 @@ function getCNfromDN(dn) {
   return match ? match[1].trim() : dn;
 }
 
-function determineUserRole(userId, username, email, role, groupsStr, dn) {
-  // 1. Wenn in der Tabelle student_profiles vorhanden -> schueler
-  const isStudent = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(userId);
-  if (isStudent) {
-    return 'schueler';
-  }
-
-  // 2. Mappings aus der DB laden und abgleichen
+async function determineUserRole(userId, username, email, role, groupsStr, dn) {
+  // 1. Primär: LDAP-Mappings aus der DB laden und abgleichen (höchste Priorität für explizit definierte Custom Claim Regeln!)
   const groups = JSON.parse(groupsStr || '[]');
   if (groups.length > 0 || dn) {
     try {
       const mappings = db.prepare('SELECT ldap_group_dn, user_role FROM ldap_mappings').all();
       
       for (const mapping of mappings) {
-        if (!mapping.user_role) continue;
+        if (!mapping.user_role || !mapping.user_role.trim()) continue;
         
         const mappingDN = mapping.ldap_group_dn.toLowerCase();
         
@@ -66,14 +135,14 @@ function determineUserRole(userId, username, email, role, groupsStr, dn) {
           return cn === mappingDN;
         };
 
-        // 2a. Erst Gruppen des Benutzers abgleichen
+        // 1a. Erst Gruppen des Benutzers abgleichen
         const groupMatch = groups.some(checkMatch);
         if (groupMatch) {
           const mappedRole = mapping.user_role.trim().toLowerCase();
           if (mappedRole) return mappedRole;
         }
 
-        // 2b. Dann den DN des Benutzers selbst abgleichen (für OUs)
+        // 1b. Dann den DN des Benutzers selbst abgleichen (für OUs)
         if (dn && checkMatch(dn)) {
           const mappedRole = mapping.user_role.trim().toLowerCase();
           if (mappedRole) return mappedRole;
@@ -81,6 +150,19 @@ function determineUserRole(userId, username, email, role, groupsStr, dn) {
       }
     } catch (err) {
       console.error('Fehler bei der Rollenermittlung über LDAP-Mappings:', err);
+    }
+  }
+
+  // 2. Sekundär: Prüfen, ob der Benutzer in den Schülerprofilen (MySQL/SQLite) existiert -> schueler
+  try {
+    const studentProf = await studentDb.getStudentProfile({ id: userId, username, email });
+    if (studentProf) {
+      return 'schueler';
+    }
+  } catch (e) {
+    const isStudent = db.prepare('SELECT 1 FROM student_profiles WHERE user_id = ?').get(userId);
+    if (isStudent) {
+      return 'schueler';
     }
   }
 
@@ -203,7 +285,7 @@ router.get('/authorize', (req, res) => {
  * Tauscht den Authorization Code gegen ein Access Token ein.
  * Unterstützt HTTP Basic Auth und POST-Body Credentials.
  */
-router.post('/token', (req, res) => {
+router.post('/token', async (req, res) => {
   try {
     let clientId = req.body.client_id;
     let clientSecret = req.body.client_secret;
@@ -270,41 +352,10 @@ router.post('/token', (req, res) => {
     const user = db.prepare('SELECT id, username, email, role, groups, display_name, dn, first_name, last_name FROM users WHERE id = ?').get(codeRow.user_id);
     
     if (user) {
-      let firstname = user.first_name || '';
-      let lastname = user.last_name || '';
-
-      if (!firstname && !lastname) {
-        firstname = user.username;
-        lastname = user.username;
-
-        if (user.display_name && user.display_name.trim()) {
-          const parts = user.display_name.trim().split(/\s+/);
-          firstname = parts[0];
-          lastname = parts.slice(1).join(' ') || parts[0];
-        } else if (user.username.includes('.')) {
-          const parts = user.username.split('.');
-          firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-          lastname = parts.slice(1).join(' ');
-          lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
-        } else if (user.email && user.email.includes('@')) {
-          const prefix = user.email.split('@')[0];
-          if (prefix.includes('.')) {
-            const parts = prefix.split('.');
-            firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-            lastname = parts.slice(1).join(' ');
-            lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
-          }
-        }
-      }
-
-      if (user.username.toLowerCase() === 'admin') {
-        firstname = 'System';
-        lastname = 'Administrator';
-      }
-
+      const { firstname, lastname } = await resolveUserNames(user);
       const issuer = getOidcBaseUrl(req);
       const { privateKeyPem } = getOrCreateOidcKeys();
-      const userRole = determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
+      const userRole = await determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
 
       // Client-Name des anfragenenden SSO-Systems auflösen
       let clientName = clientId;
@@ -327,12 +378,13 @@ router.post('/token', (req, res) => {
         user_role: userRole
       };
 
+      console.log(`[OIDC DEBUG] Token Claims für ${user.username} (${clientName}): given_name="${firstname}", family_name="${lastname}", user_role="${userRole}"`);
       console.log('OIDC ID-Token Claims:', JSON.stringify(payload, null, 2));
       if (typeof logEvent === 'function') {
         const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
           ? `127.0.0.1 (${clientName})` 
           : `${req.ip} (${clientName})`;
-        logEvent('info', 'oidc_token_claims', `OIDC ID-Token Claims für User: ${user.username} (System: ${clientName})`, payload, clientIpDisplay);
+        logEvent('info', 'oidc_token_claims', `OIDC ID-Token Claims für User: ${user.username} (System: ${clientName}, given_name="${firstname}", family_name="${lastname}")`, payload, clientIpDisplay);
       }
 
       idToken = jwt.sign(payload, privateKeyPem, {
@@ -363,7 +415,7 @@ router.post('/token', (req, res) => {
  * Endpoint 3: Userinfo Endpoint (GET /api/oauth/userinfo)
  * Gibt Profildaten des angemeldeten Benutzers zurück. Authentifiziert via Bearer Token.
  */
-router.get('/userinfo', (req, res) => {
+router.get('/userinfo', async (req, res) => {
   try {
     let token = null;
 
@@ -396,38 +448,8 @@ router.get('/userinfo', (req, res) => {
       return res.status(400).json({ error: 'invalid_grant', error_description: 'Zugehöriger Benutzer existiert nicht mehr.' });
     }
 
-    // 3. Vornamen und Nachnamen intelligent bestimmen
-    let firstname = user.first_name || '';
-    let lastname = user.last_name || '';
-
-    if (!firstname && !lastname) {
-      firstname = user.username;
-      lastname = user.username;
-
-      if (user.display_name && user.display_name.trim()) {
-        const parts = user.display_name.trim().split(/\s+/);
-        firstname = parts[0];
-        lastname = parts.slice(1).join(' ') || parts[0];
-      } else if (user.username.includes('.')) {
-        const parts = user.username.split('.');
-        firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-        lastname = parts.slice(1).join(' ');
-        lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
-      } else if (user.email && user.email.includes('@')) {
-        const prefix = user.email.split('@')[0];
-        if (prefix.includes('.')) {
-          const parts = prefix.split('.');
-          firstname = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-          lastname = parts.slice(1).join(' ');
-          lastname = lastname.charAt(0).toUpperCase() + lastname.slice(1);
-        }
-      }
-    }
-
-    if (user.username.toLowerCase() === 'admin') {
-      firstname = 'System';
-      lastname = 'Administrator';
-    }
+    // 3. Vornamen und Nachnamen intelligent bestimmen (unter Nutzung von student_db für MySQL / Schulanmeldung)
+    const { firstname, lastname } = await resolveUserNames(user);
 
     // 4. Standard-OIDC Claims zurückgeben (CNs aus den LDAP-DNs extrahieren für saubere Übergabe)
     const rawGroups = JSON.parse(user.groups || '[]');
@@ -436,7 +458,7 @@ router.get('/userinfo', (req, res) => {
       return match ? match[1].trim() : g;
     });
 
-    const userRole = determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
+    const userRole = await determineUserRole(user.id, user.username, user.email, user.role, user.groups, user.dn);
 
     const claims = {
       sub: String(user.id),
@@ -462,12 +484,13 @@ router.get('/userinfo', (req, res) => {
       }
     }
 
+    console.log(`[OIDC DEBUG] Userinfo Claims für ${user.username} (${clientName}): given_name="${firstname}", family_name="${lastname}", user_role="${userRole}"`);
     console.log('OIDC Userinfo Claims:', JSON.stringify(claims, null, 2));
     if (typeof logEvent === 'function') {
       const clientIpDisplay = (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') 
         ? `127.0.0.1 (${clientName})` 
         : `${req.ip} (${clientName})`;
-      logEvent('info', 'oidc_userinfo_claims', `OIDC Userinfo Claims für User: ${user.username} (System: ${clientName})`, claims, clientIpDisplay);
+      logEvent('info', 'oidc_userinfo_claims', `OIDC Userinfo Claims für User: ${user.username} (System: ${clientName}, given_name="${firstname}", family_name="${lastname}")`, claims, clientIpDisplay);
     }
 
     console.log(`OIDC-Userinfo erfolgreich ausgeliefert für User: ${user.username}`);

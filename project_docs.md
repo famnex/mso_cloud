@@ -200,3 +200,50 @@ Dies ermöglicht ein vollautomatisches Überspringen der Benutzernamens-Eingabe 
 ### E. Dynamisches "Tara" für Gyroskop-Neigung & Ausrichtungs-Fix
 * Das Drehen/Rotieren des Schülerausweises wurde unterbunden (`screen.orientation.lock('portrait')` & Entfernung von Z-Rotationen).
 * **Dynamisches Tara (Sliding Zero Baseline)**: Beim Kippen des Smartphones über die maximale Neigungsgrenze (15°) hinaus schiebt sich die Nullpunkt-Baseline (`baseBeta` / `baseGamma`) dynamisch mit der Bewegung mit. Sobald das Gerät zurückgekippt wird, reagiert der Ausweis sofort ohne Totpunkt oder Verzögerung.
+
+---
+
+## 9. WebUntis Single Sign-On (OIDC) Integration
+
+Das MSO Cloud Portal stellt als OpenID Connect (OIDC) Provider Endpunkte für die Anbindung von **WebUntis** bereit.
+
+### A. OIDC Endpunkte
+* **Discovery URL**: `https://cloud.mso-hef.de/novus/.well-known/openid-configuration`
+* **Authorization Server Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/authorize`
+* **Token Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/token`
+* **User Info Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/userinfo`
+* **Logout Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/logout`
+
+### B. OIDC Attribute & Claims Mapping für WebUntis
+* **Attributname für Benutzeridentifikation**: `preferred_username`
+* **Mailattribut**: `email`
+* **Rollenattribut**: `user_role`
+* **Rollenwerte**:
+  * `lehrer` -> wird in WebUntis der Personenrolle `lehrer` (Gruppe: *Lehrkräfte*) zugeordnet.
+  * `schueler` -> wird in WebUntis der Personenrolle `schueler` (Gruppe: *Schüler*innen*) zugeordnet.
+
+### C. Troubleshooting Personenzuordnung (`ERR_UNIDENTIFIED_PERSON`)
+Wenn WebUntis `UnidentifiedPersonException ERR_UNIDENTIFIED_PERSON` ausgibt, war der OIDC-Login an der MSO Cloud zwar erfolgreich, aber WebUntis konnte die OIDC-Attribute keiner Person (Lehrer/Schüler) in den WebUntis-Stammdaten zuordnen.
+
+* **Fehlerquelle 1 (Typo in Rollenidentifizierung)**:
+  * Bei *Rollenidentifizierung* = `Einzelattribut` darf im *Authentifizierungsattribut* nur ein einzelnes Attribut stehen (z. B. `preferred_username`). Steht dort `family_name,given_name`, schlägt die Zuordnung fehl.
+  * Bei *Rollenidentifizierung* = `Attribut für Familienname und Vorname` müssen im *Authentifizierungsattribut* zwei Attribute angegeben sein (`family_name,given_name`).
+* **Fehlerquelle 2 (Namensabweichung)**:
+  * Bei Zuordnung nach Namen vergleicht WebUntis Vor- und Nachname exakt mit den WebUntis-Stammdaten. Bei Abweichungen (z. B. "Max" vs "Maximilian") schlägt der Login fehl.
+* **Fehlerquelle 3 (Person fehlt in WebUntis)**:
+  * WebUntis kann automatisch neue *Benutzerkonten* anlegen, aber keine neuen *Personen* in den Stammdaten erzeugen. Die Person muss vorab in WebUntis angelegt sein.
+
+### D. Namensauflösung über MySQL (Schulanmeldungs-DB) & LDAP Rollen-Mappings
+Das MSO Cloud Backend löst Namen und Rollen in `src/routes/oauth.js` wie folgt auf:
+* **MySQL Schulanmeldungs-Datenbank (student_db)**: 
+  * OIDC greift für Schüler primär auf `studentDb.getStudentProfile()` zu – genau wie die Seite *Benutzerprofil & Zugänge*.
+  * Feld 1 der Schulanmeldung wird als `given_name` (z. B. `Hazim Alaa Hadi`) und Feld 2 als `family_name` (z. B. `Al-Gburi`) an OIDC / WebUntis geliefert.
+* **LDAP Gruppen-Mappings & Custom Claim Rollen**:
+  * `determineUserRole()` prüft primär die in den **LDAP-Gruppen-Mappings** konfigurierten Regeln. Ist die LDAP-Gruppe des Benutzers gemappt, wird exakt der dort eingetragene Wert für *Custom Claim Rolle* (`user_role`) an OIDC geliefert.
+* **Prüfung über Systemprotokolle**:
+  * Jedes OIDC Token / Userinfo-Request loggt die exakt ausgelieferten JSON-Claims unter `oidc_token_claims` bzw. `oidc_userinfo_claims`.
+  * Im Admin-Bereich unter **Systemprotokolle** sowie in der Server-Konsole (`[OIDC DEBUG]`) können die übermittelten Werte live eingesehen werden.
+
+
+
+
