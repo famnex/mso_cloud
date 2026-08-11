@@ -166,6 +166,9 @@ async function checkAuthStatus() {
       console.log(`[MSO Auth] Angemeldet als: ${data.user ? data.user.username : 'unbekannt'}`);
       currentUser = data.user;
       renderAuthenticatedHeader();
+      if (window.location.search.includes('autoUpload=true') || window.location.hash === '#upload') {
+        setTimeout(openProfileAndStartUpload, 500);
+      }
     } else {
       console.log('[MSO Auth] Nicht angemeldet (Gast-Modus aktiv).');
       currentUser = null;
@@ -1005,6 +1008,21 @@ function closeModal(id) {
   // Alerts im Modal verstecken
   const alert = document.querySelector(`#${id} .alert`);
   if (alert) alert.style.display = 'none';
+}
+
+function openProfileAndStartUpload(event) {
+  if (event) event.preventDefault();
+  openStudentView();
+  setTimeout(() => {
+    const photoInput = document.getElementById('student-photo-input');
+    const uploadBtn = document.getElementById('student-photo-upload-btn-card') || document.getElementById('student-photo-upload-btn');
+    if (uploadBtn) {
+      uploadBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (photoInput) {
+      photoInput.click();
+    }
+  }, 350);
 }
 
 // Schließen per Klick außerhalb des Modals oder Dropdowns
