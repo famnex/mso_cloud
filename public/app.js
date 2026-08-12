@@ -4118,7 +4118,7 @@ function openOnboardingCredentialsModal() {
 
   if (passMaskedEl) {
     if (!currentMsoPassword || currentMsoPassword === 'geändert' || currentMsoPassword === '-' || currentMsoPassword.toLowerCase().includes('geändert') || currentMsoPassword.toLowerCase().includes('benutzerdefiniert')) {
-      passMaskedEl.innerHTML = '<span style="font-size:0.88rem; color:var(--text-secondary); font-family:sans-serif; font-weight:500;"><i class="fa-solid fa-lock" style="color:var(--accent-color); margin-right:4px;"></i> Ein eigenes Passwort wurde bereits vergeben.</span>';
+      passMaskedEl.innerHTML = '<span style="font-size:0.88rem; color:var(--text-secondary); font-family:sans-serif; font-weight:500;"><i class="fa-solid fa-lock" style="color:var(--accent-color); margin-right:4px;"></i> Persönliches eigenes Passwort festgelegt</span>';
       passMaskedEl.style.letterSpacing = 'normal';
       if (passEyeBtn) passEyeBtn.style.display = 'none';
     } else {
@@ -4230,7 +4230,7 @@ function copyOnboardingValue(elementId, btnEl) {
   if (!el) return;
 
   const valToCopy = el.value || el.innerText || '';
-  if (!valToCopy || valToCopy === '-' || valToCopy.includes('Ein eigenes Passwort')) {
+  if (!valToCopy || valToCopy === '-' || valToCopy.includes('Persönliches eigenes Passwort')) {
     alert('Kein kopierbarer Wert vorhanden.');
     return;
   }
@@ -4392,7 +4392,7 @@ async function loadStudentProfile() {
     
     if (msoPwdText && msoPwdToggle) {
       if (!profile.start_password || profile.start_password === 'geändert' || profile.start_password === '-' || profile.start_password.toLowerCase().includes('geändert') || profile.start_password.toLowerCase().includes('benutzerdefiniert')) {
-        msoPwdText.innerHTML = '<span style="font-size:0.82rem; color:var(--text-secondary); font-family:sans-serif; font-weight:500;"><i class="fa-solid fa-lock" style="color:var(--accent-color); margin-right:4px;"></i> Ein eigenes Passwort wurde bereits vergeben.</span>';
+        msoPwdText.innerHTML = '<span style="font-size:0.82rem; color:var(--text-secondary); font-family:sans-serif; font-weight:500;"><i class="fa-solid fa-lock" style="color:var(--accent-color); margin-right:4px;"></i> Persönliches eigenes Passwort festgelegt</span>';
         msoPwdText.style.letterSpacing = 'normal';
         msoPwdToggle.style.display = 'none';
         currentMsoPassword = '';
