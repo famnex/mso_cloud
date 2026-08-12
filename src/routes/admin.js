@@ -859,5 +859,45 @@ router.post('/logs/clear', (req, res) => {
   }
 });
 
+/* ==========================================================================
+   Wartungsmodus
+   ========================================================================== */
+
+/**
+ * Gibt den aktuellen Wartungsmodus-Status zurück.
+ */
+router.get('/maintenance', (req, res) => {
+  try {
+    const enabled = getConfig('maintenance_enabled', '0') === '1';
+    const message = getConfig('maintenance_message', 'Das System wird momentan gewartet. Bitte versuchen Sie es später wieder.');
+    res.json({ enabled, message });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Setzt den Wartungsmodus (an/aus) und die Wartungsnachricht.
+ */
+router.post('/maintenance', (req, res) => {
+  try {
+    const { enabled, message } = req.body;
+    setConfig('maintenance_enabled', enabled ? '1' : '0');
+    if (message !== undefined) {
+      setConfig('maintenance_message', String(message).trim() || 'Das System wird momentan gewartet. Bitte versuchen Sie es später wieder.');
+    }
+    logEvent(
+      'info',
+      enabled ? 'maintenance_enabled' : 'maintenance_disabled',
+      `Wartungsmodus ${enabled ? 'aktiviert' : 'deaktiviert'} von Administrator`,
+      { message: getConfig('maintenance_message') },
+      req.ip
+    );
+    res.json({ success: true, enabled: getConfig('maintenance_enabled') === '1', message: getConfig('maintenance_message') });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 

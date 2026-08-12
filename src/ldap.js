@@ -99,7 +99,7 @@ async function authenticate(username, password) {
         completed = true;
         console.error(`LDAP-Authentifizierung für ${username} wegen Timeout (4s) abgebrochen.`);
         cleanup();
-        resolve(null);
+        resolve({ isLdapError: true, code: 'TIMEOUT', message: 'LDAP-Verbindung Timeout (4s)' });
       }
     }, 4000);
 
@@ -108,7 +108,7 @@ async function authenticate(username, password) {
     } catch (err) {
       console.error('LDAP Client-Erstellungsfehler:', err.message);
       clearTimeout(timeoutId);
-      return resolve(null);
+      return resolve({ isLdapError: true, code: 'CLIENT_CREATE_ERROR', message: err.message });
     }
 
     client.on('error', (err) => {
@@ -117,7 +117,7 @@ async function authenticate(username, password) {
         completed = true;
         clearTimeout(timeoutId);
         cleanup();
-        resolve(null);
+        resolve({ isLdapError: true, code: 'CONNECTION_ERROR', message: err.message });
       }
     });
 
@@ -129,7 +129,7 @@ async function authenticate(username, password) {
           completed = true;
           clearTimeout(timeoutId);
           cleanup();
-          resolve(null);
+          resolve({ isLdapError: true, code: 'ADMIN_BIND_FAILED', message: err.message });
         }
         return;
       }
@@ -150,7 +150,7 @@ async function authenticate(username, password) {
             completed = true;
             clearTimeout(timeoutId);
             cleanup();
-            resolve(null);
+            resolve({ isLdapError: true, code: 'SEARCH_FAILED', message: err.message });
           }
           return;
         }
@@ -180,7 +180,7 @@ async function authenticate(username, password) {
             completed = true;
             clearTimeout(timeoutId);
             cleanup();
-            resolve(null);
+            resolve({ isLdapError: true, code: 'SEARCH_STREAM_ERROR', message: err.message });
           }
         });
 

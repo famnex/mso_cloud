@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { db, getConfig, logEvent } = require('../db');
+const { db, getConfig, setConfig, logEvent } = require('../db');
 const ldap = require('../ldap');
 const mail = require('../mail');
 const studentDb = require('../student_db');
@@ -71,7 +71,9 @@ router.get('/me', async (req, res) => {
     };
     res.json({ logged_in: true, user: userPayload, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
   } else {
-    res.json({ logged_in: false, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
+    const maintenanceEnabled = getConfig('maintenance_enabled', '0') === '1';
+    const maintenanceMessage = getConfig('maintenance_message', 'Das System wird momentan gewartet. Bitte versuchen Sie es später wieder.');
+    res.json({ logged_in: false, impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo, maintenance: maintenanceEnabled ? { enabled: true, message: maintenanceMessage } : null });
   }
 });
 
@@ -228,12 +230,30 @@ router.post('/login', async (req, res) => {
   }
 
   try {
+    // 0. Wartungsmodus prüfen
+    if (getConfig('maintenance_enabled', '0') === '1') {
+      const maintMsg = getConfig('maintenance_message', 'Das System wird momentan gewartet. Bitte versuchen Sie es später wieder.');
+      logEvent('info', 'login_blocked_maintenance', `Login blockiert (Wartungsmodus) für: ${username}`, null, clientIp);
+      return res.status(503).json({ error: maintMsg, maintenance: true });
+    }
+
     const ldapEnabled = getConfig('ldap_enabled') === '1';
 
     // 1. LDAP Login-Versuch durchführen (wenn LDAP in den Einstellungen aktiviert ist)
     if (ldapEnabled) {
       console.log(`Versuche LDAP-Login für Benutzer: ${username}`);
-      const ldapUser = await ldap.authenticate(username, password);
+      const ldapResult = await ldap.authenticate(username, password);
+
+      // Verbindungsfehler – NICHT als falsches Passwort werten!
+      if (ldapResult && ldapResult.isLdapError) {
+        logEvent('error', 'ldap_connection_error', `LDAP-Verbindungsfehler beim Login-Versuch für: ${username} (Code: ${ldapResult.code})`, { code: ldapResult.code, message: ldapResult.message }, clientIp);
+        return res.status(503).json({
+          error: 'Anmeldung ist momentan nicht möglich. Bitte versuchen Sie es später wieder. Die Administratoren sind bereits informiert.',
+          ldap_error: true
+        });
+      }
+
+      const ldapUser = ldapResult; // null = falsches Passwort oder User nicht gefunden
       
       if (ldapUser) {
         // LDAP-Login erfolgreich! Synchronisiere mit lokaler Cache-Datenbank

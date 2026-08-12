@@ -174,6 +174,25 @@ async function checkAuthStatus() {
       currentUser = null;
       clearStudentViewDOM();
       renderAnonymousHeader();
+      // Wartungsmodus-Banner anzeigen falls aktiv
+      if (data.maintenance && data.maintenance.enabled) {
+        const loginBtn = document.getElementById('header-login-btn');
+        if (loginBtn) {
+          loginBtn.title = data.maintenance.message || 'System im Wartungsmodus';
+          loginBtn.style.opacity = '0.65';
+        }
+        const existingBanner = document.getElementById('global-maintenance-banner');
+        if (!existingBanner) {
+          const banner = document.createElement('div');
+          banner.id = 'global-maintenance-banner';
+          banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:9999; background:rgba(200,90,0,0.95); color:#fff; padding:10px 20px; text-align:center; font-weight:600; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:10px; backdrop-filter:blur(8px);';
+          banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <span>${escapeHtml(data.maintenance.message || 'Das System wird momentan gewartet.')}</span>`;
+          document.body.prepend(banner);
+        }
+      } else {
+        const existingBanner = document.getElementById('global-maintenance-banner');
+        if (existingBanner) existingBanner.remove();
+      }
     }
   } catch (err) {
     console.error('[MSO Auth Exception] Netzwerkausnahme bei checkAuthStatus:', err);
@@ -320,7 +339,43 @@ async function handleLogin(e) {
       await loadTiles();
       await loadActiveMessages();
     } else {
-      let errorMsg = data.error || `Fehler beim Anmelden (HTTP ${res.status}).`;
+      const data_err = data || {};
+
+      // Wartungsmodus
+      if (data_err.maintenance) {
+        const maintHtml = `
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px; font-weight:700; font-size:1rem;">
+              <i class="fa-solid fa-triangle-exclamation" style="color:#ff8c00; font-size:1.3rem;"></i>
+              System im Wartungsmodus
+            </div>
+            <div style="font-size:0.92rem; line-height:1.5;">${escapeHtml(data_err.error || 'Das System wird momentan gewartet.')}</div>
+          </div>`;
+        alertBox.innerHTML = maintHtml;
+        alertBox.style.background = 'rgba(255,120,0,0.13)';
+        alertBox.style.borderColor = 'rgba(255,120,0,0.4)';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      // LDAP-Verbindungsfehler
+      if (data_err.ldap_error) {
+        const ldapErrHtml = `
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px; font-weight:700; font-size:1rem;">
+              <i class="fa-solid fa-server" style="color:#f59e0b; font-size:1.2rem;"></i>
+              Anmeldung momentan nicht möglich
+            </div>
+            <div style="font-size:0.92rem; line-height:1.5;">${escapeHtml(data_err.error || 'Bitte versuchen Sie es später wieder.')}</div>
+          </div>`;
+        alertBox.innerHTML = ldapErrHtml;
+        alertBox.style.background = 'rgba(245,158,11,0.1)';
+        alertBox.style.borderColor = 'rgba(245,158,11,0.35)';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      let errorMsg = data_err.error || `Fehler beim Anmelden (HTTP ${res.status}).`;
       let errorHtml = errorMsg;
       console.warn(`[MSO Login Fehlschlag] ${errorMsg}`);
       const helpdeskBox = `<div style="margin-top: 12px; padding: 10px 12px; background: rgba(59, 130, 246, 0.12); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.84rem; color: var(--text-color); line-height: 1.4;">
@@ -334,6 +389,8 @@ async function handleLogin(e) {
             <li>Lernende: <strong>mustermann.max</strong></li>
           </ul>${helpdeskBox}`;
       }
+      alertBox.style.background = '';
+      alertBox.style.borderColor = '';
       throw { message: errorMsg, html: errorHtml };
     }
   } catch (err) {
@@ -1108,8 +1165,103 @@ function loadAdminTabContent(tabId) {
     loadAdminUsers();
   } else if (tabId === 'tab-messages') {
     loadAdminMessages();
+  } else if (tabId === 'tab-maintenance') {
+    loadMaintenanceConfig();
   } else if (tabId === 'tab-logs') {
     loadAdminLogs();
+  }
+}
+
+/* --- TAB: Wartungsmodus --- */
+
+async function loadMaintenanceConfig() {
+  try {
+    const res = await fetch('api/admin/maintenance');
+    if (!res.ok) throw new Error('Fehler beim Laden');
+    const data = await res.json();
+
+    const toggle = document.getElementById('maintenance-enabled-toggle');
+    const msgInput = document.getElementById('maintenance-message-input');
+    const banner = document.getElementById('maintenance-status-banner');
+
+    if (toggle) toggle.checked = data.enabled;
+    if (msgInput) msgInput.value = data.message || '';
+
+    if (banner) {
+      if (data.enabled) {
+        banner.style.display = 'flex';
+        banner.style.background = 'rgba(255, 120, 0, 0.15)';
+        banner.style.border = '1px solid rgba(255, 120, 0, 0.4)';
+        banner.style.color = '#ff8c00';
+        banner.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Wartungsmodus ist aktuell <strong>AKTIV</strong> – Benutzer können sich nicht einloggen.';
+      } else {
+        banner.style.display = 'flex';
+        banner.style.background = 'rgba(34, 197, 94, 0.1)';
+        banner.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+        banner.style.color = '#22c55e';
+        banner.innerHTML = '<i class="fa-solid fa-circle-check"></i> Wartungsmodus ist <strong>INAKTIV</strong> – normaler Betrieb.';
+      }
+    }
+  } catch (err) {
+    console.error('[Maintenance] Fehler beim Laden:', err);
+  }
+}
+
+function onMaintenanceToggleChange() {
+  const toggle = document.getElementById('maintenance-enabled-toggle');
+  const banner = document.getElementById('maintenance-status-banner');
+  if (!banner) return;
+
+  if (toggle && toggle.checked) {
+    banner.style.display = 'flex';
+    banner.style.background = 'rgba(255, 120, 0, 0.15)';
+    banner.style.border = '1px solid rgba(255, 120, 0, 0.4)';
+    banner.style.color = '#ff8c00';
+    banner.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Wartungsmodus wird nach dem Speichern <strong>AKTIV</strong>.';
+  } else {
+    banner.style.display = 'flex';
+    banner.style.background = 'rgba(34, 197, 94, 0.1)';
+    banner.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+    banner.style.color = '#22c55e';
+    banner.innerHTML = '<i class="fa-solid fa-circle-check"></i> Wartungsmodus wird nach dem Speichern <strong>DEAKTIVIERT</strong>.';
+  }
+}
+
+async function saveMaintenanceConfig() {
+  const toggle = document.getElementById('maintenance-enabled-toggle');
+  const msgInput = document.getElementById('maintenance-message-input');
+  const alertBox = document.getElementById('maintenance-alert');
+  const saveBtn = document.getElementById('maintenance-save-btn');
+
+  const enabled = toggle ? toggle.checked : false;
+  const message = msgInput ? msgInput.value.trim() : '';
+
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Speichern...'; }
+
+  try {
+    const res = await fetch('api/admin/maintenance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, message })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Fehler beim Speichern');
+
+    if (alertBox) {
+      alertBox.innerHTML = `<i class="fa-solid fa-circle-check"></i> Einstellungen gespeichert. Wartungsmodus ist jetzt ${data.enabled ? '<strong>AKTIV</strong>' : '<strong>INAKTIV</strong>'}.`;
+      alertBox.className = 'alert alert-success';
+      alertBox.style.display = 'flex';
+      setTimeout(() => { alertBox.style.display = 'none'; }, 5000);
+    }
+    await loadMaintenanceConfig();
+  } catch (err) {
+    if (alertBox) {
+      alertBox.innerText = err.message;
+      alertBox.className = 'alert alert-danger';
+      alertBox.style.display = 'flex';
+    }
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Einstellungen speichern'; }
   }
 }
 
