@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Datenbank initialisieren (damit Migrationen sofort laufen)
-const { getConfig } = require('./db');
+const { getConfig, cleanupOldLogs } = require('./db');
 
 const app = express();
 app.set('trust proxy', true);
@@ -130,4 +130,21 @@ app.listen(PORT, () => {
   console.log(` MSO Cloud Launcher läuft auf Port: ${PORT}`);
   console.log(` Server-Modus: ${process.env.NODE_ENV || 'development'}`);
   console.log(`=================================================`);
+
+  // Einmaligen Log-Cleanup beim Start durchführen
+  cleanupOldLogs();
+
+  // Täglicher Cleanup um 03:00 Uhr
+  const scheduleDaily = () => {
+    const now = new Date();
+    const next = new Date();
+    next.setHours(3, 0, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    const delay = next - now;
+    setTimeout(() => {
+      cleanupOldLogs();
+      setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
+    }, delay);
+  };
+  scheduleDaily();
 });

@@ -835,12 +835,43 @@ router.delete('/messages/:id', (req, res) => {
  */
 router.get('/logs', (req, res) => {
   try {
-    // 1. Logs älter als 30 Tage automatisch bereinigen
-    db.prepare("DELETE FROM system_logs WHERE datetime(created_at) < datetime('now', '-30 days')").run();
+    const page   = Math.max(1, parseInt(req.query.page  || '1',   10));
+    const limit  = Math.min(500, Math.max(10, parseInt(req.query.limit || '100', 10)));
+    const level  = req.query.level  || 'all';
+    const search = (req.query.search || '').trim();
+    const offset = (page - 1) * limit;
 
-    // 2. Alle verbliebenen Logs zurückgeben
-    const logs = db.prepare('SELECT * FROM system_logs ORDER BY created_at DESC, id DESC').all();
-    res.json(logs);
+    // WHERE-Bedingungen aufbauen
+    const conditions = [];
+    const params = [];
+
+    if (level !== 'all') {
+      conditions.push('level = ?');
+      params.push(level);
+    }
+    if (search) {
+      conditions.push('(action LIKE ? OR message LIKE ? OR ip LIKE ?)');
+      const like = `%${search}%`;
+      params.push(like, like, like);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Gesamtanzahl (für Paginierung)
+    const total = db.prepare(`SELECT COUNT(*) AS cnt FROM system_logs ${where}`).get(...params).cnt;
+
+    // Einträge holen
+    const logs = db.prepare(
+      `SELECT * FROM system_logs ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
+
+    res.json({
+      logs,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit))
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

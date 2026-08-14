@@ -501,11 +501,26 @@ async function loadTiles(isSilentHeartbeat = false) {
         if (tile.open_in_new_tab === 1) {
           tileCard.target = '_blank';
         }
-        
+
         if (isSph) {
           tileCard.onclick = function(e) {
             handleSphClick(e, tile.id, tile.open_in_new_tab === 1);
           };
+        } else {
+          // Spinner auf der Kachel anzeigen, bis die neue Seite geladen ist
+          tileCard.addEventListener('click', function(e) {
+            const iconWrapper = this.querySelector('.tile-icon-wrapper');
+            if (iconWrapper && !iconWrapper.querySelector('.tile-loading-spinner')) {
+              const spinner = document.createElement('div');
+              spinner.className = 'tile-loading-spinner';
+              spinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:1.6rem; color:#fff; opacity:0.9;"></i>';
+              spinner.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); border-radius:inherit; z-index:5; backdrop-filter:blur(2px);';
+              iconWrapper.style.position = 'relative';
+              iconWrapper.appendChild(spinner);
+              // Spinner nach 8s wieder entfernen (Fallback falls Navigation abbricht)
+              setTimeout(() => spinner.remove(), 8000);
+            }
+          });
         }
       }
       
@@ -2884,13 +2899,16 @@ async function triggerSystemUpdate() {
 }
 
 /* --- TAB: System-Protokolle (Audit Log) --- */
-let allAdminLogs = [];
-let filteredAdminLogs = [];
 let currentLogPage = 1;
-let logsPerPage = 50; // Standard 50 Einträge pro Seite
+let logsPerPage = 100; // Standard 100 Einträge pro Seite
+let logsTotalEntries = 0;
+let logsTotalPages = 1;
+let _logSearchDebounce = null;
 
-async function loadAdminLogs() {
+async function loadAdminLogs(resetPage = true) {
   const tableBody = document.getElementById('admin-logs-table-body');
+  if (resetPage) currentLogPage = 1;
+
   tableBody.innerHTML = `
     <tr>
       <td colspan="6" style="text-align:center; padding:30px; color:var(--text-secondary);">
@@ -2901,26 +2919,37 @@ async function loadAdminLogs() {
   `;
 
   try {
-    const res = await fetch('api/admin/logs');
+    const level  = document.getElementById('log-filter-level')?.value || 'all';
+    const search = document.getElementById('log-search')?.value.trim() || '';
+    const limit  = logsPerPage === 'all' ? 500 : logsPerPage;
+
+    const params = new URLSearchParams({ page: currentLogPage, limit, level, search });
+    const res = await fetch(`api/admin/logs?${params}`);
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error || 'Fehler beim Laden der Protokolle');
     }
-    allAdminLogs = await res.json();
-    
-    // Filterwerte zurücksetzen
-    document.getElementById('log-filter-level').value = 'all';
-    document.getElementById('log-search').value = '';
-    currentLogPage = 1;
-    
-    filterAdminLogs();
+    const result = await res.json();
+
+    logsTotalEntries = result.total;
+    logsTotalPages   = result.totalPages;
+
+    // Tabelle rendern
+    renderAdminLogs(result.logs);
+
+    // Paginierung rendern
+    const startIndex = (currentLogPage - 1) * limit;
+    const endIndex   = Math.min(startIndex + result.logs.length, result.total);
+    renderPaginationControls('logs-pagination-top',    startIndex, endIndex, result.total, result.totalPages);
+    renderPaginationControls('logs-pagination-bottom', startIndex, endIndex, result.total, result.totalPages);
+
   } catch (err) {
     showAdminAlert(err.message, 'danger');
     tableBody.innerHTML = `
       <tr>
         <td colspan="6" style="text-align:center; padding:30px; color:var(--error-color);">
           <i class="fa-solid fa-triangle-exclamation fa-xl" style="margin-bottom:10px; display:block;"></i>
-          Fehler beim Laden der Protokolle: ${err.message}
+          Fehler beim Laden der Protokolle: ${escapeHtml(err.message)}
         </td>
       </tr>
     `;
@@ -2928,64 +2957,26 @@ async function loadAdminLogs() {
 }
 
 function filterAdminLogs() {
-  const levelFilter = document.getElementById('log-filter-level').value;
-  const searchFilter = document.getElementById('log-search').value.toLowerCase().trim();
-
-  filteredAdminLogs = allAdminLogs.filter(log => {
-    // Level match
-    const levelMatch = (levelFilter === 'all' || log.level === levelFilter);
-    
-    // Search match (bezieht sich auf ALLE Daten)
-    const searchMatch = !searchFilter || 
-      log.action.toLowerCase().includes(searchFilter) ||
-      log.message.toLowerCase().includes(searchFilter) ||
-      (log.ip && log.ip.toLowerCase().includes(searchFilter)) ||
-      (log.details && log.details.toLowerCase().includes(searchFilter));
-
-    return levelMatch && searchMatch;
-  });
-
-  currentLogPage = 1;
-  renderAdminLogsPage();
+  // Debounce bei der Suche (300ms), sofort bei Level-Filter
+  clearTimeout(_logSearchDebounce);
+  _logSearchDebounce = setTimeout(() => loadAdminLogs(true), 300);
 }
 
 function changeLogsPerPage(val) {
   logsPerPage = val === 'all' ? 'all' : parseInt(val, 10);
-  currentLogPage = 1;
-  renderAdminLogsPage();
+  loadAdminLogs(true);
 }
 
 function changeLogPage(page) {
-  const totalEntries = filteredAdminLogs.length;
-  const pageSize = logsPerPage === 'all' ? totalEntries : parseInt(logsPerPage, 10);
-  const totalPages = Math.ceil(totalEntries / (pageSize || 1)) || 1;
-
   if (page < 1) page = 1;
-  if (page > totalPages) page = totalPages;
-
+  if (page > logsTotalPages) page = logsTotalPages;
   currentLogPage = page;
-  renderAdminLogsPage();
+  loadAdminLogs(false);
 }
 
 function renderAdminLogsPage() {
-  const totalEntries = filteredAdminLogs.length;
-  const isAll = logsPerPage === 'all';
-  const pageSize = isAll ? totalEntries : parseInt(logsPerPage, 10);
-  const totalPages = isAll ? 1 : (Math.ceil(totalEntries / (pageSize || 1)) || 1);
-
-  if (currentLogPage > totalPages) currentLogPage = totalPages;
-  if (currentLogPage < 1) currentLogPage = 1;
-
-  const startIndex = isAll ? 0 : (currentLogPage - 1) * pageSize;
-  const endIndex = isAll ? totalEntries : Math.min(startIndex + pageSize, totalEntries);
-  const pageLogs = filteredAdminLogs.slice(startIndex, endIndex);
-
-  // 1. Tabelle rendern
-  renderAdminLogs(pageLogs);
-
-  // 2. Paginierung Oben & Unten rendern
-  renderPaginationControls('logs-pagination-top', startIndex, endIndex, totalEntries, totalPages);
-  renderPaginationControls('logs-pagination-bottom', startIndex, endIndex, totalEntries, totalPages);
+  // Wird nicht mehr direkt aufgerufen – loadAdminLogs() übernimmt alles
+  loadAdminLogs(false);
 }
 
 function renderPaginationControls(containerId, startIndex, endIndex, totalEntries, totalPages) {

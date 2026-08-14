@@ -107,6 +107,26 @@ function logEvent(level, action, message, details = null, ip = null) {
   }
 }
 
+/**
+ * Löscht alte System-Protokolle anhand des Log-Levels und konfigurierbarer Aufbewahrungszeiten:
+ * - INFO  → 10 Tage
+ * - WARN  → 30 Tage
+ * - ERROR → 365 Tage
+ */
+function cleanupOldLogs() {
+  try {
+    const infoResult  = db.prepare("DELETE FROM system_logs WHERE level = 'info'  AND datetime(created_at) < datetime('now', '-10 days')").run();
+    const warnResult  = db.prepare("DELETE FROM system_logs WHERE level = 'warn'  AND datetime(created_at) < datetime('now', '-30 days')").run();
+    const errorResult = db.prepare("DELETE FROM system_logs WHERE level = 'error' AND datetime(created_at) < datetime('now', '-365 days')").run();
+    const total = infoResult.changes + warnResult.changes + errorResult.changes;
+    if (total > 0) {
+      console.log(`[Logs Cleanup] ${total} alte Protokolleinträge gelöscht (INFO: ${infoResult.changes}, WARN: ${warnResult.changes}, ERROR: ${errorResult.changes}).`);
+    }
+  } catch (err) {
+    console.error('Fehler beim Log-Cleanup:', err);
+  }
+}
+
 // Initialer Migrationslauf beim Laden des Moduls
 runMigrations();
 
@@ -115,5 +135,6 @@ module.exports = {
   getConfig,
   setConfig,
   runMigrations,
-  logEvent
+  logEvent,
+  cleanupOldLogs
 };
