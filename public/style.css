@@ -491,6 +491,25 @@ main {
   opacity: 0.5;
 }
 
+/* Kachel im Ladezustand – hält den Hover-Zustand eingefroren */
+.tile-card.tile-card--loading {
+  transform: translateY(-8px);
+  background: var(--card-bg-hover);
+  border-color: var(--accent-color);
+  box-shadow: 0 20px 38px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.tile-card.tile-card--loading .tile-icon-wrapper {
+  color: #fff;
+  background: var(--accent-color);
+  transform: scale(1.05);
+}
+.tile-card.tile-card--loading .tile-bg-glow {
+  transform: scale(1.3);
+  opacity: 0.5;
+}
+
+
 /* Kachel Deaktiviert */
 .tile-card.disabled {
   cursor: not-allowed;

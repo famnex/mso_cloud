@@ -507,18 +507,26 @@ async function loadTiles(isSilentHeartbeat = false) {
             handleSphClick(e, tile.id, tile.open_in_new_tab === 1);
           };
         } else {
-          // Spinner auf der Kachel anzeigen, bis die neue Seite geladen ist
+          // Spinner + eingefrorener Hover-Zustand beim Klick
           tileCard.addEventListener('click', function(e) {
             const iconWrapper = this.querySelector('.tile-icon-wrapper');
             if (iconWrapper && !iconWrapper.querySelector('.tile-loading-spinner')) {
+              // Hover-Zustand dauerhaft einfrieren
+              this.classList.add('tile-card--loading');
+
               const spinner = document.createElement('div');
               spinner.className = 'tile-loading-spinner';
               spinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:1.6rem; color:#fff; opacity:0.9;"></i>';
               spinner.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); border-radius:inherit; z-index:5; backdrop-filter:blur(2px);';
               iconWrapper.style.position = 'relative';
               iconWrapper.appendChild(spinner);
-              // Spinner nach 8s wieder entfernen (Fallback falls Navigation abbricht)
-              setTimeout(() => spinner.remove(), 8000);
+
+              // Nach 8s zurücksetzen (Fallback falls Navigation abbricht)
+              const card = this;
+              setTimeout(() => {
+                spinner.remove();
+                card.classList.remove('tile-card--loading');
+              }, 8000);
             }
           });
         }
