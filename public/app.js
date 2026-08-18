@@ -457,7 +457,7 @@ async function loadTiles(isSilentHeartbeat = false) {
     }
 
     const tiles = await res.json();
-    const newHash = JSON.stringify(tiles.map(t => ({ id: t.id, title: t.title, is_time_locked: t.is_time_locked, is_untis_locked: t.is_untis_locked, icon: t.icon, allowed_groups: t.allowed_groups })));
+    const newHash = JSON.stringify(tiles.map(t => ({ id: t.id, title: t.title, is_time_locked: t.is_time_locked, is_untis_locked: t.is_untis_locked, is_sph_locked: t.is_sph_locked, icon: t.icon, allowed_groups: t.allowed_groups })));
 
     if (isSilentHeartbeat && newHash === lastTilesHash) {
       // Keine Änderungen an den freigeschalteten Kacheln -> DOM nicht berühren
@@ -486,7 +486,8 @@ async function loadTiles(isSilentHeartbeat = false) {
       
       const isLocked = tile.is_time_locked === 1;
       const isUntisLocked = tile.is_untis_locked === 1;
-      const isSph = tile.link && tile.link.includes('login.schulportal.hessen.de');
+      const isSphLocked = tile.is_sph_locked === 1;
+      const isSph = tile.link && (tile.link.includes('login.schulportal.hessen.de') || tile.link.includes('schulportal') || tile.link.includes('lanis'));
       
       if (isLocked) {
         tileCard.className = 'tile-card glass-panel time-locked';
@@ -500,6 +501,13 @@ async function loadTiles(isSilentHeartbeat = false) {
         tileCard.onclick = function(e) {
           e.preventDefault();
           openTileStatusInfoModal('untis-locked', tile.title, '', '', '');
+          return false;
+        };
+      } else if (isSphLocked) {
+        tileCard.className = 'tile-card glass-panel time-locked';
+        tileCard.onclick = function(e) {
+          e.preventDefault();
+          openTileStatusInfoModal('sph-locked', tile.title, '', '', '');
           return false;
         };
       } else {
@@ -542,8 +550,8 @@ async function loadTiles(isSilentHeartbeat = false) {
       
       let keyBtnHtml = '';
       if (currentUser && isSph) {
-        if (isLocked || isUntisLocked) {
-          keyBtnHtml = `<button class="tile-key-btn disabled" disabled onclick="event.preventDefault(); event.stopPropagation(); return false;" title="Schulportal ist während der Zeitsperre nicht verfügbar"><i class="fa-solid fa-link-slash"></i></button>`;
+        if (isLocked || isUntisLocked || isSphLocked) {
+          keyBtnHtml = `<button class="tile-key-btn disabled" disabled onclick="event.preventDefault(); event.stopPropagation(); return false;" title="Schulportal ist während der Sperre nicht verfügbar"><i class="fa-solid fa-link-slash"></i></button>`;
         } else {
           keyBtnHtml = `<button class="tile-key-btn" id="tile-key-btn-${tile.id}" onclick="openSphCredentialsModal(event, ${tile.id}, ${tile.open_in_new_tab === 1})" title="Schulportal-Zugangsdaten verknüpfen"><i class="fa-solid fa-link"></i></button>`;
         }
@@ -552,7 +560,7 @@ async function loadTiles(isSilentHeartbeat = false) {
       let badgeHtml = '';
       if (isLocked) {
         badgeHtml = `<span class="tile-badge badge-locked" title="Aktivierte Zeitsperre"><i class="fa-solid fa-clock"></i> Zeitsperre</span>`;
-      } else if (isUntisLocked) {
+      } else if (isUntisLocked || isSphLocked) {
         badgeHtml = `<span class="tile-badge badge-locked" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4);" title="Einrichtung erforderlich"><i class="fa-solid fa-user-gear"></i> Einrichtung</span>`;
       } else {
         badgeHtml = `<span class="tile-badge badge-offline" id="tile-badge-${tile.id}" style="display: none;"><i class="fa-solid fa-triangle-exclamation"></i> Offline</span>`;
@@ -563,7 +571,7 @@ async function loadTiles(isSilentHeartbeat = false) {
       if (isLocked) {
         statusDotClass = '';
         statusDotTitle = 'Aktivierte Zeitsperre';
-      } else if (isUntisLocked) {
+      } else if (isUntisLocked || isSphLocked) {
         statusDotClass = 'timeout';
         statusDotTitle = 'Einrichtung erforderlich';
       }
@@ -597,7 +605,7 @@ async function loadTiles(isSilentHeartbeat = false) {
           dot.className = 'status-dot';
           dot.setAttribute('title', 'Aktivierte Zeitsperre');
         }
-      } else if (isUntisLocked) {
+      } else if (isUntisLocked || isSphLocked) {
         const dot = document.getElementById(`status-dot-${tile.id}`);
         if (dot) {
           dot.className = 'status-dot timeout';
@@ -800,7 +808,30 @@ function openTileStatusInfoModal(type, tileTitle, timeStart, timeEnd, reason) {
       </div>
       <div>
         Diese Systeme müssen für deinen Account erst noch eingerichtet werden.<br><br>
-        Eine Anmeldung bei WebUntis ist erst nach dieser Einrichtung möglich.
+        Eine Anmeldung bei WebUntis ist erst nach dieser automatischen Einrichtung möglich.<br><br>
+        <strong>Du musst aktuell nichts weiter tun und kannst diesen Vorgang nicht beschleunigen. Bitte warte einfach ab, bis die Einrichtung abgeschlossen ist.</strong>
+      </div>
+    `;
+  } else if (type === 'sph-locked') {
+    // SCHULPORTAL NOCH NICHT EINGERICHTET
+    iconWrapper.style.background = 'rgba(245, 158, 11, 0.15)';
+    iconWrapper.style.border = '2px solid #f59e0b';
+    icon.className = 'fa-solid fa-user-gear fa-2xl';
+    icon.style.color = '#f59e0b';
+
+    title.innerText = '⚙️ Einrichtung erforderlich';
+
+    messageBox.style.background = 'rgba(245, 158, 11, 0.1)';
+    messageBox.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+    messageBox.style.color = 'var(--text-primary)';
+    messageBox.innerHTML = `
+      <div style="margin-bottom: 8px; font-weight: 700; color: var(--warn-color); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-triangle-exclamation"></i> Schulportal-Zugang wird eingerichtet
+      </div>
+      <div>
+        Das Schulportal muss für deinen Account erst noch eingerichtet werden.<br><br>
+        Eine Anmeldung im Schulportal ist erst nach dieser automatischen Einrichtung möglich.<br><br>
+        <strong>Du musst aktuell nichts weiter tun und kannst diesen Vorgang nicht beschleunigen. Bitte warte einfach ab, bis die Einrichtung abgeschlossen ist.</strong>
       </div>
     `;
   }
@@ -2795,6 +2826,7 @@ function renderUtcTilesList() {
         <span>Konfiguriert als: <strong>${escapeHtml(visSettingLabel)}</strong></span>
         ${item.is_time_locked === 1 ? '<span style="color:#f59e0b;"><i class="fa-solid fa-clock"></i> Aktuell zeitsperrt</span>' : ''}
         ${item.is_untis_locked === 1 ? '<span style="color:#f59e0b;"><i class="fa-solid fa-user-gear"></i> WebUntis-Kürzel fehlt</span>' : ''}
+        ${item.is_sph_locked === 1 ? '<span style="color:#f59e0b;"><i class="fa-solid fa-user-gear"></i> SPH-Zugangsdaten fehlen</span>' : ''}
       </div>
     `;
 

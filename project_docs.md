@@ -245,11 +245,13 @@ Das MSO Cloud Backend löst Namen, Rollen und den Untis-Benutzernamen in `src/ro
   * Jedes OIDC Token / Userinfo-Request loggt die exakt ausgelieferten JSON-Claims unter `oidc_token_claims` bzw. `oidc_userinfo_claims`.
   * Im Admin-Bereich unter **Systemprotokolle** sowie in der Server-Konsole (`[OIDC DEBUG]`) können die übermittelten Werte live eingesehen werden.
 
-### E. Automatische WebUntis-Kachelsperre bei fehlendem `untis_username`
-* Hat ein Benutzer über seine Sicherheitsgruppe Zugriff auf die WebUntis-Kachel, ist jedoch für seinen Account noch **kein `untis_username`** hinterlegt (weder in MySQL Feld 167 noch im Profil), wird die Kachel im Launcher automatisch als **gesperrt** dargestellt (Status: `Einrichtung erforderlich`).
-* Ein Klick auf die gesperrte Kachel öffnet das Status-Info-Modal mit der Meldung:  
-  *„Diese Systeme müssen für deinen Account erst noch eingerichtet werden. Eine Anmeldung bei WebUntis ist erst nach dieser Einrichtung möglich.“*
-* Direkte Aufrufe über `/api/tiles/sso/:id` werden mit HTTP 403 und derselben Meldung blockiert.
+### E. Automatische WebUntis- & Schulportal-Kachelsperre bei fehlenden Einrichtungsdaten
+* **WebUntis**: Hat ein Schüler Zugriff auf die WebUntis-Kachel, ist jedoch für seinen Account noch **kein `untis_username`** hinterlegt (weder in MySQL Feld 167 noch im Profil), wird die Kachel im Launcher automatisch als **gesperrt** dargestellt (Status: `Einrichtung erforderlich`).
+* **Schulportal (SPH)**: Hat ein Schüler Zugriff auf die Schulportal-Kachel, fehlen jedoch **Feld 165 (`sph_username`) oder Feld 164 (`sph_password`)** bzw. sind diese leer, wird die Kachel ebenfalls automatisch als **gesperrt** dargestellt (Status: `Einrichtung erforderlich`).
+* **Hinweistext im Modal**: Ein Klick auf die gesperrte Kachel öffnet das Status-Info-Modal mit der klaren Information, dass die Systeme eingerichtet werden und der Benutzer nichts tun kann/muss, sondern einfach abwarten soll:  
+  *„Diese Systeme müssen für deinen Account erst noch eingerichtet werden. Eine Anmeldung bei WebUntis [bzw. Schulportal] ist erst nach dieser automatischen Einrichtung möglich. Du musst aktuell nichts weiter tun und kannst diesen Vorgang nicht beschleunigen. Bitte warte einfach ab, bis die Einrichtung abgeschlossen ist.“*
+* **Ausnahme für Lehrkräfte & Administratoren**: Lehrkräfte und Admins sind von diesen automatischen Sperren **vollständig ausgenommen**, da für sie keine Schüler-Stammdaten hinterlegt sind und sie eigene/direkte Zugänge zu beiden Systemen nutzen.
+* **SSO-Schutz**: Direkte Aufrufe über `/api/tiles/sso/:id` werden für Schüler ohne entsprechende Daten mit HTTP 403 und derselben Meldung blockiert.
 
 
 

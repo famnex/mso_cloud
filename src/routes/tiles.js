@@ -105,7 +105,66 @@ function isWebUntisTile(tile) {
 }
 
 /**
- * Ermittelt das hinterlegte WebUntis-Benutzerkürzel (untis_username) eines Benutzers.
+ * Erkennt, ob es sich bei einer Kachel um das Schulportal (SPH / Lanis) handelt.
+ */
+function isSphTile(tile) {
+  if (!tile) return false;
+  const link = (tile.link || '').toLowerCase();
+  const title = (tile.title || '').toLowerCase();
+  return link.includes('login.schulportal.hessen.de') || link.includes('schulportal') || link.includes('lanis') || title.includes('schulportal') || title.includes('lanis');
+}
+
+/**
+ * Prüft, ob ein Benutzer Lehrer oder Administrator ist.
+ * Lehrer und Admins sind von den automatischen Kontosperren (WebUntis / Schulportal) befreit.
+ */
+function isTeacherOrAdmin(user) {
+  if (!user) return false;
+  
+  // 1. Admin oder Lehrer Rolle
+  const roleLower = (user.role || '').toLowerCase();
+  if (roleLower === 'admin' || roleLower === 'lehrer' || roleLower === 'teacher') {
+    return true;
+  }
+
+  // 2. Gruppen überprüfen
+  let groups = [];
+  try {
+    groups = Array.isArray(user.groups) ? user.groups : JSON.parse(user.groups || '[]');
+  } catch (e) {
+    groups = [];
+  }
+
+  for (const g of groups) {
+    const match = g.match(/cn=([^,]+)/i);
+    const name = (match ? match[1] : g).trim().toLowerCase();
+    if (name === 'lehrer' || name.includes('lehrer') || name === 'kollegium' || name.includes('kollegium') || name === 'admin' || name === 'administratoren' || name === 'personal') {
+      return true;
+    }
+  }
+
+  // 3. LDAP Mappings prüfen falls vorhanden
+  try {
+    const mappings = db.prepare('SELECT ldap_group_dn, user_role FROM ldap_mappings').all();
+    for (const m of mappings) {
+      const uRole = (m.user_role || '').trim().toLowerCase();
+      if (uRole === 'lehrer' || uRole === 'admin') {
+        const mappingDN = m.ldap_group_dn.toLowerCase();
+        for (const g of groups) {
+          const gLower = g.toLowerCase();
+          const match = g.match(/cn=([^,]+)/i);
+          const cn = (match ? match[1] : g).trim().toLowerCase();
+          if (gLower === mappingDN || cn === mappingDN) return true;
+        }
+      }
+    }
+  } catch (e) {}
+
+  return false;
+}
+
+/**
+ * Ermittelt das hinterlegte WebUntis-Benutzerkürzel (untis_username, Feld 167) eines Benutzers.
  */
 async function resolveUserUntisUsername(user) {
   if (!user) return '';
@@ -121,6 +180,47 @@ async function resolveUserUntisUsername(user) {
     }
   }
   return untisUsername;
+}
+
+/**
+ * Ermittelt die Schulportal-Zugangsdaten (sph_username = Feld 165, sph_password = Feld 164) eines Benutzers.
+ */
+async function resolveUserSphCredentials(user) {
+  if (!user) return { sphUsername: '', sphPassword: '' };
+  let sphUsername = '';
+  let sphPassword = '';
+
+  // 1. Primär aus student_db (MySQL / dynamische Feldwerte: Feld 165 = sph_username, Feld 164 = sph_password)
+  if (user.id || user.username || user.email) {
+    try {
+      const studentProf = await studentDb.getStudentProfile(user);
+      if (studentProf) {
+        if (studentProf.sph_username && String(studentProf.sph_username).trim()) {
+          sphUsername = String(studentProf.sph_username).trim();
+        }
+        if (studentProf.sph_password && String(studentProf.sph_password).trim()) {
+          sphPassword = String(studentProf.sph_password).trim();
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. Sekundär: Aus lokaler Tabelle user_sph_credentials falls dort verknüpft
+  if ((!sphUsername || !sphPassword) && user.id) {
+    try {
+      const sphCreds = db.prepare('SELECT sph_username, sph_password FROM user_sph_credentials WHERE user_id = ?').get(user.id);
+      if (sphCreds) {
+        if (!sphUsername && sphCreds.sph_username && String(sphCreds.sph_username).trim()) {
+          sphUsername = String(sphCreds.sph_username).trim();
+        }
+        if (!sphPassword && sphCreds.sph_password && String(sphCreds.sph_password).trim()) {
+          sphPassword = String(sphCreds.sph_password).trim();
+        }
+      }
+    } catch (e) {}
+  }
+
+  return { sphUsername, sphPassword };
 }
 
 /**
@@ -309,18 +409,34 @@ router.get('/', async (req, res) => {
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
     const visibleTiles = allTiles.filter(tile => evaluateTileVisibility(tile, user).visible);
 
-    // WebUntis-Kürzel für den aktuellen Benutzer ermitteln
-    const userUntisUsername = user ? await resolveUserUntisUsername(user) : '';
+    // Prüfen, ob der Benutzer Lehrer oder Administrator ist (diese sind befreit)
+    const isExempt = isTeacherOrAdmin(user);
 
-    // Zeitsperren- & WebUntis-Sperren-Flag dynamisch anfügen
+    let userUntisUsername = '';
+    let sphUsername = '';
+    let sphPassword = '';
+
+    if (user && !isExempt) {
+      userUntisUsername = await resolveUserUntisUsername(user);
+      const sphCreds = await resolveUserSphCredentials(user);
+      sphUsername = sphCreds.sphUsername;
+      sphPassword = sphCreds.sphPassword;
+    }
+
+    // Zeitsperren- & WebUntis/SPH-Sperren-Flag dynamisch anfügen
     const mappedTiles = visibleTiles.map(tile => {
       const locked = isTileTimeLocked(tile);
       const isUntis = isWebUntisTile(tile);
-      const isUntisLocked = Boolean(user && isUntis && !userUntisUsername);
+      const isSph = isSphTile(tile);
+
+      const isUntisLocked = Boolean(user && !isExempt && isUntis && !userUntisUsername);
+      const isSphLocked = Boolean(user && !isExempt && isSph && (!sphUsername || !sphPassword));
+
       return {
         ...tile,
         is_time_locked: locked ? 1 : 0,
-        is_untis_locked: isUntisLocked ? 1 : 0
+        is_untis_locked: isUntisLocked ? 1 : 0,
+        is_sph_locked: isSphLocked ? 1 : 0
       };
     });
 
@@ -372,8 +488,19 @@ router.get('/check-user/:userId', async (req, res) => {
       displayName: userRow.display_name
     };
 
-    // WebUntis-Kürzel für den Zielbenutzer ermitteln
-    const targetUntisUsername = await resolveUserUntisUsername(targetUser);
+    // Prüfen, ob der Zielbenutzer Lehrer oder Administrator ist
+    const isExempt = isTeacherOrAdmin(targetUser);
+
+    let targetUntisUsername = '';
+    let targetSphUsername = '';
+    let targetSphPassword = '';
+
+    if (!isExempt) {
+      targetUntisUsername = await resolveUserUntisUsername(targetUser);
+      const sphCreds = await resolveUserSphCredentials(targetUser);
+      targetSphUsername = sphCreds.sphUsername;
+      targetSphPassword = sphCreds.sphPassword;
+    }
 
     // Alle Kacheln laden
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
@@ -382,7 +509,9 @@ router.get('/check-user/:userId', async (req, res) => {
       const evalResult = evaluateTileVisibility(tile, targetUser);
       const isTimeLocked = isTileTimeLocked(tile);
       const isUntis = isWebUntisTile(tile);
-      const isUntisLocked = Boolean(isUntis && !targetUntisUsername);
+      const isSph = isSphTile(tile);
+      const isUntisLocked = Boolean(!isExempt && isUntis && !targetUntisUsername);
+      const isSphLocked = Boolean(!isExempt && isSph && (!targetSphUsername || !targetSphPassword));
       return {
         id: tile.id,
         title: tile.title,
@@ -393,6 +522,7 @@ router.get('/check-user/:userId', async (req, res) => {
         allowed_groups: tile.allowed_groups,
         is_time_locked: isTimeLocked ? 1 : 0,
         is_untis_locked: isUntisLocked ? 1 : 0,
+        is_sph_locked: isSphLocked ? 1 : 0,
         time_limit_enabled: tile.time_limit_enabled,
         time_limit_start: tile.time_limit_start,
         time_limit_end: tile.time_limit_end,
@@ -478,12 +608,23 @@ router.get('/sso/:id', async (req, res) => {
       return res.status(403).send('Zugriff verweigert. Sie haben keine Berechtigung für diesen Dienst.');
     }
 
-    // WebUntis-Sperre erzwingen, wenn kein untis_username hinterlegt ist
-    const isUntis = isWebUntisTile(tile);
-    if (isUntis && user && user.role !== 'admin') {
-      const userUntisUsername = await resolveUserUntisUsername(user);
-      if (!userUntisUsername) {
-        return res.status(403).send('Zugriff vorübergehend nicht möglich. Diese Systeme müssen für deinen Account erst noch eingerichtet werden. Eine Anmeldung bei WebUntis ist erst nach dieser Einrichtung möglich.');
+    // WebUntis- und SPH-Sperre erzwingen, wenn für Schüler entsprechende Daten fehlen (Lehrer/Admins ausgenommen)
+    const isExempt = isTeacherOrAdmin(user);
+    if (user && !isExempt) {
+      const isUntis = isWebUntisTile(tile);
+      if (isUntis) {
+        const userUntisUsername = await resolveUserUntisUsername(user);
+        if (!userUntisUsername) {
+          return res.status(403).send('Zugriff vorübergehend nicht möglich. Diese Systeme müssen für deinen Account erst noch eingerichtet werden. Eine Anmeldung bei WebUntis ist erst nach dieser Einrichtung möglich.');
+        }
+      }
+
+      const isSph = isSphTile(tile);
+      if (isSph) {
+        const { sphUsername, sphPassword } = await resolveUserSphCredentials(user);
+        if (!sphUsername || !sphPassword) {
+          return res.status(403).send('Zugriff vorübergehend nicht möglich. Das Schulportal muss für deinen Account erst noch eingerichtet werden. Eine Anmeldung im Schulportal ist erst nach dieser Einrichtung möglich.');
+        }
       }
     }
 
