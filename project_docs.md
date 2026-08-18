@@ -245,6 +245,12 @@ Das MSO Cloud Backend löst Namen, Rollen und den Untis-Benutzernamen in `src/ro
   * Jedes OIDC Token / Userinfo-Request loggt die exakt ausgelieferten JSON-Claims unter `oidc_token_claims` bzw. `oidc_userinfo_claims`.
   * Im Admin-Bereich unter **Systemprotokolle** sowie in der Server-Konsole (`[OIDC DEBUG]`) können die übermittelten Werte live eingesehen werden.
 
+### E. Automatische WebUntis-Kachelsperre bei fehlendem `untis_username`
+* Hat ein Benutzer über seine Sicherheitsgruppe Zugriff auf die WebUntis-Kachel, ist jedoch für seinen Account noch **kein `untis_username`** hinterlegt (weder in MySQL Feld 167 noch im Profil), wird die Kachel im Launcher automatisch als **gesperrt** dargestellt (Status: `Einrichtung erforderlich`).
+* Ein Klick auf die gesperrte Kachel öffnet das Status-Info-Modal mit der Meldung:  
+  *„Diese Systeme müssen für deinen Account erst noch eingerichtet werden. Eine Anmeldung bei WebUntis ist erst nach dieser Einrichtung möglich.“*
+* Direkte Aufrufe über `/api/tiles/sso/:id` werden mit HTTP 403 und derselben Meldung blockiert.
+
 
 
 

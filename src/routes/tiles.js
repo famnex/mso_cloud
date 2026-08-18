@@ -7,6 +7,7 @@ const http = require('http');
 const { URL } = require('url');
 const { db, logEvent, getConfig } = require('../db');
 const ldap = require('../ldap');
+const studentDb = require('../student_db');
 
 /**
  * Native Backend Status-Checker Endpoint: Prüft die Erreichbarkeit einer Kachel-URL vom Server aus.
@@ -91,6 +92,35 @@ function isTileTimeLocked(tile) {
     // Bereich überspannt Mitternacht (z.B. 22:00 bis 06:00)
     return now < start && now > end;
   }
+}
+
+/**
+ * Erkennt, ob es sich bei einer Kachel um einen WebUntis-Dienst handelt.
+ */
+function isWebUntisTile(tile) {
+  if (!tile) return false;
+  const link = (tile.link || '').toLowerCase();
+  const title = (tile.title || '').toLowerCase();
+  return link.includes('webuntis') || link.includes('untis') || title.includes('webuntis') || title.includes('untis');
+}
+
+/**
+ * Ermittelt das hinterlegte WebUntis-Benutzerkürzel (untis_username) eines Benutzers.
+ */
+async function resolveUserUntisUsername(user) {
+  if (!user) return '';
+  let untisUsername = user.untis_username ? String(user.untis_username).trim() : '';
+  if (!untisUsername && (user.id || user.username || user.email)) {
+    try {
+      const studentProf = await studentDb.getStudentProfile(user);
+      if (studentProf && studentProf.untis_username && String(studentProf.untis_username).trim()) {
+        untisUsername = String(studentProf.untis_username).trim();
+      }
+    } catch (e) {
+      // Ignorieren falls Abfrage nicht möglich
+    }
+  }
+  return untisUsername;
 }
 
 /**
@@ -279,12 +309,18 @@ router.get('/', async (req, res) => {
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
     const visibleTiles = allTiles.filter(tile => evaluateTileVisibility(tile, user).visible);
 
-    // Zeitsperren-Flag dynamisch anfügen
+    // WebUntis-Kürzel für den aktuellen Benutzer ermitteln
+    const userUntisUsername = user ? await resolveUserUntisUsername(user) : '';
+
+    // Zeitsperren- & WebUntis-Sperren-Flag dynamisch anfügen
     const mappedTiles = visibleTiles.map(tile => {
       const locked = isTileTimeLocked(tile);
+      const isUntis = isWebUntisTile(tile);
+      const isUntisLocked = Boolean(user && isUntis && !userUntisUsername);
       return {
         ...tile,
-        is_time_locked: locked ? 1 : 0
+        is_time_locked: locked ? 1 : 0,
+        is_untis_locked: isUntisLocked ? 1 : 0
       };
     });
 
@@ -299,7 +335,7 @@ router.get('/', async (req, res) => {
  * Admin-Diagnose-Endpunkt: Prüft Kachelrechte für einen bestimmten Benutzer
  * auf Basis des exakt identischen Evaluierungs-Algorithmus.
  */
-router.get('/check-user/:userId', (req, res) => {
+router.get('/check-user/:userId', async (req, res) => {
   const adminUser = req.session.user;
   if (!adminUser || adminUser.role !== 'admin') {
     return res.status(403).json({ error: 'Nur Administratoren haben Zugriff auf das Kachel-Diagnose-Tool.' });
@@ -336,12 +372,17 @@ router.get('/check-user/:userId', (req, res) => {
       displayName: userRow.display_name
     };
 
+    // WebUntis-Kürzel für den Zielbenutzer ermitteln
+    const targetUntisUsername = await resolveUserUntisUsername(targetUser);
+
     // Alle Kacheln laden
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
 
     const evaluations = allTiles.map(tile => {
       const evalResult = evaluateTileVisibility(tile, targetUser);
       const isTimeLocked = isTileTimeLocked(tile);
+      const isUntis = isWebUntisTile(tile);
+      const isUntisLocked = Boolean(isUntis && !targetUntisUsername);
       return {
         id: tile.id,
         title: tile.title,
@@ -351,6 +392,7 @@ router.get('/check-user/:userId', (req, res) => {
         visibility: tile.visibility,
         allowed_groups: tile.allowed_groups,
         is_time_locked: isTimeLocked ? 1 : 0,
+        is_untis_locked: isUntisLocked ? 1 : 0,
         time_limit_enabled: tile.time_limit_enabled,
         time_limit_start: tile.time_limit_start,
         time_limit_end: tile.time_limit_end,
@@ -375,7 +417,7 @@ router.get('/check-user/:userId', (req, res) => {
  * SSO-Weiterleitungs-Endpunkt für Kacheln.
  * Prüft Berechtigung und signiert SSO-Tokens bei Bedarf.
  */
-router.get('/sso/:id', (req, res) => {
+router.get('/sso/:id', async (req, res) => {
   const tileId = req.params.id;
   const user = req.session.user;
 
@@ -434,6 +476,15 @@ router.get('/sso/:id', (req, res) => {
         return res.redirect(`${prefix}/index.html?login_required=1`);
       }
       return res.status(403).send('Zugriff verweigert. Sie haben keine Berechtigung für diesen Dienst.');
+    }
+
+    // WebUntis-Sperre erzwingen, wenn kein untis_username hinterlegt ist
+    const isUntis = isWebUntisTile(tile);
+    if (isUntis && user && user.role !== 'admin') {
+      const userUntisUsername = await resolveUserUntisUsername(user);
+      if (!userUntisUsername) {
+        return res.status(403).send('Zugriff vorübergehend nicht möglich. Diese Systeme müssen für deinen Account erst noch eingerichtet werden. Eine Anmeldung bei WebUntis ist erst nach dieser Einrichtung möglich.');
+      }
     }
 
     // Zeitsperre auf Server-Ebene erzwingen (Admins können sie zum Testen umgehen!)
