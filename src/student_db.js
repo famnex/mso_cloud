@@ -142,35 +142,35 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
                           lowerSub.includes('ausgegeben') || lowerVal.includes('ausgegeben') ||
                           lowerSub.includes('gedruckt') || lowerVal.includes('gedruckt');
 
-        // 1132: Bild final akzeptiert & verifiziert (Gültig & Aktiv)
-        const isApproved = lowerRaw === '1132' || lowerVal === '1132' || lowerRaw.includes('1132') ||
-                           lowerSub.includes('genehmigt') || lowerVal.includes('genehmigt') ||
-                           lowerSub.includes('verifiziert') || lowerVal.includes('verifiziert') ||
-                           lowerSub.includes('aktiviert') || lowerVal.includes('aktiviert') ||
-                           lowerSub.includes('akzeptiert') || lowerVal.includes('akzeptiert') ||
-                           lowerSub.includes('freigegeben') || lowerVal.includes('freigegeben');
-
         // 1134: Bild abgelehnt
         const isRejected = lowerRaw === '1134' || lowerVal === '1134' || lowerRaw.includes('1134') ||
                            lowerSub.includes('abgelehnt') || lowerVal.includes('abgelehnt');
 
-        // 1131: Bild in Stufe 1 akzeptiert, aber weiterhin in Prüfung
+        // 1131: Bild in Stufe 1 akzeptiert / eingereicht -> WEITERHIN IN PRÜFUNG (Ausweis gesperrt)
         const isPendingStage1 = lowerRaw === '1131' || lowerVal === '1131' || lowerRaw.includes('1131') ||
                                 lowerSub.includes('akzeptiert') || lowerVal.includes('akzeptiert') ||
                                 lowerSub.includes('eingereicht') || lowerVal.includes('eingereicht');
 
+        // 1132: Bild final genehmigt & verifiziert (Gültig & Aktiv)
+        const isApproved = lowerRaw === '1132' || lowerVal === '1132' || lowerRaw.includes('1132') ||
+                           lowerSub.includes('genehmigt') || lowerVal.includes('genehmigt') ||
+                           lowerSub.includes('verifiziert') || lowerVal.includes('verifiziert') ||
+                           lowerSub.includes('aktiviert') || lowerVal.includes('aktiviert') ||
+                           lowerSub.includes('freigegeben') || lowerVal.includes('freigegeben');
+
         if (isPrinted) {
           profile.card_status = 'Ausweis gedruckt';
           profile.card_status_code = '1133';
-        } else if (isApproved) {
-          profile.card_status = 'Bild genehmigt';
-          profile.card_status_code = '1132';
         } else if (isRejected) {
           profile.card_status = 'Bild abgelehnt';
           profile.card_status_code = '1134';
         } else if (isPendingStage1) {
+          // 1131 / Bild akzeptiert: Ist Stufe 1, also WEITERHIN IN PRÜFUNG!
           profile.card_status = 'Bild eingereicht';
           profile.card_status_code = '1131';
+        } else if (isApproved) {
+          profile.card_status = 'Bild genehmigt';
+          profile.card_status_code = '1132';
         } else {
           // 1130: Wenn Foto hochgeladen -> in Prüfung (1131). Wenn kein Foto -> kein Bild (1130).
           if (photoFile) {
@@ -208,15 +208,15 @@ function getLocalProfile(userId) {
     if (s.includes('ausgegeben') || s.includes('gedruckt') || s === '1133') {
       profile.card_status = 'Ausweis gedruckt';
       profile.card_status_code = '1133';
-    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s.includes('aktiviert') || s === '1132') {
-      profile.card_status = 'Bild genehmigt';
-      profile.card_status_code = '1132';
-    } else if (s.includes('eingereicht') || s.includes('akzeptiert') || s === '1131') {
-      profile.card_status = 'Bild eingereicht';
-      profile.card_status_code = '1131';
     } else if (s.includes('abgelehnt') || s === '1134') {
       profile.card_status = 'Bild abgelehnt';
       profile.card_status_code = '1134';
+    } else if (s.includes('eingereicht') || s.includes('akzeptiert') || s === '1131') {
+      profile.card_status = 'Bild eingereicht';
+      profile.card_status_code = '1131';
+    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s.includes('aktiviert') || s === '1132') {
+      profile.card_status = 'Bild genehmigt';
+      profile.card_status_code = '1132';
     } else {
       if (profile.card_image) {
         profile.card_status = 'Bild eingereicht';
