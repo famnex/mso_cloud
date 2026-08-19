@@ -4580,6 +4580,14 @@ function clearStudentViewDOM() {
     cardStatusLabel.style.color = 'var(--warn-color)';
   }
 
+  const uploadBtnLobby = document.getElementById('student-photo-upload-btn');
+  if (uploadBtnLobby) uploadBtnLobby.style.display = 'none';
+  const uploadBtnCard = document.getElementById('student-photo-upload-btn-card');
+  if (uploadBtnCard) uploadBtnCard.style.display = 'none';
+  const guidelinesPreview = document.getElementById('student-photo-guidelines-preview');
+  if (guidelinesPreview) guidelinesPreview.style.display = 'none';
+  const photoHelpText = document.getElementById('student-photo-help-text');
+  if (photoHelpText) photoHelpText.style.display = 'none';
 }
 
 async function loadStudentProfile() {
