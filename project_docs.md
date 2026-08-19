@@ -253,6 +253,21 @@ Das MSO Cloud Backend löst Namen, Rollen und den Untis-Benutzernamen in `src/ro
 * **Ausnahme für Lehrkräfte & Administratoren**: Lehrkräfte und Admins sind von diesen automatischen Sperren **vollständig ausgenommen**, da für sie keine Schüler-Stammdaten hinterlegt sind und sie eigene/direkte Zugänge zu beiden Systemen nutzen.
 * **SSO-Schutz**: Direkte Aufrufe über `/api/tiles/sso/:id` werden für Schüler ohne entsprechende Daten mit HTTP 403 und derselben Meldung blockiert.
 
+---
+
+## 10. Schülerausweis Status-Matrix & Ausweisbild-Verifikation
+
+Die Gültigkeit des digitalen Schülerausweises wird über Feld 158 der Schulanmeldungs-Datenbank gesteuert:
+
+| Statuscode | Status-Text (`card_status`) | Bedeutung & Prozessschritt | Ausweis-Gültigkeit | Upload-Möglichkeit | Ausweis-Ansicht | Zusatzmarker |
+| :---: | :--- | :--- | :---: | :---: | :--- | :---: |
+| **`1130`** | `Bild ungeprüft / Kein Bild` | Kein Bild vorhanden | ❌ **Inaktiv / Gesperrt** | ✅ **Upload möglich** | Warnbanner: *Kein Foto hinterlegt* | - |
+| **`1131`** | `Bild eingereicht` | Bild hochgeladen, aber noch nicht geprüft | ⏳ **In Prüfung / Gesperrt** | ✅ **Upload möglich** | Warnbanner: *Foto in Prüfung* | - |
+| **`1134`** | `Bild abgelehnt` | Bild durch Schule abgelehnt | ❌ **Abgelehnt / Gesperrt** | ✅ **Upload möglich** | Warnbanner: *Foto abgelehnt* | - |
+| **`1132`** | `Bild genehmigt` | Bild final akzeptiert & verifiziert | ✅ **Gültig & Aktiv** | ❌ **Upload gesperrt** | Vollständiger digitaler Ausweis | - |
+| **`1133`** | `Ausweis gedruckt` | Bild verifiziert & Plastikkarte produziert | ✅ **Gültig & Aktiv** | ❌ **Upload gesperrt** | Vollständiger digitaler Ausweis | 🪪 *Plastikkarte gedruckt* |
+
+
 
 
 

@@ -4770,17 +4770,24 @@ async function loadStudentProfile() {
 
     const cardStatusText = document.getElementById('card-status-text');
     if (cardStatusText) {
-      cardStatusText.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
-      if (isApproved) {
+      if (profile.card_status_code === '1133' || profile.card_status === 'Ausweis gedruckt' || profile.card_status === 'Ausweis ausgegeben') {
+        cardStatusText.innerText = 'Ausweis gedruckt (Plastikkarte produziert)';
+        cardStatusText.style.color = 'var(--success-color)';
+        cardStatusText.style.fontWeight = 'normal';
+      } else if (isApproved) {
+        cardStatusText.innerText = profile.card_status || 'Bild genehmigt';
         cardStatusText.style.color = 'var(--success-color)';
         cardStatusText.style.fontWeight = 'normal';
       } else if (profile.card_status === 'Bild eingereicht' || profile.card_status_code === '1131') {
+        cardStatusText.innerText = profile.card_status || 'Bild eingereicht';
         cardStatusText.style.color = 'var(--accent-color)';
         cardStatusText.style.fontWeight = 'normal';
       } else if (profile.card_status === 'Bild abgelehnt' || profile.card_status_code === '1134') {
+        cardStatusText.innerText = profile.card_status || 'Bild abgelehnt';
         cardStatusText.style.color = 'var(--error-color)';
         cardStatusText.style.fontWeight = 'bold';
       } else {
+        cardStatusText.innerText = profile.card_status || 'Bild ungeprüft / Kein Bild';
         cardStatusText.style.color = 'var(--warn-color)';
         cardStatusText.style.fontWeight = 'normal';
       }
@@ -4788,7 +4795,10 @@ async function loadStudentProfile() {
 
     const cardStatusLabel = document.getElementById('card-status-label');
     if (cardStatusLabel) {
-      if (isApproved) {
+      if (profile.card_status_code === '1133' || profile.card_status === 'Ausweis gedruckt' || profile.card_status === 'Ausweis ausgegeben') {
+        cardStatusLabel.innerHTML = '<i class="fa-solid fa-id-card"></i> GÜLTIG (PLASTIKKARTE)';
+        cardStatusLabel.style.color = 'var(--success-color)';
+      } else if (isApproved) {
         cardStatusLabel.innerHTML = '<i class="fa-solid fa-circle-check"></i> GÜLTIG';
         cardStatusLabel.style.color = 'var(--success-color)';
       } else if (profile.card_status === 'Bild eingereicht' || profile.card_status_code === '1131') {

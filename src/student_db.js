@@ -137,30 +137,33 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
         const lowerRaw = rawVal.toLowerCase();
         const lowerSub = subVal.toLowerCase();
 
-        // 1. Genehmigt / Gedruckt / Ausgegeben / Verifiziert / Aktiviert (Codes 1132, 1133 oder entsprechende Status-Texte)
-        const isApproved = ['1132', '1133'].includes(lowerRaw) || 
-                           ['1132', '1133'].includes(lowerVal) ||
-                           lowerRaw.includes('1132') || lowerRaw.includes('1133') ||
-                           lowerVal.includes('gedruckt') || lowerVal.includes('ausgegeben') ||
-                           lowerVal.includes('genehmigt') || lowerVal.includes('verifiziert') ||
-                           lowerVal.includes('aktiviert') || lowerVal.includes('akzeptiert') ||
-                           lowerVal.includes('freigegeben') ||
-                           lowerSub.includes('gedruckt') || lowerSub.includes('ausgegeben') ||
-                           lowerSub.includes('genehmigt') || lowerSub.includes('verifiziert') ||
-                           lowerSub.includes('aktiviert') || lowerSub.includes('akzeptiert') ||
-                           lowerSub.includes('freigegeben');
+        // 1133: Ausweis gedruckt / Plastikkarte produziert (Gültig & Aktiv)
+        const isPrinted = lowerRaw === '1133' || lowerVal === '1133' || lowerRaw.includes('1133') ||
+                          lowerSub.includes('ausgegeben') || lowerVal.includes('ausgegeben') ||
+                          lowerSub.includes('gedruckt') || lowerVal.includes('gedruckt');
 
-        // 2. Abgelehnt (Code 1134 oder Text "abgelehnt")
-        const isRejected = lowerRaw === '1134' || lowerVal === '1134' || 
-                           lowerVal.includes('abgelehnt') || lowerSub.includes('abgelehnt');
+        // 1132: Bild final akzeptiert & verifiziert (Gültig & Aktiv)
+        const isApproved = lowerRaw === '1132' || lowerVal === '1132' || lowerRaw.includes('1132') ||
+                           lowerSub.includes('genehmigt') || lowerVal.includes('genehmigt') ||
+                           lowerSub.includes('verifiziert') || lowerVal.includes('verifiziert') ||
+                           lowerSub.includes('aktiviert') || lowerVal.includes('aktiviert') ||
+                           lowerSub.includes('akzeptiert') || lowerVal.includes('akzeptiert') ||
+                           lowerSub.includes('freigegeben') || lowerVal.includes('freigegeben');
 
-        // 3. Eingereicht (Code 1131 oder Text "eingereicht")
-        const isPending = lowerRaw === '1131' || lowerVal === '1131' ||
-                          lowerVal.includes('eingereicht') || lowerSub.includes('eingereicht');
+        // 1134: Bild abgelehnt
+        const isRejected = lowerRaw === '1134' || lowerVal === '1134' || lowerRaw.includes('1134') ||
+                           lowerSub.includes('abgelehnt') || lowerVal.includes('abgelehnt');
 
-        if (isApproved) {
+        // 1131: Bild hochgeladen, aber noch nicht geprüft (in Prüfung)
+        const isPending = lowerRaw === '1131' || lowerVal === '1131' || lowerRaw.includes('1131') ||
+                          lowerSub.includes('eingereicht') || lowerVal.includes('eingereicht');
+
+        if (isPrinted) {
+          profile.card_status = 'Ausweis gedruckt';
+          profile.card_status_code = '1133';
+        } else if (isApproved) {
           profile.card_status = 'Bild genehmigt';
-          profile.card_status_code = (lowerRaw === '1133' || lowerVal.includes('ausgegeben') || lowerSub.includes('ausgegeben')) ? '1133' : '1132';
+          profile.card_status_code = '1132';
         } else if (isRejected) {
           profile.card_status = 'Bild abgelehnt';
           profile.card_status_code = '1134';
@@ -168,7 +171,7 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
           profile.card_status = 'Bild eingereicht';
           profile.card_status_code = '1131';
         } else {
-          // Ungeprüft / 1130 / Kein Bild
+          // 1130 / Ungeprüft / Kein Bild
           if (photoFile) {
             profile.card_status = 'Bild eingereicht';
             profile.card_status_code = '1131';
@@ -201,14 +204,20 @@ function getLocalProfile(userId) {
   const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(userId);
   if (profile) {
     const s = String(profile.card_status || '').toLowerCase();
-    if (s.includes('genehmigt') || s.includes('gedruckt') || s.includes('ausgegeben') || s.includes('verifiziert') || s.includes('akzeptiert') || s.includes('aktiviert') || s === '1132' || s === '1133') {
+    if (s.includes('ausgegeben') || s.includes('gedruckt') || s === '1133') {
+      profile.card_status = 'Ausweis gedruckt';
+      profile.card_status_code = '1133';
+    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s.includes('aktiviert') || s.includes('akzeptiert') || s === '1132') {
       profile.card_status = 'Bild genehmigt';
-      profile.card_status_code = (s.includes('ausgegeben') || s === '1133') ? '1133' : '1132';
+      profile.card_status_code = '1132';
     } else if (s.includes('eingereicht') || s === '1131') {
+      profile.card_status = 'Bild eingereicht';
       profile.card_status_code = '1131';
     } else if (s.includes('abgelehnt') || s === '1134') {
+      profile.card_status = 'Bild abgelehnt';
       profile.card_status_code = '1134';
     } else {
+      profile.card_status = 'Bild ungeprüft / Kein Bild';
       profile.card_status_code = '1130';
     }
   }

@@ -220,6 +220,7 @@ router.get('/card', async (req, res) => {
       card_image: profile.card_image,
       card_status: profile.card_status,
       card_status_code: profile.card_status_code || '1130',
+      is_card_printed: (profile.card_status_code === '1133' || rawStatus === 'Ausweis gedruckt' || rawStatus === 'Ausweis ausgegeben'),
       expires_at: expiresAt,
       server_time: new Date().toISOString(),
       card_primary_color: getConfig('card_primary_color', '#3b82f6'),

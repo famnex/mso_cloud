@@ -327,6 +327,23 @@
       border-radius: 1px;
     }
 
+    .printed-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1.5px solid var(--text);
+      font-size: 0.65rem;
+      position: relative;
+      opacity: 0.88;
+      flex-shrink: 0;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(4px);
+    }
+
     /* ── Geburtstagstoast (kleine Anzeige auf dem Ausweis) ─────────── */
     .birthday-cake-icon {
       display: none;
@@ -1561,10 +1578,11 @@
           </div>
         </div>
 
-        <!-- Sonder-Symbole (Torte & Unter-18) ABSOLUT links neben dem Hologramm -->
+        <!-- Sonder-Symbole (Torte, Unter-18 & Plastikkarte) ABSOLUT links neben dem Hologramm -->
         <div class="special-card-badges" id="special-card-badges">
           <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
           <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
+          <span class="printed-badge" id="printed-badge" style="display:none;" title="Ausweis als Plastikkarte gedruckt"><i class="fa-solid fa-id-card"></i></span>
         </div>
 
         <!-- Hologram PWA App-Icon Badge (Rechtsbündig OBERHALB der Trennlinie) -->
@@ -2874,6 +2892,13 @@
           under18Badge.style.display = age < 18 ? 'inline-flex' : 'none';
         } else {
           under18Badge.style.display = 'none';
+        }
+
+        // ── Plastikkarte-Gedruckt-Marker (1133) ──────────────────────────
+        const printedBadge = document.getElementById('printed-badge');
+        if (printedBadge) {
+          const isPrinted = data.is_card_printed || data.card_status_code === '1133' || data.card_status === 'Ausweis gedruckt' || data.card_status === 'Ausweis ausgegeben';
+          printedBadge.style.display = isPrinted ? 'inline-flex' : 'none';
         }
 
         // ── Automatisch Sonderdesign aktivieren (nicht Admin-Vorschau) ─
