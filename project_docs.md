@@ -257,17 +257,16 @@ Das MSO Cloud Backend löst Namen, Rollen und den Untis-Benutzernamen in `src/ro
 
 ## 10. Schülerausweis Status-Matrix & Ausweisbild-Verifikation
 
-Die Gültigkeit des digitalen Schülerausweises wird über Feld 158 der Schulanmeldungs-Datenbank gesteuert:
+Die Gültigkeit des digitalen Schülerausweises wird über die Kombination von **Feld 158** (Ausweisstatus) und **Feld 37** (Passfoto-Blob) gesteuert:
 
-| Statuscode | Status-Text (`card_status`) | Bedeutung & Prozessschritt | Ausweis-Gültigkeit | Upload-Möglichkeit | Ausweis-Ansicht | Zusatzmarker |
-| :---: | :--- | :--- | :---: | :---: | :--- | :---: |
-| **`1130`** | `Bild ungeprüft / Kein Bild` | Kein Bild vorhanden | ❌ **Inaktiv / Gesperrt** | ✅ **Upload möglich** | Warnbanner: *Kein Foto hinterlegt* | - |
-| **`1131`** | `Bild eingereicht` | Bild hochgeladen, aber noch nicht geprüft | ⏳ **In Prüfung / Gesperrt** | ✅ **Upload möglich** | Warnbanner: *Foto in Prüfung* | - |
-| **`1134`** | `Bild abgelehnt` | Bild durch Schule abgelehnt | ❌ **Abgelehnt / Gesperrt** | ✅ **Upload möglich** | Warnbanner: *Foto abgelehnt* | - |
-| **`1132`** | `Bild genehmigt` | Bild final akzeptiert & verifiziert | ✅ **Gültig & Aktiv** | ❌ **Upload gesperrt** | Vollständiger digitaler Ausweis | - |
-| **`1133`** | `Ausweis gedruckt` | Bild verifiziert & Plastikkarte produziert | ✅ **Gültig & Aktiv** | ❌ **Upload gesperrt** | Vollständiger digitaler Ausweis | 🪪 *Plastikkarte gedruckt* |
+| Feld 158 (Code) | Passfoto (Feld 37) | Status (`card_status`) | Bedeutung & Prüfungsprozess | Ausweis-Gültigkeit | Foto-Upload | Ausweis-Ansicht (`student_card.html`) | Profilanzeige (`app.js`) | Zusatzmarker |
+| :---: | :---: | :--- | :--- | :---: | :---: | :--- | :--- | :---: |
+| **`1130`** | ❌ **Nein** | `Bild ungeprüft / Kein Bild` | **Kein Foto vorhanden**: Schüler hat noch kein Passbild hochgeladen | ❌ **Inaktiv / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Kein Foto hinterlegt — Bitte lade ein Foto hoch.“* | ⚪ *Inaktiv / Kein Foto* | — |
+| **`1130`** | ✅ **Ja** | `Bild eingereicht` | **In Prüfung (Neu eingereicht)**: Foto hochgeladen, wartet auf Erstprüfung | ⏳ **In Prüfung / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Foto in Prüfung — Dein Ausweisfoto wird momentan noch geprüft.“* | 🟡 *In Prüfung* | — |
+| **`1131`** | ✅/❌ | `Bild eingereicht` | **In Prüfung (Stufe 1 akzeptiert)**: Foto in Stufe 1 akzeptiert, wartet auf finale Freigabe | ⏳ **In Prüfung / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Foto in Prüfung — Dein Ausweisfoto wird momentan noch geprüft.“* | 🟡 *In Prüfung* | — |
+| **`1134`** | ✅/❌ | `Bild abgelehnt` | **Foto abgelehnt**: Foto entspricht nicht den Vorgaben und wurde abgelehnt | ❌ **Abgelehnt / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Foto abgelehnt — Bitte lade ein neues Foto hoch.“* | 🔴 *Abgelehnt* | — |
+| **`1132`** | ✅ **Ja** | `Bild genehmigt` | **Gültig (Final verifiziert)**: Foto final geprüft, genehmigt & verifiziert | ✅ **Gültig & Aktiv** | ❌ **Gesperrt** | **Vollständiger digitaler Schülerausweis** (Gültig) | 🟢 *Gültig* | — |
+| **`1133`** | ✅ **Ja** | `Ausweis gedruckt` | **Gültig (Plastikkarte gedruckt)**: Foto verifiziert & Ausweis als Plastikkarte produziert | ✅ **Gültig & Aktiv** | ❌ **Gesperrt** | **Vollständiger digitaler Schülerausweis** (Gültig) + 🪪 Marker | 🟢 *Gültig (Plastikkarte)* | 🪪 *Plastikkarte gedruckt* |
 
-
-
-
-
+> [!IMPORTANT]
+> **Zwingende Bildprüfung im Backend**: Auch bei Status `1132` oder `1133` prüfen die Routen (`/api/student/card` und `/api/student/status-check`) sowie das Frontend immer zwingend, ob in Feld 37 tatsächlich ein Bild existiert. Fehlt das Bild (`!card_image`), wird der Ausweis niemals freigeschaltet.

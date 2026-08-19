@@ -2792,17 +2792,16 @@
       const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
       const isOfflineExpired = data.card_status === 'Offline-Zeitraum abgelaufen';
       const hasNoImage = !data.card_image;
+      const isVerified = (data.card_status === 'Bild genehmigt' || 
+                          data.card_status === 'genehmigt' || 
+                          data.card_status === 'Bild verifiziert' ||
+                          data.card_status === 'Ausweis gedruckt' ||
+                          data.card_status === 'Ausweis ausgegeben' ||
+                          data.card_status === '1132' ||
+                          data.card_status === '1133' ||
+                          data.card_status_code === '1132' ||
+                          data.card_status_code === '1133') && !hasNoImage;
       const isRejected = data.card_status === 'Bild abgelehnt' || data.card_status_code === '1134';
-      const isVerified = data.card_status === 'Bild genehmigt' || 
-                         data.card_status === 'genehmigt' || 
-                         data.card_status === 'Bild verifiziert' ||
-                         data.card_status === 'Bild akzeptiert' ||
-                         data.card_status === 'Ausweis gedruckt' ||
-                         data.card_status === 'Ausweis ausgegeben' ||
-                         data.card_status === '1132' ||
-                         data.card_status === '1133' ||
-                         data.card_status_code === '1132' ||
-                         data.card_status_code === '1133';
       const isNotVerified = !isVerified && !isRejected && !isOfflineExpired;
 
       // Check Expiry

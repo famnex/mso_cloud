@@ -154,9 +154,10 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
         const isRejected = lowerRaw === '1134' || lowerVal === '1134' || lowerRaw.includes('1134') ||
                            lowerSub.includes('abgelehnt') || lowerVal.includes('abgelehnt');
 
-        // 1131: Bild hochgeladen, aber noch nicht geprüft (in Prüfung)
-        const isPending = lowerRaw === '1131' || lowerVal === '1131' || lowerRaw.includes('1131') ||
-                          lowerSub.includes('eingereicht') || lowerVal.includes('eingereicht');
+        // 1131: Bild in Stufe 1 akzeptiert, aber weiterhin in Prüfung
+        const isPendingStage1 = lowerRaw === '1131' || lowerVal === '1131' || lowerRaw.includes('1131') ||
+                                lowerSub.includes('akzeptiert') || lowerVal.includes('akzeptiert') ||
+                                lowerSub.includes('eingereicht') || lowerVal.includes('eingereicht');
 
         if (isPrinted) {
           profile.card_status = 'Ausweis gedruckt';
@@ -167,11 +168,11 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
         } else if (isRejected) {
           profile.card_status = 'Bild abgelehnt';
           profile.card_status_code = '1134';
-        } else if (isPending) {
+        } else if (isPendingStage1) {
           profile.card_status = 'Bild eingereicht';
           profile.card_status_code = '1131';
         } else {
-          // 1130 / Ungeprüft / Kein Bild
+          // 1130: Wenn Foto hochgeladen -> in Prüfung (1131). Wenn kein Foto -> kein Bild (1130).
           if (photoFile) {
             profile.card_status = 'Bild eingereicht';
             profile.card_status_code = '1131';
@@ -207,18 +208,23 @@ function getLocalProfile(userId) {
     if (s.includes('ausgegeben') || s.includes('gedruckt') || s === '1133') {
       profile.card_status = 'Ausweis gedruckt';
       profile.card_status_code = '1133';
-    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s.includes('aktiviert') || s.includes('akzeptiert') || s === '1132') {
+    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s.includes('aktiviert') || s === '1132') {
       profile.card_status = 'Bild genehmigt';
       profile.card_status_code = '1132';
-    } else if (s.includes('eingereicht') || s === '1131') {
+    } else if (s.includes('eingereicht') || s.includes('akzeptiert') || s === '1131') {
       profile.card_status = 'Bild eingereicht';
       profile.card_status_code = '1131';
     } else if (s.includes('abgelehnt') || s === '1134') {
       profile.card_status = 'Bild abgelehnt';
       profile.card_status_code = '1134';
     } else {
-      profile.card_status = 'Bild ungeprüft / Kein Bild';
-      profile.card_status_code = '1130';
+      if (profile.card_image) {
+        profile.card_status = 'Bild eingereicht';
+        profile.card_status_code = '1131';
+      } else {
+        profile.card_status = 'Bild ungeprüft / Kein Bild';
+        profile.card_status_code = '1130';
+      }
     }
   }
   return profile;
