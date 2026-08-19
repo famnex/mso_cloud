@@ -4821,6 +4821,31 @@ async function loadStudentProfile() {
   }
 }
 
+function openPhotoGuidelinesModal() {
+  const checkbox = document.getElementById('photo-guidelines-confirm-checkbox');
+  if (checkbox) checkbox.checked = false;
+  togglePhotoGuidelinesConfirm(false);
+  openModal('photo-guidelines-modal');
+}
+
+function togglePhotoGuidelinesConfirm(isChecked) {
+  const submitBtn = document.getElementById('photo-guidelines-submit-btn');
+  if (submitBtn) {
+    submitBtn.disabled = !isChecked;
+    submitBtn.style.opacity = isChecked ? '1' : '0.5';
+    submitBtn.style.cursor = isChecked ? 'pointer' : 'not-allowed';
+  }
+}
+
+function startPhotoUploadSelection() {
+  closeModal('photo-guidelines-modal');
+  const input = document.getElementById('student-photo-input');
+  if (input) {
+    input.value = '';
+    input.click();
+  }
+}
+
 function handleStudentPhotoSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
