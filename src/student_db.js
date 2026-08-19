@@ -89,12 +89,17 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
     last_name: '',
     birth_date: null,
     birth_place: '',
-    mediothek_number: '',
+    email: '',
+    username: '',
     start_password: '',
+    mediothek_number: '',
+    sph_username: '',
+    sph_password: '',
+    untis_username: '',
     account_status: 'false',
     card_status: 'Bild ungeprüft / Kein Bild',
     card_status_code: '1130',
-    card_image: photoFile || null,
+    card_image: photoFile,
     dsgvo_consent: 'Nein',
     publish_consent: 'Nein',
     usage_consent: 'Nein',
@@ -110,7 +115,10 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
   };
 
   rows.forEach(row => {
-    const val = (row.value || '').trim();
+    const val = String(row.value || '').trim();
+    const rawVal = String(row.raw_value || '').trim();
+    const subVal = String(row.subfield_value || '').trim();
+
     switch (Number(row.field)) {
       case 1: profile.first_name = val; break;
       case 2: profile.last_name = val; break;
@@ -126,26 +134,48 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
       case 150: profile.account_status = val; break;
       case 158: {
         const lowerVal = val.toLowerCase();
-        profile.card_status_code = lowerVal;
-        
-        if (lowerVal.includes('gedruckt') || lowerVal.includes('ausgegeben') || ['1132', '1133'].includes(lowerVal)) {
+        const lowerRaw = rawVal.toLowerCase();
+        const lowerSub = subVal.toLowerCase();
+
+        // 1. Genehmigt / Gedruckt / Ausgegeben / Verifiziert / Aktiviert (Codes 1132, 1133 oder entsprechende Status-Texte)
+        const isApproved = ['1132', '1133'].includes(lowerRaw) || 
+                           ['1132', '1133'].includes(lowerVal) ||
+                           lowerRaw.includes('1132') || lowerRaw.includes('1133') ||
+                           lowerVal.includes('gedruckt') || lowerVal.includes('ausgegeben') ||
+                           lowerVal.includes('genehmigt') || lowerVal.includes('verifiziert') ||
+                           lowerVal.includes('aktiviert') || lowerVal.includes('akzeptiert') ||
+                           lowerVal.includes('freigegeben') ||
+                           lowerSub.includes('gedruckt') || lowerSub.includes('ausgegeben') ||
+                           lowerSub.includes('genehmigt') || lowerSub.includes('verifiziert') ||
+                           lowerSub.includes('aktiviert') || lowerSub.includes('akzeptiert') ||
+                           lowerSub.includes('freigegeben');
+
+        // 2. Abgelehnt (Code 1134 oder Text "abgelehnt")
+        const isRejected = lowerRaw === '1134' || lowerVal === '1134' || 
+                           lowerVal.includes('abgelehnt') || lowerSub.includes('abgelehnt');
+
+        // 3. Eingereicht (Code 1131 oder Text "eingereicht")
+        const isPending = lowerRaw === '1131' || lowerVal === '1131' ||
+                          lowerVal.includes('eingereicht') || lowerSub.includes('eingereicht');
+
+        if (isApproved) {
           profile.card_status = 'Bild genehmigt';
-        }
-        else if (lowerVal.includes('abgelehnt') || lowerVal === '1134') {
+          profile.card_status_code = (lowerRaw === '1133' || lowerVal.includes('ausgegeben') || lowerSub.includes('ausgegeben')) ? '1133' : '1132';
+        } else if (isRejected) {
           profile.card_status = 'Bild abgelehnt';
-        }
-        else if (lowerVal.includes('akzeptiert') || lowerVal === '1131') {
+          profile.card_status_code = '1134';
+        } else if (isPending) {
           profile.card_status = 'Bild eingereicht';
-        }
-        else if (lowerVal.includes('ungeprüft') || lowerVal.includes('kein bild') || lowerVal === '1130') {
+          profile.card_status_code = '1131';
+        } else {
+          // Ungeprüft / 1130 / Kein Bild
           if (photoFile) {
             profile.card_status = 'Bild eingereicht';
+            profile.card_status_code = '1131';
           } else {
             profile.card_status = 'Bild ungeprüft / Kein Bild';
+            profile.card_status_code = '1130';
           }
-        }
-        else {
-          profile.card_status = 'Bild ungeprüft / Kein Bild';
         }
         break;
       }
@@ -170,11 +200,13 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
 function getLocalProfile(userId) {
   const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(userId);
   if (profile) {
-    if (profile.card_status === 'Bild genehmigt') {
-      profile.card_status_code = '1132';
-    } else if (profile.card_status === 'Bild eingereicht') {
+    const s = String(profile.card_status || '').toLowerCase();
+    if (s.includes('genehmigt') || s.includes('gedruckt') || s.includes('ausgegeben') || s.includes('verifiziert') || s.includes('akzeptiert') || s.includes('aktiviert') || s === '1132' || s === '1133') {
+      profile.card_status = 'Bild genehmigt';
+      profile.card_status_code = (s.includes('ausgegeben') || s === '1133') ? '1133' : '1132';
+    } else if (s.includes('eingereicht') || s === '1131') {
       profile.card_status_code = '1131';
-    } else if (profile.card_status === 'Bild abgelehnt') {
+    } else if (s.includes('abgelehnt') || s === '1134') {
       profile.card_status_code = '1134';
     } else {
       profile.card_status_code = '1130';
@@ -238,7 +270,9 @@ async function getStudentProfile(user) {
 
       const [fieldRows] = await pool.query(`
         SELECT fv.field, f.type, 
-               CASE WHEN f.type IN ('select', 'radio', 'checkboxes') THEN sf.value ELSE fv.value END AS value
+               CASE WHEN f.type IN ('select', 'radio', 'checkboxes') THEN sf.value ELSE fv.value END AS value,
+               fv.value AS raw_value,
+               sf.value AS subfield_value
         FROM fieldvalues fv
         JOIN fields f ON fv.field = f.ID
         LEFT JOIN subfields sf ON sf.ID = fv.value
@@ -401,7 +435,9 @@ async function getAllStudents() {
 
         const [fieldRows] = await pool.query(`
           SELECT fv.field, f.type, 
-                 CASE WHEN f.type IN ('select', 'radio', 'checkboxes') THEN sf.value ELSE fv.value END AS value
+                 CASE WHEN f.type IN ('select', 'radio', 'checkboxes') THEN sf.value ELSE fv.value END AS value,
+                 fv.value AS raw_value,
+                 sf.value AS subfield_value
           FROM fieldvalues fv
           JOIN fields f ON fv.field = f.ID
           LEFT JOIN subfields sf ON sf.ID = fv.value

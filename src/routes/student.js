@@ -141,6 +141,7 @@ router.get('/card', async (req, res) => {
 
     // Status- und Gültigkeitsauswertung
     const rawStatus = profile.card_status || 'Bild ungeprüft / Kein Bild';
+    const statusCode = String(profile.card_status_code || '');
     const isRevoked = rawStatus === 'Ausweis gesperrt' || rawStatus === 'gesperrt' || rawStatus === 'Ungültig';
     const expiryDate = new Date(expirationYear, 6, 31, 23, 59, 59);
     const isExpired = now > expiryDate;
@@ -149,7 +150,11 @@ router.get('/card', async (req, res) => {
                        rawStatus === 'Bild verifiziert' ||
                        rawStatus === 'Bild akzeptiert' ||
                        rawStatus === 'Ausweis gedruckt' ||
-                       rawStatus === 'Ausweis ausgegeben';
+                       rawStatus === 'Ausweis ausgegeben' ||
+                       rawStatus === '1132' ||
+                       rawStatus === '1133' ||
+                       statusCode === '1132' ||
+                       statusCode === '1133';
     const hasNoImage = !profile.card_image;
 
     let statusSummary = 'Gültig';
@@ -214,6 +219,7 @@ router.get('/card', async (req, res) => {
       mediothek_number: profile.mediothek_number,
       card_image: profile.card_image,
       card_status: profile.card_status,
+      card_status_code: profile.card_status_code || '1130',
       expires_at: expiresAt,
       server_time: new Date().toISOString(),
       card_primary_color: getConfig('card_primary_color', '#3b82f6'),
@@ -311,6 +317,7 @@ router.get('/status-check', async (req, res) => {
     }
 
     const rawStatus = profile.card_status || 'Bild ungeprüft / Kein Bild';
+    const statusCode = String(profile.card_status_code || '');
     const hasImage = !!profile.card_image;
 
     const isVerified = rawStatus === 'Bild genehmigt' || 
@@ -318,7 +325,11 @@ router.get('/status-check', async (req, res) => {
                        rawStatus === 'Bild verifiziert' ||
                        rawStatus === 'Bild akzeptiert' ||
                        rawStatus === 'Ausweis gedruckt' ||
-                       rawStatus === 'Ausweis ausgegeben';
+                       rawStatus === 'Ausweis ausgegeben' ||
+                       rawStatus === '1132' ||
+                       rawStatus === '1133' ||
+                       statusCode === '1132' ||
+                       statusCode === '1133';
 
     const now = new Date();
     const currentYear = now.getFullYear();

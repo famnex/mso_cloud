@@ -2780,7 +2780,11 @@
                          data.card_status === 'Bild verifiziert' ||
                          data.card_status === 'Bild akzeptiert' ||
                          data.card_status === 'Ausweis gedruckt' ||
-                         data.card_status === 'Ausweis ausgegeben';
+                         data.card_status === 'Ausweis ausgegeben' ||
+                         data.card_status === '1132' ||
+                         data.card_status === '1133' ||
+                         data.card_status_code === '1132' ||
+                         data.card_status_code === '1133';
       const isNotVerified = !isVerified && !isRejected && !isOfflineExpired;
 
       // Check Expiry
