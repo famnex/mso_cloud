@@ -4730,12 +4730,20 @@ async function loadStudentProfile() {
     
     const uploadBtnLobby = document.getElementById('student-photo-upload-btn');
     const uploadBtnCard = document.getElementById('student-photo-upload-btn-card');
+    const guidelinesPreview = document.getElementById('student-photo-guidelines-preview');
+    const photoHelpText = document.getElementById('student-photo-help-text');
     
     if (uploadBtnLobby) {
       uploadBtnLobby.style.display = uploadAllowed ? 'flex' : 'none';
     }
     if (uploadBtnCard) {
       uploadBtnCard.style.display = uploadAllowed ? 'flex' : 'none';
+    }
+    if (guidelinesPreview) {
+      guidelinesPreview.style.display = uploadAllowed ? 'block' : 'none';
+    }
+    if (photoHelpText) {
+      photoHelpText.style.display = uploadAllowed ? 'block' : 'none';
     }
 
     const previewImg = document.getElementById('student-photo-preview');
