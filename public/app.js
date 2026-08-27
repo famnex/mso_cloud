@@ -1855,6 +1855,22 @@ async function loadAdminConfig() {
       loginIpWhitelistInput.value = formattedIps.join('\n');
     }
 
+    // ProxyCheck Felder befüllen
+    const proxycheckEnabledEl = document.getElementById('proxycheck_enabled');
+    if (proxycheckEnabledEl) proxycheckEnabledEl.checked = cfg.proxycheck_enabled === '1';
+    const proxycheckKeyEl = document.getElementById('proxycheck_api_key');
+    if (proxycheckKeyEl) proxycheckKeyEl.value = cfg.proxycheck_api_key || '';
+    const proxycheckVpnEl = document.getElementById('proxycheck_check_vpn');
+    if (proxycheckVpnEl) proxycheckVpnEl.checked = cfg.proxycheck_check_vpn !== '0';
+    const proxycheckTorEl = document.getElementById('proxycheck_check_tor');
+    if (proxycheckTorEl) proxycheckTorEl.checked = cfg.proxycheck_check_tor !== '0';
+    const proxycheckProxyEl = document.getElementById('proxycheck_check_proxy');
+    if (proxycheckProxyEl) proxycheckProxyEl.checked = cfg.proxycheck_check_proxy !== '0';
+    const proxycheckCompromisedEl = document.getElementById('proxycheck_check_compromised');
+    if (proxycheckCompromisedEl) proxycheckCompromisedEl.checked = cfg.proxycheck_check_compromised !== '0';
+    const proxycheckThresholdEl = document.getElementById('proxycheck_risk_threshold');
+    if (proxycheckThresholdEl) proxycheckThresholdEl.value = cfg.proxycheck_risk_threshold || '67';
+
     // Schülerausweis Felder befüllen
     const cardSchoolInput = document.getElementById('card_school_name');
     if (cardSchoolInput) {
@@ -2329,6 +2345,79 @@ async function testMysqlConnection() {
     }
   } catch (err) {
     showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function saveProxyCheckConfig() {
+  const body = {
+    proxycheck_enabled: document.getElementById('proxycheck_enabled').checked ? '1' : '0',
+    proxycheck_api_key: document.getElementById('proxycheck_api_key').value.trim(),
+    proxycheck_check_vpn: document.getElementById('proxycheck_check_vpn').checked ? '1' : '0',
+    proxycheck_check_tor: document.getElementById('proxycheck_check_tor').checked ? '1' : '0',
+    proxycheck_check_proxy: document.getElementById('proxycheck_check_proxy').checked ? '1' : '0',
+    proxycheck_check_compromised: document.getElementById('proxycheck_check_compromised').checked ? '1' : '0',
+    proxycheck_risk_threshold: document.getElementById('proxycheck_risk_threshold').value.trim() || '67'
+  };
+
+  try {
+    const res = await fetch('api/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      showAdminAlert('ProxyCheck.io Einstellungen erfolgreich gespeichert.', 'success');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function testProxyCheckConnection() {
+  const apiKey = document.getElementById('proxycheck_api_key').value.trim();
+  const resultBox = document.getElementById('proxycheck-test-result');
+  if (resultBox) {
+    resultBox.style.display = 'block';
+    resultBox.style.background = 'rgba(56, 189, 248, 0.1)';
+    resultBox.style.border = '1px solid rgba(56, 189, 248, 0.3)';
+    resultBox.style.color = '#38bdf8';
+    resultBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verbindung zu ProxyCheck.io wird getestet...';
+  }
+
+  try {
+    const res = await fetch('api/admin/proxycheck/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: apiKey })
+    });
+    const data = await res.json();
+
+    if (resultBox) {
+      if (res.ok && data.success) {
+        resultBox.style.background = 'rgba(34, 197, 94, 0.12)';
+        resultBox.style.border = '1px solid rgba(34, 197, 94, 0.35)';
+        resultBox.style.color = 'var(--success-color)';
+        resultBox.innerHTML = `
+          <div style="font-weight:700; margin-bottom:4px;"><i class="fa-solid fa-circle-check"></i> ${data.message}</div>
+          <div style="font-size:0.82rem; color:var(--text);">
+            Heute verbrauchte Abfragen: <strong>${data.queries_today}</strong> / <strong>${data.daily_limit}</strong><br>
+            Verbleibende Abfragen heute: <strong style="color:var(--accent-color);">${data.queries_remaining}</strong>
+          </div>
+        `;
+      } else {
+        resultBox.style.background = 'rgba(239, 68, 68, 0.12)';
+        resultBox.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+        resultBox.style.color = 'var(--error-color)';
+        resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>Verbindungsfehler:</strong> ${data.message || data.error}`;
+      }
+    }
+  } catch (err) {
+    if (resultBox) {
+      resultBox.style.background = 'rgba(239, 68, 68, 0.12)';
+      resultBox.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+      resultBox.style.color = 'var(--error-color)';
+      resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>Fehler:</strong> ${err.message}`;
+    }
   }
 }
 

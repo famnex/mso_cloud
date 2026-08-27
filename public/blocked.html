@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zugriff eingeschränkt - MSO Cloud Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      background: radial-gradient(circle at top right, #1e1b4b, #0f172a, #020617);
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .blocked-card {
+      max-width: 620px;
+      width: 100%;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 20px;
+      padding: 40px 35px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(239, 68, 68, 0.15);
+      text-align: center;
+      box-sizing: border-box;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .icon-wrapper {
+      width: 80px;
+      height: 80px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 2px solid rgba(239, 68, 68, 0.4);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px auto;
+      color: #ef4444;
+      font-size: 2.2rem;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+      margin-bottom: 25px;
+    }
+
+    .guide-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: left;
+      margin-bottom: 25px;
+    }
+
+    .guide-box h3 {
+      margin: 0 0 12px 0;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .guide-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 0.88rem;
+      color: #e2e8f0;
+      line-height: 1.7;
+    }
+
+    .details-box {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      padding: 15px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      text-align: left;
+      margin-bottom: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .details-item span {
+      display: block;
+      color: #cbd5e1;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .btn-reload {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #ffffff;
+      border: none;
+      padding: 14px 28px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+      text-decoration: none;
+    }
+
+    .btn-reload:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    @media (max-width: 480px) {
+      .blocked-card { padding: 25px 20px; }
+      .details-box { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="blocked-card">
+    <div class="icon-wrapper" id="block-icon">
+      <i class="fa-solid fa-shield-halved"></i>
+    </div>
+
+    <h1 id="block-title">Zugriff eingeschränkt</h1>
+    <p class="subtitle" id="block-subtitle">
+      Ihre Verbindung konnte nicht freigegeben werden, da ein aktiver Anonymisierungsdienst oder ein erhöhtes Sicherheitsrisiko auf Ihrer IP-Adresse erkannt wurde.
+    </p>
+
+    <!-- Handlungsempfehlungen -->
+    <div class="guide-box">
+      <h3><i class="fa-solid fa-circle-check"></i> Was können Sie jetzt tun?</h3>
+      <ul id="block-recommendations">
+        <li>Deaktivieren Sie eventuell aktive <strong>VPN-Verbindungen</strong> oder Tunnel-Dienste.</li>
+        <li>Beenden Sie den <strong>TOR-Browser</strong> oder Proxy-Dienste, falls verwendet.</li>
+        <li>Laden Sie diese Seite anschließend neu.</li>
+        <li>Bei Fragen wenden Sie sich an die Schul-IT der Modellschule Obersberg.</li>
+      </ul>
+    </div>
+
+    <!-- Technische Details -->
+    <div class="details-box">
+      <div class="details-item">
+        IP-Adresse:
+        <span id="detail-ip">-</span>
+      </div>
+      <div class="details-item">
+        Erkannter Typ:
+        <span id="detail-type">-</span>
+      </div>
+      <div class="details-item">
+        Provider / Netz:
+        <span id="detail-provider">-</span>
+      </div>
+      <div class="details-item">
+        Risiko-Score:
+        <span id="detail-risk">-</span>
+      </div>
+    </div>
+
+    <button class="btn-reload" onclick="window.location.reload()">
+      <i class="fa-solid fa-arrows-rotate"></i> Seite neu laden
+    </button>
+  </div>
+
+  <script>
+    // URL-Parameter auslesen und Seite dynamisch anpassen
+    const params = new URLSearchParams(window.location.search);
+    const reason = (params.get('reason') || '').toLowerCase();
+    const ip = params.get('ip') || '-';
+    const type = params.get('type') || '-';
+    const provider = params.get('provider') || '-';
+    const score = params.get('score') || '-';
+
+    document.getElementById('detail-ip').textContent = ip;
+    document.getElementById('detail-type').textContent = type;
+    document.getElementById('detail-provider').textContent = provider;
+    document.getElementById('detail-risk').textContent = score !== '-' ? (score + ' / 100') : '-';
+
+    const iconEl = document.getElementById('block-icon');
+    const titleEl = document.getElementById('block-title');
+    const subtitleEl = document.getElementById('block-subtitle');
+    const recsEl = document.getElementById('block-recommendations');
+
+    if (reason === 'vpn') {
+      iconEl.innerHTML = '<i class="fa-solid fa-lock"></i>';
+      titleEl.textContent = 'VPN-Verbindung erkannt';
+      subtitleEl.textContent = 'Aus Sicherheitsgründen ist der Zugriff auf das MSO Cloud Portal über aktive VPN-Tunnel nicht gestattet.';
+      recsEl.innerHTML = `
+        <li>Bitte <strong>deaktivieren Sie Ihren VPN-Dienst</strong> (z.B. NordVPN, Mullvad, ExpressVPN, ProtonVPN).</li>
+        <li>Klicken Sie danach unten auf <strong>"Seite neu laden"</strong>.</li>
+        <li>Sollten Sie sich im Schulnetzwerk befinden, ist keine VPN-Verbindung erforderlich.</li>
+      `;
+    } else if (reason === 'tor') {
+      iconEl.innerHTML = '<i class="fa-solid fa-user-ninja"></i>';
+      titleEl.textContent = 'TOR-Netzwerk erkannt';
+      subtitleEl.textContent = 'Der Zugriff über das TOR-Anonymisierungsnetzwerk ist aus Sicherheitsgründen nicht erlaubt.';
+      recsEl.innerHTML = `
+        <li>Bitte schließen Sie den <strong>TOR-Browser</strong> und nutzen Sie einen Standard-Browser (z. B. Chrome, Firefox, Safari, Edge).</li>
+        <li>Verwenden Sie eine direkte Internetverbindung ohne TOR-Relays.</li>
+      `;
+    } else if (reason === 'proxy') {
+      iconEl.innerHTML = '<i class="fa-solid fa-network-wired"></i>';
+      titleEl.textContent = 'Proxy-Server erkannt';
+      subtitleEl.textContent = 'Ein aktiver Proxy-Server wurde auf Ihrer Verbindung festgestellt.';
+      recsEl.innerHTML = `
+        <li>Deaktivieren Sie eventuell konfigurierte Proxy-Server in Ihren Browser- oder Systemeinstellungen.</li>
+        <li>Laden Sie die Seite anschließend neu.</li>
+      `;
+    } else if (reason === 'compromised' || reason === 'risk') {
+      iconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      titleEl.textContent = 'Erhöhtes Sicherheitsrisiko erkannt';
+      subtitleEl.textContent = `Aufgrund eines erhöhten Risiko-Scores (${score !== '-' ? score : 'hoch'}) wurde der Zugriff temporär eingeschränkt.`;
+      recsEl.innerHTML = `
+        <li>Stellen Sie sicher, dass keine Schadsoftware oder ungewöhnlicher Traffic von Ihrem Netz ausgeht.</li>
+        <li>Versuchen Sie, die Verbindung neu aufzubauen oder das Netzwerk zu wechseln.</li>
+      `;
+    }
+  </script>
+</body>
+</html>

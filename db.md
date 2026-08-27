@@ -31,6 +31,13 @@ Speichert alle globalen Konfigurationswerte der Anwendung (LDAP, SMTP, Setup-Sta
 * `login_max_attempts`: `'5'` (Maximale Fehlversuche vor IP-Sperre, vom Admin konfigurierbar)
 * `login_lockout_duration_min`: `'15'` (Sperrdauer in Minuten, vom Admin konfigurierbar)
 * `login_ip_whitelist`: `''` (Komma-/Zeilen-getrennte IPs oder CIDR-Subnetze wie `10.0.0.0/8`, die niemals gesperrt werden)
+* `proxycheck_enabled`: `'0'` (Flag für ProxyCheck.io Schutz: `0` = Deaktiviert, `1` = Aktiv)
+* `proxycheck_api_key`: `''` (ProxyCheck.io API-Key für Anonymisierungs- und VPN-Prüfung)
+* `proxycheck_check_vpn`: `'1'` (VPN-Verbindungen blockieren: `0` = Nein, `1` = Ja)
+* `proxycheck_check_tor`: `'1'` (TOR-Netzwerk-Verbindungen blockieren: `0` = Nein, `1` = Ja)
+* `proxycheck_check_proxy`: `'1'` (Proxy-Server blockieren: `0` = Nein, `1` = Ja)
+* `proxycheck_check_compromised`: `'1'` (Kompromittierte Server/IPs blockieren: `0` = Nein, `1` = Ja)
+* `proxycheck_risk_threshold`: `'67'` (Schwellenwert für den Risiko-Score 0-100, ab dem der Zugriff gesperrt wird)
 
 ---
 
@@ -322,4 +329,27 @@ Protokolliert alle Erhebungs-, Änderungs- und Abfrageprozesse zu Prüf- und Rev
 *   `comment` (TEXT) - Beschreibung des Ereignisses.
 *   `value` (TEXT, NULLABLE) - Genutzter Wert (z. B. E-Mail-Adresse oder geändertes Feld).
 *   `ip` (VARCHAR) - IP-Adresse des ausführenden Clients.
+
+---
+
+### Tabelle: `proxycheck_cache` (Migration 018_proxycheck_cache.sql)
+Speichert die Abfrageergebnisse von ProxyCheck.io für 30 Tage, um externe API-Aufrufe zu minimieren.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `ip` (PK) | TEXT | Geprüfte IP-Adresse |
+| `type` | TEXT | Verbindungstyp (z. B. `VPN`, `TOR`, `Proxy`, `Compromised`, `Residential`, `Wireless`) |
+| `provider` | TEXT | Provider / ISP / Organisation |
+| `country` | TEXT | Herkunftsland / ISO-Code |
+| `is_vpn` | INTEGER | Flag, ob VPN erkannt wurde (`0` = Nein, `1` = Ja) |
+| `is_tor` | INTEGER | Flag, ob TOR-Knoten erkannt wurde (`0` = Nein, `1` = Ja) |
+| `is_proxy` | INTEGER | Flag, ob Proxy erkannt wurde (`0` = Nein, `1` = Ja) |
+| `is_compromised` | INTEGER | Flag, ob kompromittierter Server/IP erkannt wurde (`0` = Nein, `1` = Ja) |
+| `risk_score` | INTEGER | Risiko-Score von 0 bis 100 |
+| `raw_json` | TEXT | Vollständige rohe JSON-Antwort von ProxyCheck.io |
+| `checked_at` | DATETIME | Erstellungs-/Prüfungszeitpunkt (Default: `CURRENT_TIMESTAMP`) |
+| `expires_at` | DATETIME | Ablaufdatum des Cache-Eintrags (Default: `+30 Tage`) |
+
+*   **Index**: `idx_proxycheck_cache_expires` auf `expires_at` für performanten Cleanup.
+
 

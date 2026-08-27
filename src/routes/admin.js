@@ -6,6 +6,7 @@ const ldap = require('../ldap');
 const mail = require('../mail');
 const updater = require('../updater');
 const studentDb = require('../student_db');
+const proxycheck = require('../proxycheck');
 
 function isAdmin(req, res, next) {
   if (process.env.NODE_ENV === 'test' || (req.session.user && req.session.user.role === 'admin')) {
@@ -77,7 +78,15 @@ router.get('/config', (req, res) => {
        card_signature: getConfig('card_signature', ''),
        card_pwa_logging: getConfig('card_pwa_logging', '0'),
        card_pwa_icon: getConfig('card_pwa_icon', ''),
-       card_seal: getConfig('card_seal', '')
+       card_seal: getConfig('card_seal', ''),
+
+       proxycheck_enabled: getConfig('proxycheck_enabled', '0'),
+       proxycheck_api_key: getConfig('proxycheck_api_key') ? '********' : '',
+       proxycheck_check_vpn: getConfig('proxycheck_check_vpn', '1'),
+       proxycheck_check_tor: getConfig('proxycheck_check_tor', '1'),
+       proxycheck_check_proxy: getConfig('proxycheck_check_proxy', '1'),
+       proxycheck_check_compromised: getConfig('proxycheck_check_compromised', '1'),
+       proxycheck_risk_threshold: getConfig('proxycheck_risk_threshold', '67')
      };
      res.json(config);
   } catch (error) {
@@ -99,7 +108,8 @@ router.post('/config', async (req, res) => {
       'mysql_enabled', 'mysql_host', 'mysql_port', 'mysql_user', 'mysql_database',
       'impressum_url', 'disable_student_check', 'platform_name', 'platform_logo',
       'login_max_attempts', 'login_lockout_duration_min', 'login_ip_whitelist',
-      'card_primary_color', 'card_secondary_color', 'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_guilloche_density', 'card_install_instructions', 'card_school_name', 'card_principal_name', 'card_principal_gender', 'card_logo', 'card_signature', 'card_pwa_logging', 'card_pwa_icon', 'card_seal'
+      'card_primary_color', 'card_secondary_color', 'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_guilloche_density', 'card_install_instructions', 'card_school_name', 'card_principal_name', 'card_principal_gender', 'card_logo', 'card_signature', 'card_pwa_logging', 'card_pwa_icon', 'card_seal',
+      'proxycheck_enabled', 'proxycheck_check_vpn', 'proxycheck_check_tor', 'proxycheck_check_proxy', 'proxycheck_check_compromised', 'proxycheck_risk_threshold'
     ];
 
     // Standard-Keys sichern
@@ -118,6 +128,9 @@ router.post('/config', async (req, res) => {
     }
     if (req.body.mysql_password && req.body.mysql_password !== '********') {
       setConfig('mysql_password', req.body.mysql_password.trim());
+    }
+    if (req.body.proxycheck_api_key && req.body.proxycheck_api_key !== '********') {
+      setConfig('proxycheck_api_key', req.body.proxycheck_api_key.trim());
     }
 
     // Reaktiv den MySQL-Verbindungspool im laufenden Betrieb neu laden
@@ -199,6 +212,26 @@ router.post('/config/test-mysql', async (req, res) => {
   } catch (error) {
     logEvent('warn', 'mysql_test_failed', 'MySQL-Verbindungstest fehlgeschlagen', { error: error.message }, req.ip);
     res.status(400).json({ error: 'MySQL-Verbindungsfehler: ' + error.message });
+  }
+});
+
+/**
+ * Testet den ProxyCheck.io API-Schlüssel und ruft verbleibende Abfragen ab.
+ */
+router.post('/proxycheck/test', async (req, res) => {
+  try {
+    const apiKey = req.body.api_key;
+    const result = await proxycheck.testApiConnection(apiKey);
+    if (result.success) {
+      logEvent('info', 'proxycheck_test_success', 'ProxyCheck.io Verbindungstest erfolgreich durchgeführt', result, req.ip);
+      res.json(result);
+    } else {
+      logEvent('warn', 'proxycheck_test_failed', 'ProxyCheck.io Verbindungstest fehlgeschlagen', result, req.ip);
+      res.status(400).json(result);
+    }
+  } catch (error) {
+    logEvent('error', 'proxycheck_test_error', 'Fehler beim ProxyCheck.io Verbindungstest', { error: error.message }, req.ip);
+    res.status(500).json({ success: false, message: 'Fehler beim Testen: ' + error.message });
   }
 });
 

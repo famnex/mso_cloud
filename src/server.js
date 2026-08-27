@@ -5,6 +5,8 @@ const fs = require('fs');
 
 // Datenbank initialisieren (damit Migrationen sofort laufen)
 const { getConfig, cleanupOldLogs } = require('./db');
+const proxyCheckMiddleware = require('./middleware/proxyCheckMiddleware');
+const { cleanExpiredCache } = require('./proxycheck');
 
 const app = express();
 app.set('trust proxy', true);
@@ -98,6 +100,9 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/novus', express.static(path.join(__dirname, '../public')));
 
+// ProxyCheck.io Schutz-Middleware für Anonymisierungs- und VPN-Filterung
+app.use(proxyCheckMiddleware);
+
 /* ==========================================================================
    Routen registrieren
    ========================================================================== */
@@ -131,8 +136,9 @@ app.listen(PORT, () => {
   console.log(` Server-Modus: ${process.env.NODE_ENV || 'development'}`);
   console.log(`=================================================`);
 
-  // Einmaligen Log-Cleanup beim Start durchführen
+  // Einmaligen Log- & ProxyCheck Cache-Cleanup beim Start durchführen
   cleanupOldLogs();
+  cleanExpiredCache();
 
   // Täglicher Cleanup um 03:00 Uhr
   const scheduleDaily = () => {
@@ -143,7 +149,11 @@ app.listen(PORT, () => {
     const delay = next - now;
     setTimeout(() => {
       cleanupOldLogs();
-      setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
+      cleanExpiredCache();
+      setInterval(() => {
+        cleanupOldLogs();
+        cleanExpiredCache();
+      }, 24 * 60 * 60 * 1000);
     }, delay);
   };
   scheduleDaily();
