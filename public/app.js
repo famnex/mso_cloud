@@ -93,12 +93,63 @@ function setTheme(theme) {
 /* ==========================================================================
    2. Auth Status & Session Handling
    ========================================================================== */
+
+/**
+ * Prüft, ob eine API-Antwort eine ProxyCheck.io Blockierung darstellt.
+ * Bei Erkennung wird der Benutzer automatisch auf die voll ausgestattete Blockseite weitergeleitet.
+ */
+function checkProxyCheckError(res, dataOrText) {
+  let isProxyBlock = false;
+  let blockObj = null;
+
+  if (dataOrText && typeof dataOrText === 'object') {
+    if (dataOrText.code === 'PROXYCHECK_BLOCKED' || (dataOrText.reason && dataOrText.details)) {
+      isProxyBlock = true;
+      blockObj = dataOrText;
+    }
+  } else if (typeof dataOrText === 'string') {
+    try {
+      const parsed = JSON.parse(dataOrText);
+      if (parsed.code === 'PROXYCHECK_BLOCKED' || (parsed.reason && parsed.details)) {
+        isProxyBlock = true;
+        blockObj = parsed;
+      }
+    } catch(e) {
+      if (dataOrText.includes('PROXYCHECK_BLOCKED')) {
+        isProxyBlock = true;
+      }
+    }
+  }
+
+  if (isProxyBlock || (res && res.status === 403 && String(dataOrText).includes('PROXYCHECK_BLOCKED'))) {
+    const details = (blockObj && blockObj.details) || {};
+    const reason = (blockObj && blockObj.reason) || 'proxy';
+    const ip = details.ip || '';
+    const type = details.type || 'Anonymisiert';
+    const provider = details.provider || 'Unbekannt';
+    const score = details.risk_score || '0';
+
+    const queryParams = new URLSearchParams({
+      reason,
+      ip,
+      type,
+      provider,
+      score: String(score)
+    });
+
+    window.location.href = `blocked.html?${queryParams.toString()}`;
+    return true;
+  }
+  return false;
+}
+
 async function checkAuthStatus() {
   console.log('[MSO Auth] Prüfe Authentifizierungsstatus...');
   try {
     const res = await fetch('api/auth/me');
     if (!res.ok) {
       const errText = await res.text();
+      if (checkProxyCheckError(res, errText)) return;
       console.error(`[MSO Auth Error] HTTP ${res.status} von /api/auth/me:`, errText);
       renderAnonymousHeader();
       return;
@@ -442,14 +493,16 @@ async function loadTiles(isSilentHeartbeat = false) {
   try {
     const res = await fetch('api/tiles');
     if (!res.ok) {
+      const errText = await res.text();
+      if (checkProxyCheckError(res, errText)) return;
+
       if (!isSilentHeartbeat) {
-        const errText = await res.text();
         console.error(`[MSO Tiles Error] HTTP ${res.status} beim Kachel-Abruf:`, errText);
         tilesContainer.innerHTML = `
           <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--error-color);">
             <i class="fa-solid fa-triangle-exclamation fa-2xl" style="margin-bottom: 10px;"></i>
             <p style="font-size: 1.1rem; font-weight: bold;">Fehler beim Laden der Dienste (HTTP ${res.status})</p>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">${errText}</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">${escapeHtml(errText)}</p>
           </div>
         `;
       }

@@ -115,14 +115,14 @@ async function proxyCheckMiddleware(req, res, next) {
 
       if (isJsonRequest) {
         return res.status(403).json({
-          error: 'Zugriff verweigert. Anonymisierte Verbindungen oder Verbindungen mit erhöhtem Sicherheitsrisiko sind nicht gestattet.',
+          error: 'Zugriff verweigert: Sie nutzen eine VPN-Verbindung, einen Proxy-Server oder einen anonymisierten Dienst. Bitte deaktivieren Sie Ihre VPN-Verbindung (z.B. NordVPN, Mullvad, ProtonVPN, ExpressVPN) und laden Sie die Seite neu.',
           code: 'PROXYCHECK_BLOCKED',
           reason: blockReason,
           details: {
             ip: clientIp,
-            type: result.type,
-            provider: result.provider,
-            risk_score: result.risk_score
+            type: result.type || 'Anonymisiert',
+            provider: result.provider || 'Unbekannt',
+            risk_score: result.risk_score || 0
           }
         });
       } else {
