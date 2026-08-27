@@ -279,11 +279,22 @@ router.get('/proxycheck/cache', (req, res) => {
       LIMIT ? OFFSET ?
     `).all(...params, limit, offset);
 
+    const blockedDevices = db.prepare('SELECT DISTINCT ip FROM blocked_devices WHERE ip IS NOT NULL').all();
+    const blockedIps = blockedDevices.map(b => b.ip);
+
     res.json({
       cache: rows,
       total,
       page,
-      totalPages
+      totalPages,
+      asn_whitelist: getConfig('proxycheck_asn_whitelist', 'AS13335, AS54113, AS714, AS13238, AS20940'),
+      proxycheck_enabled: getConfig('proxycheck_enabled', '0') === '1',
+      risk_threshold: parseInt(getConfig('proxycheck_risk_threshold', '67'), 10),
+      check_vpn: getConfig('proxycheck_check_vpn', '1') === '1',
+      check_tor: getConfig('proxycheck_check_tor', '1') === '1',
+      check_proxy: getConfig('proxycheck_check_proxy', '1') === '1',
+      check_compromised: getConfig('proxycheck_check_compromised', '1') === '1',
+      blocked_ips: blockedIps
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

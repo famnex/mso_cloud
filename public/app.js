@@ -2804,14 +2804,39 @@ function filterProxyCheckCache() {
   _proxyCheckSearchDebounce = setTimeout(() => loadProxyCheckCache(true), 300);
 }
 
-function renderProxyCheckCacheTable(cacheList) {
+function checkIsAsnWhitelistedInClient(asnStr, providerStr, whitelistConfig) {
+  if (!whitelistConfig) return false;
+  const allowedItems = whitelistConfig
+    .split(/[\s,;\n]+/)
+    .map(a => a.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (allowedItems.length === 0) return false;
+
+  const cleanAsn = String(asnStr || '').trim().toUpperCase();
+  const cleanNum = cleanAsn.replace(/^AS/, '');
+  const cleanProvider = String(providerStr || '').trim().toUpperCase();
+
+  for (const allowed of allowedItems) {
+    const allowedNum = allowed.replace(/^AS/, '');
+    if (
+      (cleanAsn && (cleanAsn === allowed || cleanNum === allowedNum)) ||
+      (cleanProvider && cleanProvider.includes(allowed))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function renderProxyCheckCacheTable(cacheList, meta = {}) {
   const tbody = document.getElementById('proxycheck-cache-table-body');
   if (!tbody) return;
 
   if (!cacheList || cacheList.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center; padding:35px; color:var(--text-secondary);">
+        <td colspan="9" style="text-align:center; padding:35px; color:var(--text-secondary);">
           Keine gecachten IP-Einträge vorhanden.
         </td>
       </tr>
@@ -2819,12 +2844,46 @@ function renderProxyCheckCacheTable(cacheList) {
     return;
   }
 
+  const asnWhitelist = meta.asn_whitelist || 'AS13335, AS54113, AS714, AS13238, AS20940';
+  const protectionEnabled = meta.proxycheck_enabled !== false;
+  const riskThreshold = meta.risk_threshold || 67;
+  const blockedIps = meta.blocked_ips || [];
+
   tbody.innerHTML = cacheList.map(item => {
-    // Badges für Typen (VPN, TOR, Proxy, Compromised)
+    const isAsnBypass = checkIsAsnWhitelistedInClient(item.asn, item.provider, asnWhitelist);
+
+    const isRiskBlocked = (riskThreshold > 0) && (item.risk_score >= riskThreshold);
+    const isVpnBlocked = meta.check_vpn !== false && item.is_vpn;
+    const isTorBlocked = meta.check_tor !== false && item.is_tor;
+    const isProxyBlocked = meta.check_proxy !== false && item.is_proxy;
+    const isCompBlocked = meta.check_compromised !== false && item.is_compromised;
+
+    const wouldBlock = (isRiskBlocked || isVpnBlocked || isTorBlocked || isProxyBlocked || isCompBlocked);
+    const isActuallyBlocked = wouldBlock && !isAsnBypass && protectionEnabled;
+
+    // Status Badge
+    let statusBadge = '';
+    if (isAsnBypass) {
+      statusBadge = `<span class="user-badge" style="background:rgba(34, 197, 94, 0.15); color:#22c55e; border:1px solid rgba(34, 197, 94, 0.4); font-size:0.75rem; font-weight:600;"><i class="fa-brands fa-apple"></i> Freigegeben (Private Relay / ASN)</span>`;
+    } else if (isActuallyBlocked || blockedIps.includes(item.ip)) {
+      statusBadge = `<span class="user-badge" style="background:rgba(239, 68, 68, 0.22); color:#f87171; border:1px solid rgba(239, 68, 68, 0.5); font-size:0.75rem; font-weight:700;"><i class="fa-solid fa-lock"></i> GESPERRT</span>`;
+    } else if (wouldBlock && !protectionEnabled) {
+      statusBadge = `<span class="user-badge" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245, 158, 11, 0.3); font-size:0.75rem;"><i class="fa-solid fa-eye"></i> Erkannt (Schutz inaktiv)</span>`;
+    } else {
+      statusBadge = `<span class="user-badge" style="background:rgba(16, 185, 129, 0.12); color:#10b981; border:1px solid rgba(16, 185, 129, 0.3); font-size:0.75rem;"><i class="fa-solid fa-circle-check"></i> Erlaubt</span>`;
+    }
+
+    // Badges für Typen (VPN, TOR, Proxy, Compromised, ASN)
     const typeBadges = [];
-    if (item.is_vpn) typeBadges.push('<span class="user-badge" style="background:rgba(239, 68, 68, 0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); font-size:0.72rem;"><i class="fa-solid fa-lock"></i> VPN</span>');
+    if (isAsnBypass) {
+      typeBadges.push(`<span class="user-badge" style="background:rgba(34, 197, 94, 0.12); color:#4ade80; border:1px solid rgba(34, 197, 94, 0.3); font-size:0.72rem;"><i class="fa-brands fa-apple"></i> ASN Whitelist (${escapeHtml(item.asn || 'Bypass')})</span>`);
+    }
+    if (item.is_vpn) {
+      const vpnStyle = isAsnBypass ? 'background:rgba(34, 197, 94, 0.1); color:#4ade80; border:1px solid rgba(34, 197, 94, 0.3);' : 'background:rgba(239, 68, 68, 0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);';
+      typeBadges.push(`<span class="user-badge" style="${vpnStyle} font-size:0.72rem;"><i class="fa-solid fa-shield-halved"></i> VPN</span>`);
+    }
     if (item.is_tor) typeBadges.push('<span class="user-badge" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); font-size:0.72rem;"><i class="fa-solid fa-globe"></i> TOR</span>');
-    if (item.is_proxy) typeBadges.push('<span class="user-badge" style="background:rgba(59, 130, 246, 0.15); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); font-size:0.72rem;"><i class="fa-solid fa-shield"></i> Proxy</span>');
+    if (item.is_proxy) typeBadges.push('<span class="user-badge" style="background:rgba(59, 130, 246, 0.15); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); font-size:0.72rem;"><i class="fa-solid fa-network-wired"></i> Proxy</span>');
     if (item.is_compromised) typeBadges.push('<span class="user-badge" style="background:rgba(220, 38, 38, 0.2); color:#f87171; border:1px solid rgba(220,38,38,0.4); font-size:0.72rem;"><i class="fa-solid fa-triangle-exclamation"></i> Server/IP</span>');
     
     if (typeBadges.length === 0) {
@@ -2840,8 +2899,8 @@ function renderProxyCheckCacheTable(cacheList) {
     let scoreColor = '#10b981'; // grün
     let scoreBg = 'rgba(16, 185, 129, 0.12)';
     if (item.risk_score >= 67) {
-      scoreColor = '#ef4444'; // rot
-      scoreBg = 'rgba(239, 68, 68, 0.15)';
+      scoreColor = isAsnBypass ? '#f59e0b' : '#ef4444'; // gelb bei bypass, rot bei gesperrt
+      scoreBg = isAsnBypass ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)';
     } else if (item.risk_score >= 33) {
       scoreColor = '#f59e0b'; // gelb/orange
       scoreBg = 'rgba(245, 158, 11, 0.15)';
@@ -2862,6 +2921,7 @@ function renderProxyCheckCacheTable(cacheList) {
       <tr>
         <td><strong style="font-family:monospace; font-size:0.9rem;">${escapeHtml(item.ip)}</strong></td>
         <td>${userBadge}</td>
+        <td>${statusBadge}</td>
         <td><div style="display:flex; gap:4px; flex-wrap:wrap;">${typeBadges.join(' ')}</div></td>
         <td style="font-size:0.85rem; color:var(--text-secondary); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(item.provider || '-')}">${escapeHtml(item.provider || '-')}</td>
         <td style="font-size:0.85rem;">${escapeHtml(item.country || '-')}</td>
