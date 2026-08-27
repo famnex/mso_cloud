@@ -930,6 +930,66 @@
             </div>
           </div>
 
+          <!-- Gecachte IP-Adressen Tabelle (30-Tage SQLite Cache) -->
+          <div class="glass-panel" style="padding:24px; margin-bottom:24px; border-radius:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+              <h4 style="font-weight:600; font-size:1.05rem; color:var(--accent-color); margin:0; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-database"></i> Gecachte IP-Adressen (30-Tage SQLite Cache)
+              </h4>
+              <div style="display:flex; gap:10px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="loadProxyCheckCache()">
+                  <i class="fa-solid fa-arrows-rotate"></i> Aktualisieren
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="clearProxyCheckCache()">
+                  <i class="fa-solid fa-trash-can"></i> Cache leeren
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter & Suche -->
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; margin-bottom:15px; background:rgba(0,0,0,0.15); padding:12px 16px; border-radius:10px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:0.85rem; color:var(--text-secondary);">Typ-Filter:</span>
+                <select id="proxycheck-cache-filter-type" class="form-control" style="width:160px; height:36px; padding:4px 8px; font-size:0.85rem;" onchange="loadProxyCheckCache(true)">
+                  <option value="all">Alle Typen</option>
+                  <option value="vpn">Nur VPN</option>
+                  <option value="tor">Nur TOR</option>
+                  <option value="proxy">Nur Proxy</option>
+                  <option value="compromised">Nur Kompromittiert</option>
+                  <option value="high_risk">Nur Hohes Risiko (≥ 67)</option>
+                </select>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:10px; flex-grow:1; max-width:380px;">
+                <span style="font-size:0.85rem; color:var(--text-secondary);">Suche:</span>
+                <input type="text" id="proxycheck-cache-search" class="form-control" placeholder="IP, Provider, Typ, Land..." style="height:36px; font-size:0.85rem;" oninput="filterProxyCheckCache()">
+              </div>
+            </div>
+
+            <!-- Cache Pagination Oben -->
+            <div id="proxycheck-cache-pagination-top" style="margin-bottom:12px;"></div>
+
+            <!-- Tabelle -->
+            <div class="admin-table-container">
+              <table class="admin-table accordion-table">
+                <thead>
+                  <tr>
+                    <th>IP-Adresse</th>
+                    <th>Typ</th>
+                    <th>Provider / Organisation</th>
+                    <th>Land</th>
+                    <th style="width:100px; text-align:center;">Risk-Score</th>
+                    <th style="width:140px;">Gültig bis</th>
+                    <th style="width:140px; text-align:center;">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody id="proxycheck-cache-table-body">
+                  <!-- Dynamisch via App.js geladen -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Hinweis-Box Bypässe & Caching -->
           <div class="glass-panel" style="padding:20px; border-radius:16px; border:1px solid rgba(56,189,248,0.2); background:rgba(56,189,248,0.04);">
             <h4 style="font-weight:600; font-size:0.95rem; color:#38bdf8; margin-bottom:10px; display:flex; align-items:center; gap:8px;">

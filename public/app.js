@@ -1270,6 +1270,9 @@ function loadAdminTabContent(tabId) {
     loadMaintenanceConfig();
   } else if (tabId === 'tab-logs') {
     loadAdminLogs();
+  } else if (tabId === 'tab-proxycheck') {
+    loadAdminConfig();
+    loadProxyCheckCache();
   }
 }
 
@@ -2418,6 +2421,234 @@ async function testProxyCheckConnection() {
       resultBox.style.color = 'var(--error-color)';
       resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>Fehler:</strong> ${err.message}`;
     }
+  }
+}
+
+/* --- PROXYCHECK CACHE TABELLE --- */
+let proxyCheckCachePage = 1;
+let proxyCheckCachePerPage = 50;
+let proxyCheckCacheTotalPages = 1;
+let _proxyCheckSearchDebounce = null;
+
+async function loadProxyCheckCache(resetPage = true) {
+  const tbody = document.getElementById('proxycheck-cache-table-body');
+  if (!tbody) return;
+
+  if (resetPage) proxyCheckCachePage = 1;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">
+        <i class="fa-solid fa-spinner fa-spin fa-xl" style="color:var(--accent-color); margin-bottom:10px; display:block;"></i>
+        Lade IP-Cache...
+      </td>
+    </tr>
+  `;
+
+  try {
+    const filter = document.getElementById('proxycheck-cache-filter-type')?.value || 'all';
+    const search = document.getElementById('proxycheck-cache-search')?.value.trim() || '';
+
+    const params = new URLSearchParams({
+      page: proxyCheckCachePage,
+      limit: proxyCheckCachePerPage,
+      filter,
+      search
+    });
+
+    const res = await fetch(`api/admin/proxycheck/cache?${params}`);
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Fehler beim Laden des IP-Caches');
+    }
+    const data = await res.json();
+
+    proxyCheckCacheTotalPages = data.totalPages;
+
+    renderProxyCheckCacheTable(data.cache);
+    renderProxyCheckCachePagination(data.total, data.page, data.totalPages);
+
+  } catch (err) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:25px; color:var(--error-color);">
+          <i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i> ${escapeHtml(err.message)}
+        </td>
+      </tr>
+    `;
+  }
+}
+
+function filterProxyCheckCache() {
+  clearTimeout(_proxyCheckSearchDebounce);
+  _proxyCheckSearchDebounce = setTimeout(() => loadProxyCheckCache(true), 300);
+}
+
+function renderProxyCheckCacheTable(cacheList) {
+  const tbody = document.getElementById('proxycheck-cache-table-body');
+  if (!tbody) return;
+
+  if (!cacheList || cacheList.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:35px; color:var(--text-secondary);">
+          Keine gecachten IP-Einträge vorhanden.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = cacheList.map(item => {
+    // Badges für Typen (VPN, TOR, Proxy, Compromised)
+    const typeBadges = [];
+    if (item.is_vpn) typeBadges.push('<span class="user-badge" style="background:rgba(239, 68, 68, 0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); font-size:0.72rem;"><i class="fa-solid fa-lock"></i> VPN</span>');
+    if (item.is_tor) typeBadges.push('<span class="user-badge" style="background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); font-size:0.72rem;"><i class="fa-solid fa-globe"></i> TOR</span>');
+    if (item.is_proxy) typeBadges.push('<span class="user-badge" style="background:rgba(59, 130, 246, 0.15); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); font-size:0.72rem;"><i class="fa-solid fa-shield"></i> Proxy</span>');
+    if (item.is_compromised) typeBadges.push('<span class="user-badge" style="background:rgba(220, 38, 38, 0.2); color:#f87171; border:1px solid rgba(220,38,38,0.4); font-size:0.72rem;"><i class="fa-solid fa-triangle-exclamation"></i> Server/IP</span>');
+    
+    if (typeBadges.length === 0) {
+      typeBadges.push(`<span class="user-badge" style="font-size:0.72rem; opacity:0.8;">${escapeHtml(item.type || 'Residential / Clean')}</span>`);
+    }
+
+    // Risk-Score Farb-Badge
+    let scoreColor = '#10b981'; // grün
+    let scoreBg = 'rgba(16, 185, 129, 0.12)';
+    if (item.risk_score >= 67) {
+      scoreColor = '#ef4444'; // rot
+      scoreBg = 'rgba(239, 68, 68, 0.15)';
+    } else if (item.risk_score >= 33) {
+      scoreColor = '#f59e0b'; // gelb/orange
+      scoreBg = 'rgba(245, 158, 11, 0.15)';
+    }
+
+    const scoreBadge = `<span style="display:inline-block; padding:3px 10px; border-radius:12px; font-weight:700; font-size:0.8rem; background:${scoreBg}; color:${scoreColor}; border:1px solid ${scoreColor}44;">${item.risk_score}</span>`;
+
+    // Datumsformatierung für "Gültig bis"
+    let expiresStr = item.expires_at || '-';
+    try {
+      if (item.expires_at) {
+        const d = new Date(item.expires_at.includes('Z') ? item.expires_at : item.expires_at + 'Z');
+        expiresStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      }
+    } catch(e) {}
+
+    return `
+      <tr>
+        <td><strong style="font-family:monospace; font-size:0.9rem;">${escapeHtml(item.ip)}</strong></td>
+        <td><div style="display:flex; gap:4px; flex-wrap:wrap;">${typeBadges.join(' ')}</div></td>
+        <td style="font-size:0.85rem; color:var(--text-secondary); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(item.provider || '-')}">${escapeHtml(item.provider || '-')}</td>
+        <td style="font-size:0.85rem;">${escapeHtml(item.country || '-')}</td>
+        <td style="text-align:center;">${scoreBadge}</td>
+        <td style="font-size:0.82rem; color:var(--text-secondary);">${expiresStr}</td>
+        <td style="text-align:center;">
+          <div style="display:inline-flex; gap:6px;">
+            <button class="btn btn-primary btn-sm" onclick="whitelistProxyCheckIp('${escapeHtml(item.ip)}')" title="Auf Whitelist übertragen" style="padding:4px 8px; font-size:0.78rem; display:inline-flex; align-items:center; gap:4px;">
+              <i class="fa-solid fa-user-check"></i> Whitelist
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteProxyCheckCacheEntry('${escapeHtml(item.ip)}')" title="Aus Cache löschen" style="padding:4px 8px; font-size:0.78rem;">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderProxyCheckCachePagination(totalEntries, currentPage, totalPages) {
+  const container = document.getElementById('proxycheck-cache-pagination-top');
+  if (!container) return;
+
+  if (totalEntries === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const showingStart = (currentPage - 1) * proxyCheckCachePerPage + 1;
+  const showingEnd = Math.min(currentPage * proxyCheckCachePerPage, totalEntries);
+
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(0,0,0,0.12); padding:8px 12px; border-radius:8px; font-size:0.82rem;">
+      <span style="color:var(--text-secondary);">
+        Gecachte IPs: <strong>${showingStart}–${showingEnd}</strong> von <strong>${totalEntries}</strong>
+      </span>
+
+      <div style="display:flex; align-items:center; gap:4px;">
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; height:28px;" onclick="changeProxyCheckCachePage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>
+          <i class="fa-solid fa-angle-left"></i>
+        </button>
+        <span style="padding:0 8px;">Seite <strong>${currentPage}</strong> von ${totalPages}</span>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; height:28px;" onclick="changeProxyCheckCachePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>
+          <i class="fa-solid fa-angle-right"></i>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function changeProxyCheckCachePage(page) {
+  if (page < 1) page = 1;
+  if (page > proxyCheckCacheTotalPages) page = proxyCheckCacheTotalPages;
+  proxyCheckCachePage = page;
+  loadProxyCheckCache(false);
+}
+
+async function deleteProxyCheckCacheEntry(ip) {
+  if (!confirm(`Möchten Sie die IP-Adresse ${ip} wirklich aus dem Cache löschen?`)) return;
+
+  try {
+    const res = await fetch(`api/admin/proxycheck/cache/${encodeURIComponent(ip)}`, { method: 'DELETE' });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAdminAlert(data.message, 'success');
+      loadProxyCheckCache(false);
+    } else {
+      throw new Error(data.error || 'Fehler beim Löschen');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function whitelistProxyCheckIp(ip) {
+  if (!confirm(`Möchten Sie die IP-Adresse ${ip} auf die globale IP-Whitelist übertragen?\n\nDie IP wird damit aus dem Cache entfernt und künftig niemals blockiert.`)) return;
+
+  try {
+    const res = await fetch('api/admin/proxycheck/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAdminAlert(data.message, 'success');
+      loadProxyCheckCache(false);
+    } else {
+      throw new Error(data.error || 'Fehler beim Übertragen auf die Whitelist');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
+}
+
+async function clearProxyCheckCache() {
+  if (!confirm('Möchten Sie den gesamten ProxyCheck IP-Cache unwiderruflich leeren?')) return;
+
+  try {
+    const res = await fetch('api/admin/proxycheck/cache-clear', { method: 'POST' });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAdminAlert(data.message, 'success');
+      loadProxyCheckCache(true);
+    } else {
+      throw new Error(data.error || 'Fehler beim Leeren des Caches');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
   }
 }
 

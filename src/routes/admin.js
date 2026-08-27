@@ -235,6 +235,120 @@ router.post('/proxycheck/test', async (req, res) => {
   }
 });
 
+/**
+ * Ruft gecachte IP-Ergebnisse aus proxycheck_cache ab (gefiltert & paginiert).
+ */
+router.get('/proxycheck/cache', (req, res) => {
+  try {
+    const page = parseInt(req.query.page || '1', 10);
+    const limit = parseInt(req.query.limit || '50', 10);
+    const typeFilter = req.query.filter || 'all';
+    const search = (req.query.search || '').trim().toLowerCase();
+
+    let whereClause = '1=1';
+    const params = [];
+
+    if (typeFilter === 'vpn') {
+      whereClause += ' AND is_vpn = 1';
+    } else if (typeFilter === 'tor') {
+      whereClause += ' AND is_tor = 1';
+    } else if (typeFilter === 'proxy') {
+      whereClause += ' AND is_proxy = 1';
+    } else if (typeFilter === 'compromised') {
+      whereClause += ' AND is_compromised = 1';
+    } else if (typeFilter === 'high_risk') {
+      whereClause += ' AND risk_score >= 67';
+    }
+
+    if (search) {
+      whereClause += ' AND (LOWER(ip) LIKE ? OR LOWER(type) LIKE ? OR LOWER(provider) LIKE ? OR LOWER(country) LIKE ?)';
+      const s = `%${search}%`;
+      params.push(s, s, s, s);
+    }
+
+    const totalRow = db.prepare(`SELECT COUNT(*) as count FROM proxycheck_cache WHERE ${whereClause}`).get(...params);
+    const total = totalRow ? totalRow.count : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const offset = (page - 1) * limit;
+
+    const rows = db.prepare(`
+      SELECT * FROM proxycheck_cache 
+      WHERE ${whereClause} 
+      ORDER BY checked_at DESC 
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
+
+    res.json({
+      cache: rows,
+      total,
+      page,
+      totalPages
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Entfernt eine einzelne IP aus dem proxycheck_cache.
+ */
+router.delete('/proxycheck/cache/:ip', (req, res) => {
+  try {
+    const ip = req.params.ip;
+    db.prepare('DELETE FROM proxycheck_cache WHERE ip = ?').run(ip);
+    logEvent('info', 'proxycheck_cache_delete', `IP ${ip} aus ProxyCheck-Cache entfernt`, null, req.ip);
+    res.json({ success: true, message: `IP-Adresse ${ip} wurde aus dem Cache entfernt.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Überträgt eine IP-Adresse auf die globale IP-Whitelist (login_ip_whitelist)
+ * und entfernt sie aus dem proxycheck_cache.
+ */
+router.post('/proxycheck/whitelist', (req, res) => {
+  try {
+    const ip = (req.body.ip || '').trim();
+    if (!ip) {
+      return res.status(400).json({ error: 'Keine IP-Adresse angegeben.' });
+    }
+
+    // Aktuelle Whitelist aus der Konfiguration laden
+    const currentWhitelistRaw = getConfig('login_ip_whitelist', '');
+    const currentIps = currentWhitelistRaw
+      .split(/[\r\n,\s]+/)
+      .map(i => i.trim())
+      .filter(Boolean);
+
+    if (!currentIps.includes(ip)) {
+      currentIps.push(ip);
+      setConfig('login_ip_whitelist', currentIps.join('\n'));
+    }
+
+    // IP aus dem ProxyCheck Cache entfernen
+    db.prepare('DELETE FROM proxycheck_cache WHERE ip = ?').run(ip);
+
+    logEvent('info', 'proxycheck_whitelist_add', `IP ${ip} zur IP-Whitelist hinzugefügt und aus Cache entfernt`, null, req.ip);
+    res.json({ success: true, message: `IP-Adresse ${ip} wurde erfolgreich zur Whitelist hinzugefügt.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Leert den gesamten proxycheck_cache.
+ */
+router.post('/proxycheck/cache-clear', (req, res) => {
+  try {
+    const result = db.prepare('DELETE FROM proxycheck_cache').run();
+    logEvent('info', 'proxycheck_cache_clear', `ProxyCheck-Cache vollständig geleert (${result.changes} Einträge)`, null, req.ip);
+    res.json({ success: true, message: `Gesamter ProxyCheck-Cache (${result.changes} Einträge) wurde geleert.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 /* ==========================================================================
    1b. OAuth 2.0 Client Konfiguration
