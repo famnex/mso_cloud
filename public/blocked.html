@@ -188,12 +188,18 @@
       </div>
     </div>
 
-    <button class="btn-reload" onclick="window.location.reload()">
+    <button class="btn-reload" onclick="reloadPortal()">
       <i class="fa-solid fa-arrows-rotate"></i> Seite neu laden
     </button>
   </div>
 
   <script>
+    function reloadPortal() {
+      const isNovus = window.location.pathname.startsWith('/novus');
+      const targetUrl = isNovus ? '/novus/' : '/';
+      window.location.href = targetUrl;
+    }
+
     // URL-Parameter auslesen und Seite dynamisch anpassen
     const params = new URLSearchParams(window.location.search);
     const reason = (params.get('reason') || '').toLowerCase();
