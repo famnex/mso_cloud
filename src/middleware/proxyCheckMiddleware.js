@@ -14,48 +14,25 @@ function parseCookies(req) {
   return list;
 }
 
-function detectUserForRequest(req, clientIp) {
-  // 1. Session User
+function detectUserForRequest(req) {
+  // 1. Session User (vom aktiven Login im Browser)
   if (req.session && req.session.user) {
     const u = req.session.user.username || req.session.user.name || req.session.user.email;
     if (u) return String(u).trim();
   }
 
-  // 2. Login Payload
+  // 2. Login Payload (vom Anmeldeformular des Browsers)
   if (req.body && req.body.username) {
     return String(req.body.username).trim();
   }
 
-  // 3. Persistent Cookie
+  // 3. Persistent Cookie (aus den Browserdaten des Nutzers)
   const cookies = parseCookies(req);
   if (cookies.mso_remember_user) {
     return cookies.mso_remember_user.trim();
   }
 
-  // 4. DB Lookup in system_logs nach letztem bekannten Login / User-Event für diese IP
-  try {
-    const logRow = db.prepare(`
-      SELECT details, message FROM system_logs 
-      WHERE ip = ? AND (action LIKE '%login%' OR action LIKE '%auth%' OR action LIKE '%user%')
-      ORDER BY id DESC LIMIT 1
-    `).get(clientIp);
-
-    if (logRow) {
-      if (logRow.details) {
-        try {
-          const d = JSON.parse(logRow.details);
-          if (d.username) return d.username;
-          if (d.user) return d.user;
-          if (d.email) return d.email;
-        } catch(e) {}
-      }
-      if (logRow.message) {
-        const match = logRow.message.match(/für:\s*([^\s,;]+)|Benutzer\s+([^\s,;]+)|User\s+([^\s,;]+)|E-Mail:\s*([^\s,;]+)/i);
-        if (match) return match[1] || match[2] || match[3] || match[4];
-      }
-    }
-  } catch(e) {}
-
+  // NIEMALS über alte IP-Adressen in der Datenbank suchen, da VPN-IPs von mehreren Nutzern geteilt werden!
   return null;
 }
 
