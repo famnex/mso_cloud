@@ -3081,6 +3081,7 @@ let logsPerPage = 100; // Standard 100 Einträge pro Seite
 let logsTotalEntries = 0;
 let logsTotalPages = 1;
 let _logSearchDebounce = null;
+let allAdminLogs = [];
 
 async function loadAdminLogs(resetPage = true) {
   const tableBody = document.getElementById('admin-logs-table-body');
@@ -3110,6 +3111,7 @@ async function loadAdminLogs(resetPage = true) {
 
     logsTotalEntries = result.total;
     logsTotalPages   = result.totalPages;
+    allAdminLogs     = result.logs || [];
 
     // Tabelle rendern
     renderAdminLogs(result.logs);
