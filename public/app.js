@@ -2400,18 +2400,21 @@ async function testProxyCheckConnection() {
         resultBox.style.background = 'rgba(34, 197, 94, 0.12)';
         resultBox.style.border = '1px solid rgba(34, 197, 94, 0.35)';
         resultBox.style.color = 'var(--success-color)';
+        
+        const estNotice = data.is_estimated ? ' <span style="font-size:0.75rem; opacity:0.8;">(Lokal gezählt)</span>' : '';
+
         resultBox.innerHTML = `
-          <div style="font-weight:700; margin-bottom:4px;"><i class="fa-solid fa-circle-check"></i> ${data.message}</div>
-          <div style="font-size:0.82rem; color:var(--text);">
-            Heute verbrauchte Abfragen: <strong>${data.queries_today}</strong> / <strong>${data.daily_limit}</strong><br>
-            Verbleibende Abfragen heute: <strong style="color:var(--accent-color);">${data.queries_remaining}</strong>
+          <div style="font-weight:700; margin-bottom:6px;"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(data.message)}</div>
+          <div style="font-size:0.85rem; color:var(--text); line-height:1.6;">
+            Heute verbrauchte Abfragen: <strong>${data.queries_today}</strong> / <strong>${data.daily_limit}</strong>${estNotice}<br>
+            Verbleibende Abfragen heute: <strong style="color:var(--accent-color); font-size:0.95rem;">${data.queries_remaining}</strong>
           </div>
         `;
       } else {
         resultBox.style.background = 'rgba(239, 68, 68, 0.12)';
         resultBox.style.border = '1px solid rgba(239, 68, 68, 0.35)';
         resultBox.style.color = 'var(--error-color)';
-        resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>Verbindungsfehler:</strong> ${data.message || data.error}`;
+        resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>Verbindungsfehler:</strong> ${escapeHtml(data.message || data.error)}`;
       }
     }
   } catch (err) {

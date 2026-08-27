@@ -249,17 +249,44 @@ async function testApiConnection(apiKey) {
       };
     }
 
-    const queriesToday = res.queries_today !== undefined ? res.queries_today : (res['8.8.8.8'] && res['8.8.8.8'].queries_today);
-    const totalQueries = res.total_queries !== undefined ? res.total_queries : 1000;
-    const remainingQueries = (queriesToday !== undefined && totalQueries !== undefined) ? (totalQueries - queriesToday) : null;
+    // ProxyCheck API Antwort-Felder prüfen
+    let rawToday = res.queries_today !== undefined ? res.queries_today :
+                   (res.queries_used !== undefined ? res.queries_used :
+                   (res['queries_today'] !== undefined ? res['queries_today'] :
+                   (res['8.8.8.8'] && res['8.8.8.8'].queries_today !== undefined ? res['8.8.8.8'].queries_today : undefined)));
+
+    let rawLimit = res.daily_limit !== undefined ? res.daily_limit :
+                  (res.limit !== undefined ? res.limit :
+                  (res.max_queries !== undefined ? res.max_queries :
+                  (res.queries_limit !== undefined ? res.queries_limit : 1000)));
+
+    let queriesTodayNum = (rawToday !== undefined && rawToday !== null) ? parseInt(rawToday, 10) : null;
+    let dailyLimitNum = (rawLimit !== undefined && rawLimit !== null) ? parseInt(rawLimit, 10) : 1000;
+    if (isNaN(dailyLimitNum)) dailyLimitNum = 1000;
+
+    let isEstimated = false;
+    // Falls ProxyCheck.io queries_today nicht in der Antwort sendet, zählen wir die heutigen API-Lookups lokal
+    if (queriesTodayNum === null || isNaN(queriesTodayNum)) {
+      try {
+        const localCount = db.prepare("SELECT COUNT(*) as count FROM proxycheck_cache WHERE DATE(checked_at) = DATE('now')").get();
+        queriesTodayNum = localCount ? localCount.count : 0;
+        isEstimated = true;
+      } catch (e) {
+        queriesTodayNum = 0;
+      }
+    }
+
+    const remainingNum = Math.max(0, dailyLimitNum - queriesTodayNum);
 
     return {
       success: true,
       message: 'Verbindung zu ProxyCheck.io erfolgreich hergestellt!',
       status: res.status || 'ok',
-      queries_today: queriesToday !== undefined ? queriesToday : 'Unbekannt',
-      daily_limit: totalQueries !== undefined ? totalQueries : 1000,
-      queries_remaining: remainingQueries !== null ? remainingQueries : 'Unbekannt'
+      queries_today: queriesTodayNum,
+      daily_limit: dailyLimitNum,
+      queries_remaining: remainingNum,
+      is_estimated: isEstimated,
+      raw_status: res.status
     };
   } catch (err) {
     return {
