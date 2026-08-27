@@ -304,6 +304,23 @@ Speichert die 30-Tage gecachten IP-Ergebnisse von ProxyCheck.io inklusive der au
 
 ---
 
+### Tabelle: `blocked_devices`
+Erfasst gerätebasierte Sperrungen (Device Fingerprinting & persistent Device Token ID `mso_device_id`).
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `id` (PK) | INTEGER | Eindeutige ID (Auto-Increment) |
+| `device_id` (UNIQUE) | TEXT | Eindeutiges kryptografisches Device-Token (`mso_device_id`) |
+| `fingerprint` | TEXT | SHA-256 Browser Hardware- & Canvas-Fingerprint (`mso_fingerprint`) |
+| `username` | TEXT | Erkannter / zugeordneter Benutzername des Geräts |
+| `reason` | TEXT | Grund der Gerätesperrung (`vpn`, `proxy`, `tor`, `compromised`, `risk`) |
+| `ip` | TEXT | IP-Adresse bei der Erst-Sperrung des Geräts |
+| `details` | TEXT | JSON-kodierte Zusatzdetails (Provider, Risk-Score, etc.) |
+| `blocked_at` | DATETIME | Zeitstempel der Gerätesperrung |
+| `expires_at` | DATETIME | Ablaufdatum der Sperre (optional) |
+
+---
+
 ## 3. Datenbank-Update-Skripte für GitHub
 Bei zukünftigen Updates über GitHub vergleicht der Updater den Ordner `/migrations` und führt neue `.sql`-Dateien automatisch aus.
 Jede neue Migration muss als separate Datei (z.B. `002_add_new_fields.sql`) hinterlegt werden.

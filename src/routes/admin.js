@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { db, getConfig, setConfig, logEvent } = require('../db');
+const { db, getConfig, setConfig, logEvent, unblockDevice } = require('../db');
 const ldap = require('../ldap');
 const mail = require('../mail');
 const updater = require('../updater');
@@ -299,6 +299,65 @@ router.delete('/proxycheck/cache/:ip', (req, res) => {
     db.prepare('DELETE FROM proxycheck_cache WHERE ip = ?').run(ip);
     logEvent('info', 'proxycheck_cache_delete', `IP ${ip} aus ProxyCheck-Cache entfernt`, null, req.ip);
     res.json({ success: true, message: `IP-Adresse ${ip} wurde aus dem Cache entfernt.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Ruft gesperrte Geräte aus blocked_devices ab (gefiltert & paginiert).
+ */
+router.get('/proxycheck/devices', (req, res) => {
+  try {
+    const page = parseInt(req.query.page || '1', 10);
+    const limit = parseInt(req.query.limit || '50', 10);
+    const search = (req.query.search || '').trim().toLowerCase();
+
+    let whereClause = '1=1';
+    const params = [];
+
+    if (search) {
+      whereClause += ' AND (LOWER(device_id) LIKE ? OR LOWER(fingerprint) LIKE ? OR LOWER(username) LIKE ? OR LOWER(ip) LIKE ? OR LOWER(reason) LIKE ?)';
+      const s = `%${search}%`;
+      params.push(s, s, s, s, s);
+    }
+
+    const totalRow = db.prepare(`SELECT COUNT(*) as count FROM blocked_devices WHERE ${whereClause}`).get(...params);
+    const total = totalRow ? totalRow.count : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const offset = (page - 1) * limit;
+
+    const rows = db.prepare(`
+      SELECT * FROM blocked_devices 
+      WHERE ${whereClause} 
+      ORDER BY blocked_at DESC 
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
+
+    res.json({
+      devices: rows,
+      total,
+      page,
+      totalPages
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Entsperrt ein Gerät aus blocked_devices.
+ */
+router.delete('/proxycheck/devices/:id', (req, res) => {
+  try {
+    const id = req.params.id;
+    const success = unblockDevice(id);
+    if (success) {
+      logEvent('info', 'proxycheck_device_unblock', `Gerät/Fingerprint ${id} entsperrt`, null, req.ip);
+      res.json({ success: true, message: 'Gerät erfolgreich entsperrt.' });
+    } else {
+      res.status(404).json({ error: 'Gerät nicht in der Sperrliste gefunden.' });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -128,6 +128,78 @@ function cleanupOldLogs() {
   }
 }
 
+/**
+ * Sperrt ein Gerät (Device-ID und/oder Fingerprint) in blocked_devices.
+ */
+function blockDevice({ device_id, fingerprint, username = null, reason = 'blocked', ip = null, details = null }) {
+  if (!device_id && !fingerprint) return null;
+  try {
+    const detailsStr = details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null;
+    return db.prepare(`
+      INSERT INTO blocked_devices (device_id, fingerprint, username, reason, ip, details)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(device_id) DO UPDATE SET
+        fingerprint = COALESCE(excluded.fingerprint, blocked_devices.fingerprint),
+        username = COALESCE(excluded.username, blocked_devices.username),
+        reason = excluded.reason,
+        ip = COALESCE(excluded.ip, blocked_devices.ip),
+        details = COALESCE(excluded.details, blocked_devices.details),
+        blocked_at = CURRENT_TIMESTAMP
+    `).run(device_id || null, fingerprint || null, username || null, reason, ip || null, detailsStr);
+  } catch (err) {
+    console.error('Fehler beim Sperren des Geräts in blocked_devices:', err);
+    return null;
+  }
+}
+
+/**
+ * Prüft, ob ein Gerät anhand von device_id oder fingerprint gesperrt ist.
+ */
+function isDeviceBlocked(deviceId, fingerprint) {
+  if (!deviceId && !fingerprint) return null;
+  try {
+    if (deviceId && fingerprint) {
+      return db.prepare(`
+        SELECT * FROM blocked_devices 
+        WHERE (device_id = ? OR fingerprint = ?)
+        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+        LIMIT 1
+      `).get(deviceId, fingerprint);
+    } else if (deviceId) {
+      return db.prepare(`
+        SELECT * FROM blocked_devices 
+        WHERE device_id = ?
+        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+        LIMIT 1
+      `).get(deviceId);
+    } else if (fingerprint) {
+      return db.prepare(`
+        SELECT * FROM blocked_devices 
+        WHERE fingerprint = ?
+        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+        LIMIT 1
+      `).get(fingerprint);
+    }
+  } catch (err) {
+    console.error('Fehler beim Prüfen der Gerätesperre:', err);
+  }
+  return null;
+}
+
+/**
+ * Entsperrt ein Gerät aus blocked_devices per ID oder device_id.
+ */
+function unblockDevice(identifier) {
+  if (!identifier) return false;
+  try {
+    const info = db.prepare('DELETE FROM blocked_devices WHERE id = ? OR device_id = ? OR fingerprint = ?').run(identifier, identifier, identifier);
+    return info.changes > 0;
+  } catch (err) {
+    console.error('Fehler beim Entsperren des Geräts:', err);
+    return false;
+  }
+}
+
 // Initialer Migrationslauf beim Laden des Moduls
 runMigrations();
 
@@ -137,5 +209,8 @@ module.exports = {
   setConfig,
   runMigrations,
   logEvent,
-  cleanupOldLogs
+  cleanupOldLogs,
+  blockDevice,
+  isDeviceBlocked,
+  unblockDevice
 };
