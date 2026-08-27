@@ -237,13 +237,23 @@
         <li>Deaktivieren Sie eventuell konfigurierte Proxy-Server in Ihren Browser- oder Systemeinstellungen.</li>
         <li>Laden Sie die Seite anschließend neu.</li>
       `;
-    } else if (reason === 'compromised' || reason === 'risk') {
+    } else if (reason === 'compromised') {
+      iconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      titleEl.textContent = 'Kompromittierte IP oder Server erkannt';
+      subtitleEl.textContent = 'Ihre IP-Adresse wurde in Sicherheitsdatenbanken als kompromittierter Server oder auffälliger Anonymisierungs-Knoten eingestuft.';
+      recsEl.innerHTML = `
+        <li>Falls Sie eine <strong>VPN-Verbindung</strong>, einen <strong>Proxy-Dienst</strong> oder Anonymisierer nutzen, <strong>deaktivieren Sie diesen bitte</strong>. Sehr häufig werden öffentlich genutzte VPN-IP-Adressen von Sicherheitsdatenbanken als kompromittierte Server eingestuft.</li>
+        <li>Stellen Sie sicher, dass keine Schadsoftware oder ungewöhnlicher Traffic von Ihrem Netzwerk ausgeht.</li>
+        <li>Klicken Sie danach unten auf <strong>"Seite neu laden"</strong> oder wechseln Sie das Netzwerk.</li>
+      `;
+    } else if (reason === 'risk') {
       iconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
       titleEl.textContent = 'Erhöhtes Sicherheitsrisiko erkannt';
       subtitleEl.textContent = `Aufgrund eines erhöhten Risiko-Scores (${score !== '-' ? score : 'hoch'}) wurde der Zugriff temporär eingeschränkt.`;
       recsEl.innerHTML = `
-        <li>Stellen Sie sicher, dass keine Schadsoftware oder ungewöhnlicher Traffic von Ihrem Netz ausgeht.</li>
-        <li>Versuchen Sie, die Verbindung neu aufzubauen oder das Netzwerk zu wechseln.</li>
+        <li>Falls Sie eine <strong>VPN-Verbindung</strong> oder Anonymisierungs-Tools nutzen, <strong>deaktivieren Sie diese bitte</strong>. Aktivierte VPNs erhöhen den Risiko-Score bei Sicherheitsprüfungen erheblich.</li>
+        <li>Klicken Sie danach unten auf <strong>"Seite neu laden"</strong>.</li>
+        <li>Versuchen Sie alternativ, das Netzwerk zu wechseln oder Ihren Internetrouter neu zu starten.</li>
       `;
     }
   </script>
