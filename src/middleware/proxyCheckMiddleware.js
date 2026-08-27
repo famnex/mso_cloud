@@ -89,8 +89,14 @@ async function proxyCheckMiddleware(req, res, next) {
     }
 
     // 6. Benutzererkennung & IP-Lookup über ProxyCheck.io (30-Tage SQLite Cache)
-    const detectedUser = detectUserForRequest(req, clientIp);
+    const detectedUser = detectUserForRequest(req);
     const result = await lookupIp(clientIp, detectedUser);
+
+    // Fail-Open Check: Wenn ProxyCheck.io nicht erreichbar ist oder das Tageskontingent aufgebraucht ist -> Traffic durchlassen!
+    if (result.api_error || result.error) {
+      console.warn(`[ProxyCheck Fail-Open] API nicht verfügbar (${result.error || 'Quota Limit'}). Traffic für IP ${clientIp} durchgelassen.`);
+      return next();
+    }
 
     // 7. Konfigurierte Schwellenwerte und Schalter abrufen
     const checkVpn = getConfig('proxycheck_check_vpn', '1') === '1';

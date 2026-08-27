@@ -153,7 +153,28 @@ async function lookupIp(ip, detectedUser = null) {
     // Bei API-Fehler nicht blockieren (Fail-Open für hohe Verfügbarkeit)
     return {
       ip: cleanIp,
+      api_error: true,
       error: err.message,
+      is_vpn: false,
+      is_tor: false,
+      is_proxy: false,
+      is_compromised: false,
+      risk_score: 0,
+      type: 'Unknown',
+      provider: 'Unknown',
+      country: 'Unknown',
+      last_user: detectedUser || null
+    };
+  }
+
+  // API-Ergebnis auf Fehler oder Kontingent-Limit prüfen (status = 'denied' / 'error')
+  if (!apiResponse || apiResponse.status === 'denied' || apiResponse.status === 'error' || !apiResponse[cleanIp]) {
+    const errMessage = (apiResponse && (apiResponse.message || apiResponse.status)) || 'Keine gültigen IP-Daten von ProxyCheck.io empfangen';
+    console.warn(`ProxyCheck.io API nicht verfügbar oder Limit erreicht (${cleanIp}): ${errMessage}`);
+    return {
+      ip: cleanIp,
+      api_error: true,
+      error: errMessage,
       is_vpn: false,
       is_tor: false,
       is_proxy: false,
