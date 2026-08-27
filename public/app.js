@@ -1927,7 +1927,11 @@ async function loadAdminConfig() {
     const proxycheckThresholdEl = document.getElementById('proxycheck_risk_threshold');
     if (proxycheckThresholdEl) proxycheckThresholdEl.value = cfg.proxycheck_risk_threshold || '67';
     const proxycheckAsnEl = document.getElementById('proxycheck_asn_whitelist');
-    if (proxycheckAsnEl) proxycheckAsnEl.value = cfg.proxycheck_asn_whitelist || 'AS13335, AS54113, AS714, AS13238, AS20940';
+    if (proxycheckAsnEl) {
+      proxycheckAsnEl.value = (cfg.proxycheck_asn_whitelist !== undefined && cfg.proxycheck_asn_whitelist !== null) 
+        ? cfg.proxycheck_asn_whitelist 
+        : 'AS13335, AS54113, AS714, AS13238, AS20940';
+    }
 
     // Schülerausweis Felder befüllen
     const cardSchoolInput = document.getElementById('card_school_name');
@@ -2406,16 +2410,27 @@ async function testMysqlConnection() {
   }
 }
 
-async function saveProxyCheckConfig() {
+async function saveProxyCheckConfig(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const enabledEl = document.getElementById('proxycheck_enabled');
+  const apiKeyEl = document.getElementById('proxycheck_api_key');
+  const vpnEl = document.getElementById('proxycheck_check_vpn');
+  const torEl = document.getElementById('proxycheck_check_tor');
+  const proxyEl = document.getElementById('proxycheck_check_proxy');
+  const compEl = document.getElementById('proxycheck_check_compromised');
+  const thresholdEl = document.getElementById('proxycheck_risk_threshold');
+  const asnEl = document.getElementById('proxycheck_asn_whitelist');
+
   const body = {
-    proxycheck_enabled: document.getElementById('proxycheck_enabled').checked ? '1' : '0',
-    proxycheck_api_key: document.getElementById('proxycheck_api_key').value.trim(),
-    proxycheck_check_vpn: document.getElementById('proxycheck_check_vpn').checked ? '1' : '0',
-    proxycheck_check_tor: document.getElementById('proxycheck_check_tor').checked ? '1' : '0',
-    proxycheck_check_proxy: document.getElementById('proxycheck_check_proxy').checked ? '1' : '0',
-    proxycheck_check_compromised: document.getElementById('proxycheck_check_compromised').checked ? '1' : '0',
-    proxycheck_risk_threshold: document.getElementById('proxycheck_risk_threshold').value.trim() || '67',
-    proxycheck_asn_whitelist: (document.getElementById('proxycheck_asn_whitelist')?.value || '').trim()
+    proxycheck_enabled: enabledEl && enabledEl.checked ? '1' : '0',
+    proxycheck_api_key: apiKeyEl ? apiKeyEl.value.trim() : '',
+    proxycheck_check_vpn: vpnEl && vpnEl.checked ? '1' : '0',
+    proxycheck_check_tor: torEl && torEl.checked ? '1' : '0',
+    proxycheck_check_proxy: proxyEl && proxyEl.checked ? '1' : '0',
+    proxycheck_check_compromised: compEl && compEl.checked ? '1' : '0',
+    proxycheck_risk_threshold: thresholdEl ? (thresholdEl.value.trim() || '67') : '67',
+    proxycheck_asn_whitelist: asnEl ? asnEl.value.trim() : ''
   };
 
   try {
@@ -2426,6 +2441,9 @@ async function saveProxyCheckConfig() {
     });
     if (res.ok) {
       showAdminAlert('ProxyCheck.io Einstellungen erfolgreich gespeichert.', 'success');
+    } else {
+      const errData = await res.json();
+      showAdminAlert(errData.error || 'Fehler beim Speichern der Einstellungen', 'danger');
     }
   } catch (err) {
     showAdminAlert(err.message, 'danger');
