@@ -122,6 +122,14 @@ async function lookupIp(ip, detectedUser = null) {
       if (detectedUser && !cachedRow.last_user) {
         updateCacheUser(cleanIp, detectedUser);
       }
+      let asnVal = cachedRow.asn || '';
+      if (!asnVal && cachedRow.raw_json) {
+        try {
+          const parsedRaw = JSON.parse(cachedRow.raw_json);
+          asnVal = (parsedRaw[cleanIp] && parsedRaw[cleanIp].asn) || '';
+        } catch(e) {}
+      }
+
       return {
         ip: cachedRow.ip,
         cached: true,
@@ -134,6 +142,7 @@ async function lookupIp(ip, detectedUser = null) {
         is_compromised: cachedRow.is_compromised === 1,
         risk_score: cachedRow.risk_score || 0,
         last_user: detectedUser || cachedRow.last_user || null,
+        asn: asnVal,
         raw: cachedRow.raw_json ? JSON.parse(cachedRow.raw_json) : null
       };
     }
@@ -163,7 +172,8 @@ async function lookupIp(ip, detectedUser = null) {
       type: 'Unknown',
       provider: 'Unknown',
       country: 'Unknown',
-      last_user: detectedUser || null
+      last_user: detectedUser || null,
+      asn: ''
     };
   }
 
@@ -183,7 +193,8 @@ async function lookupIp(ip, detectedUser = null) {
       type: 'Unknown',
       provider: 'Unknown',
       country: 'Unknown',
-      last_user: detectedUser || null
+      last_user: detectedUser || null,
+      asn: ''
     };
   }
 
@@ -197,14 +208,15 @@ async function lookupIp(ip, detectedUser = null) {
   const type = ipData.type || (ipData.proxy === 'yes' ? 'Proxy' : 'Residential');
   const provider = ipData.provider || ipData.asn || 'Unbekannt';
   const country = ipData.country || ipData.isocode || 'Unbekannt';
+  const asn = ipData.asn || '';
 
   // 3. Ergebnis für 30 Tage im SQLite Cache speichern (upsert)
   try {
     db.prepare(`
       INSERT INTO proxycheck_cache (
-        ip, type, provider, country, is_vpn, is_tor, is_proxy, is_compromised, risk_score, raw_json, last_user, expires_at
+        ip, type, provider, country, is_vpn, is_tor, is_proxy, is_compromised, risk_score, raw_json, last_user, asn, expires_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+30 days')
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+30 days')
       )
       ON CONFLICT(ip) DO UPDATE SET
         type = excluded.type,
@@ -217,6 +229,7 @@ async function lookupIp(ip, detectedUser = null) {
         risk_score = excluded.risk_score,
         raw_json = excluded.raw_json,
         last_user = COALESCE(excluded.last_user, proxycheck_cache.last_user),
+        asn = excluded.asn,
         checked_at = CURRENT_TIMESTAMP,
         expires_at = datetime('now', '+30 days')
     `).run(
@@ -230,7 +243,8 @@ async function lookupIp(ip, detectedUser = null) {
       isCompromised ? 1 : 0,
       riskScore,
       JSON.stringify(apiResponse),
-      detectedUser
+      detectedUser,
+      asn
     );
   } catch (e) {
     console.error('Fehler beim Speichern in proxycheck_cache:', e);
@@ -248,6 +262,7 @@ async function lookupIp(ip, detectedUser = null) {
     is_compromised: isCompromised,
     risk_score: riskScore,
     last_user: detectedUser,
+    asn,
     raw: apiResponse
   };
 }

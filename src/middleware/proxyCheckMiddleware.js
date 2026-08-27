@@ -14,26 +14,31 @@ function parseCookies(req) {
   return list;
 }
 
-function detectUserForRequest(req) {
-  // 1. Session User (vom aktiven Login im Browser)
-  if (req.session && req.session.user) {
-    const u = req.session.user.username || req.session.user.name || req.session.user.email;
-    if (u) return String(u).trim();
+function isAsnWhitelisted(asnStr, providerStr, whitelistConfig) {
+  if (!whitelistConfig) return false;
+  
+  const allowedItems = whitelistConfig
+    .split(/[\s,;\n]+/)
+    .map(a => a.trim().toUpperCase())
+    .filter(a => a);
+
+  if (allowedItems.length === 0) return false;
+
+  const cleanAsn = String(asnStr || '').trim().toUpperCase();
+  const cleanNum = cleanAsn.replace(/^AS/, '');
+  const cleanProvider = String(providerStr || '').trim().toUpperCase();
+
+  for (const allowed of allowedItems) {
+    const allowedNum = allowed.replace(/^AS/, '');
+    if (
+      (cleanAsn && (cleanAsn === allowed || cleanNum === allowedNum)) ||
+      (cleanProvider && cleanProvider.includes(allowed))
+    ) {
+      return true;
+    }
   }
 
-  // 2. Login Payload (vom Anmeldeformular des Browsers)
-  if (req.body && req.body.username) {
-    return String(req.body.username).trim();
-  }
-
-  // 3. Persistent Cookie (aus den Browserdaten des Nutzers)
-  const cookies = parseCookies(req);
-  if (cookies.mso_remember_user) {
-    return cookies.mso_remember_user.trim();
-  }
-
-  // NIEMALS über alte IP-Adressen in der Datenbank suchen, da VPN-IPs von mehreren Nutzern geteilt werden!
-  return null;
+  return false;
 }
 
 /**
@@ -95,6 +100,16 @@ async function proxyCheckMiddleware(req, res, next) {
     // Fail-Open Check: Wenn ProxyCheck.io nicht erreichbar ist oder das Tageskontingent aufgebraucht ist -> Traffic durchlassen!
     if (result.api_error || result.error) {
       console.warn(`[ProxyCheck Fail-Open] API nicht verfügbar (${result.error || 'Quota Limit'}). Traffic für IP ${clientIp} durchgelassen.`);
+      return next();
+    }
+
+    // 7. Automatische Bypass-Prüfung für geweißlistete Autonome Systeme (ASNs)
+    // z. B. Apple iCloud Private Relay (AS13335, AS54113, AS714, AS13238, AS20940)
+    const defaultAsnWhitelist = 'AS13335, AS54113, AS714, AS13238, AS20940';
+    const asnWhitelist = getConfig('proxycheck_asn_whitelist', defaultAsnWhitelist);
+    
+    if (isAsnWhitelisted(result.asn, result.provider, asnWhitelist)) {
+      console.log(`[ProxyCheck ASN Bypass] IP ${clientIp} freigegeben durch geweißlistete AS-Nummer (${result.asn || result.provider}).`);
       return next();
     }
 

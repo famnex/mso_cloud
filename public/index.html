@@ -928,6 +928,19 @@
                 Verbindungen mit einem Risiko-Score ab diesem Wert (Standard: <strong>67</strong>) werden automatisch blockiert. (0 = deaktiviert).
               </p>
             </div>
+
+            <div class="form-group" style="margin-top:16px;">
+              <label for="proxycheck_asn_whitelist" style="font-weight:600;">Geweißlistete AS-Nummern / Netzwerke (ASN Whitelist)</label>
+              <textarea id="proxycheck_asn_whitelist" class="form-control" rows="2" placeholder="AS13335, AS54113, AS714, AS13238, AS20940" onchange="saveProxyCheckConfig()" style="font-family:monospace; font-size:0.85rem;"></textarea>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; flex-wrap:wrap; gap:10px;">
+                <p style="font-size:0.78rem; color:var(--text-secondary); margin:0;">
+                  Verbindungen aus diesen Autonomen Systemen (z. B. <strong>Apple iCloud Private Relay</strong>) werden niemals blockiert (Kommagetrennt oder pro Zeile).
+                </p>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addApplePrivateRelayAsns()" style="font-size:0.78rem; padding:4px 10px;">
+                  <i class="fa-brands fa-apple"></i> Apple Private Relay ASNs laden
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Gecachte IP-Adressen Tabelle (30-Tage SQLite Cache) -->

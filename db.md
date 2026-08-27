@@ -297,7 +297,8 @@ Speichert die 30-Tage gecachten IP-Ergebnisse von ProxyCheck.io inklusive der au
 | `is_compromised` | INTEGER | Flag: Ist die IP ein kompromittierter Server (`0` = Nein, `1` = Ja) |
 | `risk_score` | INTEGER | Risiko-Score der IP-Adresse (0 - 100) |
 | `raw_json` | TEXT | Roh-JSON-Antwort der ProxyCheck.io API |
-| `last_user` | TEXT | Erkannter / zugeordneter Benutzername (aus Session, Cookie oder Audit-Log) |
+| `last_user` | TEXT | Erkannter / zugeordneter Benutzername (aus Session, Cookie oder Formular) |
+| `asn` | TEXT | Autonomes System (ASN, z. B. `AS13335` für Cloudflare / Apple Private Relay) |
 | `checked_at` | DATETIME | Zeitstempel der ersten/letzten Prüfung |
 | `expires_at` | DATETIME | Ablaufzeitpunkt im Cache (30 Tage nach Prüfung) |
 

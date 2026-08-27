@@ -1926,6 +1926,8 @@ async function loadAdminConfig() {
     if (proxycheckCompromisedEl) proxycheckCompromisedEl.checked = cfg.proxycheck_check_compromised !== '0';
     const proxycheckThresholdEl = document.getElementById('proxycheck_risk_threshold');
     if (proxycheckThresholdEl) proxycheckThresholdEl.value = cfg.proxycheck_risk_threshold || '67';
+    const proxycheckAsnEl = document.getElementById('proxycheck_asn_whitelist');
+    if (proxycheckAsnEl) proxycheckAsnEl.value = cfg.proxycheck_asn_whitelist || 'AS13335, AS54113, AS714, AS13238, AS20940';
 
     // Schülerausweis Felder befüllen
     const cardSchoolInput = document.getElementById('card_school_name');
@@ -2412,7 +2414,8 @@ async function saveProxyCheckConfig() {
     proxycheck_check_tor: document.getElementById('proxycheck_check_tor').checked ? '1' : '0',
     proxycheck_check_proxy: document.getElementById('proxycheck_check_proxy').checked ? '1' : '0',
     proxycheck_check_compromised: document.getElementById('proxycheck_check_compromised').checked ? '1' : '0',
-    proxycheck_risk_threshold: document.getElementById('proxycheck_risk_threshold').value.trim() || '67'
+    proxycheck_risk_threshold: document.getElementById('proxycheck_risk_threshold').value.trim() || '67',
+    proxycheck_asn_whitelist: (document.getElementById('proxycheck_asn_whitelist')?.value || '').trim()
   };
 
   try {
@@ -2427,6 +2430,18 @@ async function saveProxyCheckConfig() {
   } catch (err) {
     showAdminAlert(err.message, 'danger');
   }
+}
+
+function addApplePrivateRelayAsns() {
+  const el = document.getElementById('proxycheck_asn_whitelist');
+  if (!el) return;
+  const appleAsns = ['AS13335', 'AS54113', 'AS714', 'AS13238', 'AS20940'];
+  const current = el.value.split(/[\s,;\n]+/).map(a => a.trim().toUpperCase()).filter(Boolean);
+  
+  const merged = Array.from(new Set([...current, ...appleAsns]));
+  el.value = merged.join(', ');
+  saveProxyCheckConfig();
+  showAdminAlert('Apple Private Relay AS-Nummern wurden zur Whitelist hinzugefügt und gespeichert.', 'success');
 }
 
 async function testProxyCheckConnection() {

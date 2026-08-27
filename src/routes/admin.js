@@ -86,7 +86,8 @@ router.get('/config', (req, res) => {
        proxycheck_check_tor: getConfig('proxycheck_check_tor', '1'),
        proxycheck_check_proxy: getConfig('proxycheck_check_proxy', '1'),
        proxycheck_check_compromised: getConfig('proxycheck_check_compromised', '1'),
-       proxycheck_risk_threshold: getConfig('proxycheck_risk_threshold', '67')
+       proxycheck_risk_threshold: getConfig('proxycheck_risk_threshold', '67'),
+       proxycheck_asn_whitelist: getConfig('proxycheck_asn_whitelist', 'AS13335, AS54113, AS714, AS13238, AS20940')
      };
      res.json(config);
   } catch (error) {
@@ -109,7 +110,7 @@ router.post('/config', async (req, res) => {
       'impressum_url', 'disable_student_check', 'platform_name', 'platform_logo',
       'login_max_attempts', 'login_lockout_duration_min', 'login_ip_whitelist',
       'card_primary_color', 'card_secondary_color', 'card_guilloche_pattern', 'card_guilloche_angle', 'card_guilloche_fineness', 'card_guilloche_density', 'card_install_instructions', 'card_school_name', 'card_principal_name', 'card_principal_gender', 'card_logo', 'card_signature', 'card_pwa_logging', 'card_pwa_icon', 'card_seal',
-      'proxycheck_enabled', 'proxycheck_check_vpn', 'proxycheck_check_tor', 'proxycheck_check_proxy', 'proxycheck_check_compromised', 'proxycheck_risk_threshold'
+      'proxycheck_enabled', 'proxycheck_check_vpn', 'proxycheck_check_tor', 'proxycheck_check_proxy', 'proxycheck_check_compromised', 'proxycheck_risk_threshold', 'proxycheck_asn_whitelist'
     ];
 
     // Standard-Keys sichern
