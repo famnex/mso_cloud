@@ -313,6 +313,7 @@ router.post('/login', async (req, res) => {
 
         const isOauth = !!req.session.oauthQuery;
         logEvent('info', 'login_success', `LDAP-Login erfolgreich für: ${ldapUser.username}`, { userId: userId, role: role, groups: ldapUser.rawGroups }, clientIp);
+        res.cookie('mso_remember_user', username, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
       }
     }
@@ -362,6 +363,7 @@ router.post('/login', async (req, res) => {
 
         const isOauth = !!req.session.oauthQuery;
         logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, clientIp);
+        res.cookie('mso_remember_user', localUser.username, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
         return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
       }
     }

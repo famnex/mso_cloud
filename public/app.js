@@ -2494,7 +2494,7 @@ async function loadProxyCheckCache(resetPage = true) {
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">
+      <td colspan="8" style="text-align:center; padding:30px; color:var(--text-secondary);">
         <i class="fa-solid fa-spinner fa-spin fa-xl" style="color:var(--accent-color); margin-bottom:10px; display:block;"></i>
         Lade IP-Cache...
       </td>
@@ -2527,7 +2527,7 @@ async function loadProxyCheckCache(resetPage = true) {
   } catch (err) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align:center; padding:25px; color:var(--error-color);">
+        <td colspan="8" style="text-align:center; padding:25px; color:var(--error-color);">
           <i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i> ${escapeHtml(err.message)}
         </td>
       </tr>
@@ -2547,7 +2547,7 @@ function renderProxyCheckCacheTable(cacheList) {
   if (!cacheList || cacheList.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align:center; padding:35px; color:var(--text-secondary);">
+        <td colspan="8" style="text-align:center; padding:35px; color:var(--text-secondary);">
           Keine gecachten IP-Einträge vorhanden.
         </td>
       </tr>
@@ -2566,6 +2566,11 @@ function renderProxyCheckCacheTable(cacheList) {
     if (typeBadges.length === 0) {
       typeBadges.push(`<span class="user-badge" style="font-size:0.72rem; opacity:0.8;">${escapeHtml(item.type || 'Residential / Clean')}</span>`);
     }
+
+    // Benutzer Badge
+    const userBadge = item.last_user 
+      ? `<span class="user-badge" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa; border:1px solid rgba(59, 130, 246, 0.3); font-size:0.78rem;"><i class="fa-solid fa-user" style="margin-right:4px;"></i> ${escapeHtml(item.last_user)}</span>`
+      : '<span style="color:var(--text-secondary); font-size:0.8rem;">-</span>';
 
     // Risk-Score Farb-Badge
     let scoreColor = '#10b981'; // grün
@@ -2592,6 +2597,7 @@ function renderProxyCheckCacheTable(cacheList) {
     return `
       <tr>
         <td><strong style="font-family:monospace; font-size:0.9rem;">${escapeHtml(item.ip)}</strong></td>
+        <td>${userBadge}</td>
         <td><div style="display:flex; gap:4px; flex-wrap:wrap;">${typeBadges.join(' ')}</div></td>
         <td style="font-size:0.85rem; color:var(--text-secondary); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(item.provider || '-')}">${escapeHtml(item.provider || '-')}</td>
         <td style="font-size:0.85rem;">${escapeHtml(item.country || '-')}</td>

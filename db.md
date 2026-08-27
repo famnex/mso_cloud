@@ -282,6 +282,27 @@ Speichert die aktiven, verschlüsselten oder unverschlüsselten Sitzungsdaten (E
 
 ---
 
+### Tabelle: `proxycheck_cache`
+Speichert die 30-Tage gecachten IP-Ergebnisse von ProxyCheck.io inklusive der automatischen Benutzerzuordnung.
+
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `ip` (PK) | TEXT | Eindeutige IP-Adresse des Anfragenden |
+| `type` | TEXT | Verbindungstyp (`VPN`, `TOR`, `Proxy`, `Compromised Server`, `Residential`) |
+| `provider` | TEXT | ISP / Provider / Hostname der IP-Adresse |
+| `country` | TEXT | Land / Ländercode der IP-Adresse |
+| `is_vpn` | INTEGER | Flag: Ist die IP ein VPN-Tunnel (`0` = Nein, `1` = Ja) |
+| `is_tor` | INTEGER | Flag: Ist die IP ein TOR-Exit-Node (`0` = Nein, `1` = Ja) |
+| `is_proxy` | INTEGER | Flag: Ist die IP ein Proxy-Server (`0` = Nein, `1` = Ja) |
+| `is_compromised` | INTEGER | Flag: Ist die IP ein kompromittierter Server (`0` = Nein, `1` = Ja) |
+| `risk_score` | INTEGER | Risiko-Score der IP-Adresse (0 - 100) |
+| `raw_json` | TEXT | Roh-JSON-Antwort der ProxyCheck.io API |
+| `last_user` | TEXT | Erkannter / zugeordneter Benutzername (aus Session, Cookie oder Audit-Log) |
+| `checked_at` | DATETIME | Zeitstempel der ersten/letzten Prüfung |
+| `expires_at` | DATETIME | Ablaufzeitpunkt im Cache (30 Tage nach Prüfung) |
+
+---
+
 ## 3. Datenbank-Update-Skripte für GitHub
 Bei zukünftigen Updates über GitHub vergleicht der Updater den Ordner `/migrations` und führt neue `.sql`-Dateien automatisch aus.
 Jede neue Migration muss als separate Datei (z.B. `002_add_new_fields.sql`) hinterlegt werden.

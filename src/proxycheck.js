@@ -89,9 +89,10 @@ function httpGet(url) {
  * Führt die Prüfung einer IP-Adresse durch (mit 30-Tage SQLite Cache).
  * 
  * @param {string} ip 
+ * @param {string} [detectedUser]
  * @returns {Promise<Object>}
  */
-async function lookupIp(ip) {
+async function lookupIp(ip, detectedUser = null) {
   if (!ip || isPrivateOrLocalIp(ip)) {
     return {
       ip,
@@ -118,6 +119,9 @@ async function lookupIp(ip) {
     `).get(cleanIp);
 
     if (cachedRow) {
+      if (detectedUser && !cachedRow.last_user) {
+        updateCacheUser(cleanIp, detectedUser);
+      }
       return {
         ip: cachedRow.ip,
         cached: true,
@@ -129,6 +133,7 @@ async function lookupIp(ip) {
         is_proxy: cachedRow.is_proxy === 1,
         is_compromised: cachedRow.is_compromised === 1,
         risk_score: cachedRow.risk_score || 0,
+        last_user: detectedUser || cachedRow.last_user || null,
         raw: cachedRow.raw_json ? JSON.parse(cachedRow.raw_json) : null
       };
     }
@@ -156,7 +161,8 @@ async function lookupIp(ip) {
       risk_score: 0,
       type: 'Unknown',
       provider: 'Unknown',
-      country: 'Unknown'
+      country: 'Unknown',
+      last_user: detectedUser || null
     };
   }
 
@@ -175,9 +181,9 @@ async function lookupIp(ip) {
   try {
     db.prepare(`
       INSERT INTO proxycheck_cache (
-        ip, type, provider, country, is_vpn, is_tor, is_proxy, is_compromised, risk_score, raw_json, expires_at
+        ip, type, provider, country, is_vpn, is_tor, is_proxy, is_compromised, risk_score, raw_json, last_user, expires_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+30 days')
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+30 days')
       )
       ON CONFLICT(ip) DO UPDATE SET
         type = excluded.type,
@@ -189,6 +195,7 @@ async function lookupIp(ip) {
         is_compromised = excluded.is_compromised,
         risk_score = excluded.risk_score,
         raw_json = excluded.raw_json,
+        last_user = COALESCE(excluded.last_user, proxycheck_cache.last_user),
         checked_at = CURRENT_TIMESTAMP,
         expires_at = datetime('now', '+30 days')
     `).run(
@@ -201,7 +208,8 @@ async function lookupIp(ip) {
       isProxy ? 1 : 0,
       isCompromised ? 1 : 0,
       riskScore,
-      JSON.stringify(apiResponse)
+      JSON.stringify(apiResponse),
+      detectedUser
     );
   } catch (e) {
     console.error('Fehler beim Speichern in proxycheck_cache:', e);
@@ -218,8 +226,22 @@ async function lookupIp(ip) {
     is_proxy: isProxy,
     is_compromised: isCompromised,
     risk_score: riskScore,
+    last_user: detectedUser,
     raw: apiResponse
   };
+}
+
+/**
+ * Aktualisiert den zugeordneten Benutzernamen für eine IP im proxycheck_cache.
+ */
+function updateCacheUser(ip, username) {
+  if (!ip || !username) return;
+  const cleanIp = ip.startsWith('::ffff:') ? ip.substring(7) : ip;
+  try {
+    db.prepare(`UPDATE proxycheck_cache SET last_user = ? WHERE ip = ?`).run(username, cleanIp);
+  } catch (e) {
+    console.error('Fehler beim Aktualisieren des Benutzers im ProxyCheck-Cache:', e);
+  }
 }
 
 /**

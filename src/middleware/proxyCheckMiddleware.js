@@ -1,6 +1,63 @@
-const { getConfig, logEvent } = require('../db');
+const { db, getConfig, logEvent } = require('../db');
 const { isPrivateOrLocalIp, lookupIp } = require('../proxycheck');
-const path = require('path');
+
+function parseCookies(req) {
+  const list = {};
+  const rc = req.headers.cookie;
+  if (!rc) return list;
+  rc.split(';').forEach(cookie => {
+    const parts = cookie.split('=');
+    if (parts.length >= 2) {
+      list[parts[0].trim()] = decodeURIComponent(parts[1].trim());
+    }
+  });
+  return list;
+}
+
+function detectUserForRequest(req, clientIp) {
+  // 1. Session User
+  if (req.session && req.session.user) {
+    const u = req.session.user.username || req.session.user.name || req.session.user.email;
+    if (u) return String(u).trim();
+  }
+
+  // 2. Login Payload
+  if (req.body && req.body.username) {
+    return String(req.body.username).trim();
+  }
+
+  // 3. Persistent Cookie
+  const cookies = parseCookies(req);
+  if (cookies.mso_remember_user) {
+    return cookies.mso_remember_user.trim();
+  }
+
+  // 4. DB Lookup in system_logs nach letztem bekannten Login / User-Event für diese IP
+  try {
+    const logRow = db.prepare(`
+      SELECT details, message FROM system_logs 
+      WHERE ip = ? AND (action LIKE '%login%' OR action LIKE '%auth%' OR action LIKE '%user%')
+      ORDER BY id DESC LIMIT 1
+    `).get(clientIp);
+
+    if (logRow) {
+      if (logRow.details) {
+        try {
+          const d = JSON.parse(logRow.details);
+          if (d.username) return d.username;
+          if (d.user) return d.user;
+          if (d.email) return d.email;
+        } catch(e) {}
+      }
+      if (logRow.message) {
+        const match = logRow.message.match(/für:\s*([^\s,;]+)|Benutzer\s+([^\s,;]+)|User\s+([^\s,;]+)|E-Mail:\s*([^\s,;]+)/i);
+        if (match) return match[1] || match[2] || match[3] || match[4];
+      }
+    }
+  } catch(e) {}
+
+  return null;
+}
 
 /**
  * Express-Middleware für den automatisierten ProxyCheck.io Schutz.
@@ -54,8 +111,9 @@ async function proxyCheckMiddleware(req, res, next) {
       return next();
     }
 
-    // 6. IP-Lookup über ProxyCheck.io (30-Tage SQLite Cache)
-    const result = await lookupIp(clientIp);
+    // 6. Benutzererkennung & IP-Lookup über ProxyCheck.io (30-Tage SQLite Cache)
+    const detectedUser = detectUserForRequest(req, clientIp);
+    const result = await lookupIp(clientIp, detectedUser);
 
     // 7. Konfigurierte Schwellenwerte und Schalter abrufen
     const checkVpn = getConfig('proxycheck_check_vpn', '1') === '1';
@@ -94,11 +152,13 @@ async function proxyCheckMiddleware(req, res, next) {
         risk: `Erhöhter Risiko-Score (${result.risk_score}/${riskThreshold})`
       };
 
-      const logMsg = `Verbindung blockiert (${reasonTitleMap[blockReason] || blockReason}): IP ${clientIp}, Typ: ${result.type || 'Unknown'}, Provider: ${result.provider || 'Unknown'}, Risk-Score: ${result.risk_score || 0}`;
+      const userDisplay = detectedUser ? `User: ${detectedUser}` : 'User: Unbekannt';
+      const logMsg = `Verbindung blockiert (${reasonTitleMap[blockReason] || blockReason}): IP ${clientIp}, ${userDisplay}, Typ: ${result.type || 'Unknown'}, Provider: ${result.provider || 'Unknown'}, Risk-Score: ${result.risk_score || 0}`;
 
       // WARN Event im System-Protokoll eintragen
       logEvent('WARN', 'PROXYCHECK_BLOCKED', logMsg, {
         ip: clientIp,
+        username: detectedUser || null,
         type: result.type,
         provider: result.provider,
         country: result.country,
@@ -118,6 +178,7 @@ async function proxyCheckMiddleware(req, res, next) {
           error: 'Zugriff verweigert: Sie nutzen eine VPN-Verbindung, einen Proxy-Server oder einen anonymisierten Dienst. Bitte deaktivieren Sie Ihre VPN-Verbindung (z.B. NordVPN, Mullvad, ProtonVPN, ExpressVPN) und laden Sie die Seite neu.',
           code: 'PROXYCHECK_BLOCKED',
           reason: blockReason,
+          user: detectedUser || null,
           details: {
             ip: clientIp,
             type: result.type || 'Anonymisiert',
@@ -131,7 +192,8 @@ async function proxyCheckMiddleware(req, res, next) {
           ip: clientIp,
           type: result.type || 'Anonymisiert',
           provider: result.provider || 'Unbekannt',
-          score: String(result.risk_score || 0)
+          score: String(result.risk_score || 0),
+          user: detectedUser || ''
         });
 
         return res.redirect(`/blocked.html?${queryParams.toString()}`);

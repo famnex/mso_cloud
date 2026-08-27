@@ -175,6 +175,10 @@
         <span id="detail-ip">-</span>
       </div>
       <div class="details-item">
+        Erkannter Benutzer:
+        <span id="detail-user">-</span>
+      </div>
+      <div class="details-item">
         Erkannter Typ:
         <span id="detail-type">-</span>
       </div>
@@ -182,7 +186,7 @@
         Provider / Netz:
         <span id="detail-provider">-</span>
       </div>
-      <div class="details-item">
+      <div class="details-item" style="grid-column: 1 / -1;">
         Risiko-Score:
         <span id="detail-risk">-</span>
       </div>
@@ -207,8 +211,10 @@
     const type = params.get('type') || '-';
     const provider = params.get('provider') || '-';
     const score = params.get('score') || '-';
+    const user = params.get('user') || '-';
 
     document.getElementById('detail-ip').textContent = ip;
+    document.getElementById('detail-user').textContent = user || '-';
     document.getElementById('detail-type').textContent = type;
     document.getElementById('detail-provider').textContent = provider;
     document.getElementById('detail-risk').textContent = score !== '-' ? (score + ' / 100') : '-';
