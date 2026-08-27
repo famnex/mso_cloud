@@ -14,6 +14,27 @@ function parseCookies(req) {
   return list;
 }
 
+function detectUserForRequest(req) {
+  // 1. Session User (vom aktiven Login im Browser)
+  if (req.session && req.session.user) {
+    const u = req.session.user.username || req.session.user.name || req.session.user.email;
+    if (u) return String(u).trim();
+  }
+
+  // 2. Login Payload (vom Anmeldeformular des Browsers)
+  if (req.body && req.body.username) {
+    return String(req.body.username).trim();
+  }
+
+  // 3. Persistent Cookie (aus den Browserdaten des Nutzers)
+  const cookies = parseCookies(req);
+  if (cookies.mso_remember_user) {
+    return cookies.mso_remember_user.trim();
+  }
+
+  return null;
+}
+
 function isAsnWhitelisted(asnStr, providerStr, whitelistConfig) {
   if (!whitelistConfig) return false;
   
