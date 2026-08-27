@@ -96,12 +96,13 @@ function setConfig(key, value) {
  */
 function logEvent(level, action, message, details = null, ip = null) {
   try {
+    const cleanLevel = String(level || 'info').toLowerCase().trim();
     const detailsStr = details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null;
     db.prepare(`
       INSERT INTO system_logs (level, action, message, details, ip)
       VALUES (?, ?, ?, ?, ?)
-    `).run(level, action, message, detailsStr, ip);
-    console.log(`[System Log - ${level.toUpperCase()}] Action: ${action}, Message: ${message}`);
+    `).run(cleanLevel, action, message, detailsStr, ip);
+    console.log(`[System Log - ${cleanLevel.toUpperCase()}] Action: ${action}, Message: ${message}`);
   } catch (err) {
     console.error('Fehler beim Schreiben des System-Protokolls:', err);
   }

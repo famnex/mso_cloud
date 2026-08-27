@@ -3554,15 +3554,16 @@ function renderAdminLogs(logs) {
 
   tableBody.innerHTML = logs.map(log => {
     // Level badge (ultra-robust inline styles to avoid conflicts)
+    const logLevel = String(log.level || '').toLowerCase();
     let levelBadge = '';
-    if (log.level === 'error') {
+    if (logLevel === 'error') {
       levelBadge = `
         <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(239, 68, 68, 0.12) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
           <i class="fa-solid fa-circle-xmark" style="font-size: 0.85rem !important; margin: 0 !important; color: #ef4444 !important; display: inline-block !important; line-height: 1 !important;"></i>
           <span style="color: #ef4444 !important; line-height: 1 !important; font-weight: 600 !important;">Error</span>
         </span>
       `;
-    } else if (log.level === 'warn') {
+    } else if (logLevel === 'warn') {
       levelBadge = `
         <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(245, 158, 11, 0.12) !important; color: #f59e0b !important; border: 1px solid rgba(245, 158, 11, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
           <i class="fa-solid fa-circle-exclamation" style="font-size: 0.85rem !important; margin: 0 !important; color: #f59e0b !important; display: inline-block !important; line-height: 1 !important;"></i>
@@ -3658,14 +3659,15 @@ function openLogDetails(id) {
 
   // Badge in modal
   const modalBadge = document.getElementById('log-details-level-badge');
-  if (log.level === 'error') {
+  const modalLvl = String(log.level || '').toLowerCase();
+  if (modalLvl === 'error') {
     modalBadge.innerHTML = `
       <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(239, 68, 68, 0.12) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
         <i class="fa-solid fa-circle-xmark" style="font-size: 0.85rem !important; margin: 0 !important; color: #ef4444 !important; display: inline-block !important; line-height: 1 !important;"></i>
         <span style="color: #ef4444 !important; line-height: 1 !important; font-weight: 600 !important;">Error</span>
       </span>
     `;
-  } else if (log.level === 'warn') {
+  } else if (modalLvl === 'warn') {
     modalBadge.innerHTML = `
       <span style="display: inline-flex !important; align-items: center !important; flex-direction: row !important; gap: 6px !important; background: rgba(245, 158, 11, 0.12) !important; color: #f59e0b !important; border: 1px solid rgba(245, 158, 11, 0.25) !important; padding: 4px 8px !important; border-radius: 4px !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; line-height: 1 !important; height: 24px !important; white-space: nowrap !important;">
         <i class="fa-solid fa-circle-exclamation" style="font-size: 0.85rem !important; margin: 0 !important; color: #f59e0b !important; display: inline-block !important; line-height: 1 !important;"></i>
