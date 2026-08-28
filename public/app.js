@@ -2686,21 +2686,32 @@ function renderProxyCheckCacheTable(cacheList, meta = {}) {
       }
     } catch(e) {}
 
+    const asnStr = item.asn ? escapeHtml(item.asn) : '';
+    const asnBadge = asnStr ? `<span class="badge" style="font-family:monospace; font-size:0.72rem; background:rgba(56, 189, 248, 0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25); margin-left:6px;" title="Autonomes System (ASN): ${asnStr}">${asnStr}</span>` : '';
+    const providerDisplay = `<span title="Autonomes System (ASN): ${asnStr || 'Unbekannt'} | Provider: ${escapeHtml(item.provider || '-')}">${escapeHtml(item.provider || '-')}${asnBadge}</span>`;
+
+    const asnButton = item.asn 
+      ? `<button class="btn btn-secondary btn-sm" onclick="whitelistAsnAction('${escapeHtml(item.asn)}')" title="AS-Nummer ${escapeHtml(item.asn)} zur ASN-Whitelist hinzufügen" style="padding:4px 8px; font-size:0.78rem; display:inline-flex; align-items:center; gap:4px;">
+           <i class="fa-solid fa-network-wired"></i> AS ${escapeHtml(item.asn.replace(/^AS/i, ''))} Whitelist
+         </button>` 
+      : '';
+
     return `
       <tr>
         <td><strong style="font-family:monospace; font-size:0.9rem;">${escapeHtml(item.ip)}</strong></td>
         <td>${userBadge}</td>
         <td>${statusBadge}</td>
         <td><div style="display:flex; gap:4px; flex-wrap:wrap;">${typeBadges.join(' ')}</div></td>
-        <td style="font-size:0.85rem; color:var(--text-secondary); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(item.provider || '-')}">${escapeHtml(item.provider || '-')}</td>
+        <td style="font-size:0.85rem; color:var(--text-secondary); max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${providerDisplay}</td>
         <td style="font-size:0.85rem;">${escapeHtml(item.country || '-')}</td>
         <td style="text-align:center;">${scoreBadge}</td>
         <td style="font-size:0.82rem; color:var(--text-secondary);">${expiresStr}</td>
         <td style="text-align:center;">
           <div style="display:inline-flex; gap:6px;">
             <button class="btn btn-primary btn-sm" onclick="whitelistProxyCheckIp('${escapeHtml(item.ip)}')" title="Auf Whitelist übertragen" style="padding:4px 8px; font-size:0.78rem; display:inline-flex; align-items:center; gap:4px;">
-              <i class="fa-solid fa-user-check"></i> Whitelist
+              <i class="fa-solid fa-user-check"></i> IP Whitelist
             </button>
+            ${asnButton}
             <button class="btn btn-danger btn-sm" onclick="deleteProxyCheckCacheEntry('${escapeHtml(item.ip)}')" title="Aus Cache löschen" style="padding:4px 8px; font-size:0.78rem;">
               <i class="fa-solid fa-trash"></i>
             </button>
@@ -2709,6 +2720,40 @@ function renderProxyCheckCacheTable(cacheList, meta = {}) {
       </tr>
     `;
   }).join('');
+}
+
+async function whitelistAsnAction(asn) {
+  if (!asn) return;
+  const cleanAsn = asn.trim().toUpperCase();
+  const el = document.getElementById('proxycheck_asn_whitelist');
+  let current = el ? el.value.trim() : '';
+  
+  const existingAsns = current.split(/[\s,;\n]+/).map(a => a.trim().toUpperCase()).filter(Boolean);
+  if (existingAsns.includes(cleanAsn)) {
+    showAdminAlert(`AS-Nummer ${cleanAsn} ist bereits in der ASN-Whitelist enthalten.`, 'info');
+    return;
+  }
+
+  existingAsns.push(cleanAsn);
+  const updatedWhitelist = existingAsns.join(', ');
+  if (el) el.value = updatedWhitelist;
+
+  try {
+    const res = await fetch('api/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proxycheck_asn_whitelist: updatedWhitelist })
+    });
+    if (res.ok) {
+      showAdminAlert(`AS-Nummer ${cleanAsn} wurde erfolgreich zur ASN-Whitelist hinzugefügt und gespeichert!`, 'success');
+      loadProxyCheckCache(false);
+    } else {
+      const errData = await res.json();
+      showAdminAlert(errData.error || 'Fehler beim Speichern der ASN-Whitelist', 'danger');
+    }
+  } catch (err) {
+    showAdminAlert(err.message, 'danger');
+  }
 }
 
 function renderProxyCheckCachePagination(totalEntries, currentPage, totalPages) {
