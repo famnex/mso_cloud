@@ -87,7 +87,7 @@ router.get('/config', (req, res) => {
        proxycheck_check_proxy: getConfig('proxycheck_check_proxy', '1'),
        proxycheck_check_compromised: getConfig('proxycheck_check_compromised', '1'),
        proxycheck_risk_threshold: getConfig('proxycheck_risk_threshold', '67'),
-       proxycheck_asn_whitelist: getConfig('proxycheck_asn_whitelist', 'AS13335, AS54113, AS714, AS13238, AS20940')
+       proxycheck_asn_whitelist: getConfig('proxycheck_asn_whitelist', 'AS13335, AS54113, AS714, AS13238, AS20940, AS63949, AS16625, AS36183, AKAMAI')
      };
      res.json(config);
   } catch (error) {
@@ -284,7 +284,7 @@ router.get('/proxycheck/cache', (req, res) => {
       total,
       page,
       totalPages,
-      asn_whitelist: getConfig('proxycheck_asn_whitelist', 'AS13335, AS54113, AS714, AS13238, AS20940'),
+      asn_whitelist: getConfig('proxycheck_asn_whitelist', 'AS13335, AS54113, AS714, AS13238, AS20940, AS63949, AS16625, AS36183, AKAMAI'),
       proxycheck_enabled: getConfig('proxycheck_enabled', '0') === '1',
       risk_threshold: parseInt(getConfig('proxycheck_risk_threshold', '67'), 10),
       check_vpn: getConfig('proxycheck_check_vpn', '1') === '1',

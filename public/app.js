@@ -1930,7 +1930,7 @@ async function loadAdminConfig() {
     if (proxycheckAsnEl) {
       proxycheckAsnEl.value = (cfg.proxycheck_asn_whitelist !== undefined && cfg.proxycheck_asn_whitelist !== null) 
         ? cfg.proxycheck_asn_whitelist 
-        : 'AS13335, AS54113, AS714, AS13238, AS20940';
+        : 'AS13335, AS54113, AS714, AS13238, AS20940, AS63949, AS16625, AS36183, AKAMAI';
     }
 
     // Schülerausweis Felder befüllen
@@ -2453,13 +2453,13 @@ async function saveProxyCheckConfig(e) {
 function addApplePrivateRelayAsns() {
   const el = document.getElementById('proxycheck_asn_whitelist');
   if (!el) return;
-  const appleAsns = ['AS13335', 'AS54113', 'AS714', 'AS13238', 'AS20940'];
+  const appleAsns = ['AS13335', 'AS54113', 'AS714', 'AS13238', 'AS20940', 'AS63949', 'AS16625', 'AS36183', 'AKAMAI'];
   const current = el.value.split(/[\s,;\n]+/).map(a => a.trim().toUpperCase()).filter(Boolean);
   
   const merged = Array.from(new Set([...current, ...appleAsns]));
   el.value = merged.join(', ');
   saveProxyCheckConfig();
-  showAdminAlert('Apple Private Relay AS-Nummern wurden zur Whitelist hinzugefügt und gespeichert.', 'success');
+  showAdminAlert('Apple Private Relay & Akamai AS-Nummern wurden zur Whitelist hinzugefügt und gespeichert.', 'success');
 }
 
 async function testProxyCheckConnection() {
@@ -2554,7 +2554,7 @@ async function loadProxyCheckCache(resetPage = true) {
 
     proxyCheckCacheTotalPages = data.totalPages;
 
-    renderProxyCheckCacheTable(data.cache);
+    renderProxyCheckCacheTable(data.cache, data);
     renderProxyCheckCachePagination(data.total, data.page, data.totalPages);
 
   } catch (err) {
@@ -2590,7 +2590,7 @@ function checkIsAsnWhitelistedInClient(asnStr, providerStr, whitelistConfig) {
     const allowedNum = allowed.replace(/^AS/, '');
     if (
       (cleanAsn && (cleanAsn === allowed || cleanNum === allowedNum)) ||
-      (cleanProvider && cleanProvider.includes(allowed))
+      (cleanProvider && allowed.length >= 3 && cleanProvider.includes(allowed))
     ) {
       return true;
     }
@@ -2613,7 +2613,7 @@ function renderProxyCheckCacheTable(cacheList, meta = {}) {
     return;
   }
 
-  const asnWhitelist = meta.asn_whitelist || 'AS13335, AS54113, AS714, AS13238, AS20940';
+  const asnWhitelist = meta.asn_whitelist || 'AS13335, AS54113, AS714, AS13238, AS20940, AS63949, AS16625, AS36183, AKAMAI';
   const protectionEnabled = meta.proxycheck_enabled !== false;
   const riskThreshold = meta.risk_threshold || 67;
   const blockedIps = meta.blocked_ips || [];

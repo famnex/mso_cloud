@@ -41,7 +41,7 @@ function isAsnWhitelisted(asnStr, providerStr, whitelistConfig) {
   const allowedItems = whitelistConfig
     .split(/[\s,;\n]+/)
     .map(a => a.trim().toUpperCase())
-    .filter(a => a);
+    .filter(Boolean);
 
   if (allowedItems.length === 0) return false;
 
@@ -53,7 +53,7 @@ function isAsnWhitelisted(asnStr, providerStr, whitelistConfig) {
     const allowedNum = allowed.replace(/^AS/, '');
     if (
       (cleanAsn && (cleanAsn === allowed || cleanNum === allowedNum)) ||
-      (cleanProvider && cleanProvider.includes(allowed))
+      (cleanProvider && allowed.length >= 3 && cleanProvider.includes(allowed))
     ) {
       return true;
     }
@@ -124,13 +124,13 @@ async function proxyCheckMiddleware(req, res, next) {
       return next();
     }
 
-    // 7. Automatische Bypass-Prüfung für geweißlistete Autonome Systeme (ASNs)
-    // z. B. Apple iCloud Private Relay (AS13335, AS54113, AS714, AS13238, AS20940)
-    const defaultAsnWhitelist = 'AS13335, AS54113, AS714, AS13238, AS20940';
+    // 7. Automatische Bypass-Prüfung für geweißlistete Autonome Systeme (ASNs) & Apple Private Relay
+    // e.g. Cloudflare (AS13335), Fastly (AS54113), Apple (AS714), YISP (AS13238), Akamai (AS20940, AS63949, AS16625, AS36183, AKAMAI)
+    const defaultAsnWhitelist = 'AS13335, AS54113, AS714, AS13238, AS20940, AS63949, AS16625, AS36183, AKAMAI';
     const asnWhitelist = getConfig('proxycheck_asn_whitelist', defaultAsnWhitelist);
     
     if (isAsnWhitelisted(result.asn, result.provider, asnWhitelist)) {
-      console.log(`[ProxyCheck ASN Bypass] IP ${clientIp} freigegeben durch geweißlistete AS-Nummer (${result.asn || result.provider}).`);
+      console.log(`[ProxyCheck ASN Bypass] IP ${clientIp} freigegeben durch geweißlistete AS-Nummer/Provider (${result.asn || result.provider}).`);
       return next();
     }
 
