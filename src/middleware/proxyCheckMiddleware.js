@@ -1,4 +1,4 @@
-const { db, getConfig, logEvent, blockDevice, isDeviceBlocked } = require('../db');
+const { db, getConfig, logEvent } = require('../db');
 const { isPrivateOrLocalIp, lookupIp } = require('../proxycheck');
 
 function parseCookies(req) {
@@ -63,7 +63,7 @@ function isAsnWhitelisted(asnStr, providerStr, whitelistConfig) {
 }
 
 /**
- * Express-Middleware für den automatisierten ProxyCheck.io Schutz & Geräte-Fingerprinting.
+ * Express-Middleware für den automatisierten ProxyCheck.io Schutz.
  */
 async function proxyCheckMiddleware(req, res, next) {
   try {
@@ -99,39 +99,6 @@ async function proxyCheckMiddleware(req, res, next) {
 
       if (isExemptRole) {
         return next();
-      }
-    }
-
-    // 3.5 Device-ID & Fingerprint ermitteln & Gerätesperre prüfen
-    const cookies = parseCookies(req);
-    const deviceId = req.headers['x-device-id'] || cookies.mso_device_id || null;
-    const fingerprint = req.headers['x-device-fingerprint'] || cookies.mso_fingerprint || null;
-
-    const existingDeviceBlock = isDeviceBlocked(deviceId, fingerprint);
-    if (existingDeviceBlock) {
-      console.log(`[ProxyCheck Device Block] Zugriff für gesperrtes Gerät ${deviceId || fingerprint} verweigert.`);
-      const isJsonRequest = req.xhr || 
-                            (req.headers.accept && req.headers.accept.includes('application/json')) ||
-                            p.startsWith('/api/') || 
-                            p.startsWith('/novus/api/');
-      if (isJsonRequest) {
-        return res.status(403).json({
-          error: 'Zugriff verweigert: Dieses Endgerät wurde aufgrund von Sicherheitsverstößen gesperrt.',
-          code: 'DEVICE_BLOCKED',
-          reason: existingDeviceBlock.reason || 'blocked_device',
-          user: existingDeviceBlock.username || null,
-          details: {
-            device_id: existingDeviceBlock.device_id,
-            fingerprint: existingDeviceBlock.fingerprint
-          }
-        });
-      } else {
-        const queryParams = new URLSearchParams({
-          reason: existingDeviceBlock.reason || 'blocked_device',
-          user: existingDeviceBlock.username || '',
-          device: existingDeviceBlock.device_id || ''
-        });
-        return res.redirect(`/blocked.html?${queryParams.toString()}`);
       }
     }
 
@@ -194,18 +161,8 @@ async function proxyCheckMiddleware(req, res, next) {
       blockReason = 'risk';
     }
 
-    // 8. Wenn ein Sicherheitsverstoß vorliegt: Gerätesperrung & Loggen
+    // 8. Wenn die IP gesperrt ist: Loggen & Blockieren
     if (isBlocked) {
-      if (deviceId || fingerprint) {
-        blockDevice({
-          device_id: deviceId,
-          fingerprint: fingerprint,
-          username: detectedUser,
-          reason: blockReason,
-          ip: clientIp,
-          details: result
-        });
-      }
       const reasonTitleMap = {
         vpn: 'VPN-Verbindung',
         tor: 'TOR-Netzwerk',
