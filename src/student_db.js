@@ -243,15 +243,27 @@ function getLocalAllStudents() {
  * Holt das Schülerprofil wahlweise aus MySQL oder SQLite.
  */
 async function getStudentProfile(user) {
+  let userObj = (typeof user === 'object' && user !== null) ? { ...user } : { id: user };
+  
+  if (!userObj.username && userObj.id) {
+    try {
+      const uRow = db.prepare('SELECT username, email FROM users WHERE id = ?').get(userObj.id);
+      if (uRow) {
+        userObj.username = uRow.username;
+        userObj.email = uRow.email;
+      }
+    } catch (e) {}
+  }
+
   if (pool) {
     try {
       let applicationId = null;
       
       // 1. Primär nach Benutzernamen (Feld 146) suchen
-      if (user && user.username) {
+      if (userObj.username) {
         const [userRows] = await pool.query(
           'SELECT application FROM fieldvalues WHERE field = 146 AND value = ?',
-          [user.username.trim()]
+          [userObj.username.trim()]
         );
         if (userRows.length > 0) {
           applicationId = userRows[0].application;
@@ -259,8 +271,8 @@ async function getStudentProfile(user) {
       }
       
       // 2. Sekundär nach E-Mail (Feld 18) suchen (aktive Anträge mit Status >= 10 bevorzugen)
-      if (!applicationId && user && user.email) {
-        const email = user.email.trim();
+      if (!applicationId && userObj.email) {
+        const email = userObj.email.trim();
         if (email && email.includes('@')) {
           const [emailRows] = await pool.query(`
             SELECT fv.application, app.status 
@@ -275,12 +287,20 @@ async function getStudentProfile(user) {
           }
         }
       }
+
+      // 3. Tertiär nach Mediotheksnummer (Feld 145) suchen
+      if (!applicationId && userObj.mediothek_number) {
+        const [medRows] = await pool.query(
+          'SELECT application FROM fieldvalues WHERE field = 145 AND value = ?',
+          [String(userObj.mediothek_number).trim()]
+        );
+        if (medRows.length > 0) {
+          applicationId = medRows[0].application;
+        }
+      }
       
       if (!applicationId) {
-        // Der Benutzer ist online, aber es existiert kein passender Schülerdatensatz in MySQL.
-        // Das lokale Profil wird sofort gelöscht, um den Ausweis unbrauchbar zu machen.
-        db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
-        return null;
+        return getLocalProfile(userObj.id);
       }
 
       const [fieldRows] = await pool.query(`
@@ -303,13 +323,23 @@ async function getStudentProfile(user) {
         photoFile = convertBlobToDataUrl(photoRows[0].file);
       }
 
-      return buildProfileFromMySQL(user.id, applicationId, fieldRows, photoFile);
+      const mysqlProf = buildProfileFromMySQL(userObj.id, applicationId, fieldRows, photoFile);
+      const localProf = getLocalProfile(userObj.id);
+      if (localProf) {
+        if (localProf.mediothek_number && !mysqlProf.mediothek_number) {
+          mysqlProf.mediothek_number = localProf.mediothek_number;
+        }
+        if (localProf.start_password === 'geändert' || (localProf.start_password && !mysqlProf.start_password)) {
+          mysqlProf.start_password = localProf.start_password;
+        }
+      }
+      return mysqlProf;
     } catch (err) {
       console.error('MySQL Error in getStudentProfile:', err);
-      return getLocalProfile(user.id);
+      return getLocalProfile(userObj.id);
     }
   } else {
-    return getLocalProfile(user.id);
+    return getLocalProfile(userObj.id);
   }
 }
 

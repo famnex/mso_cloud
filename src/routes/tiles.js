@@ -505,7 +505,7 @@ router.get('/check-user/:userId', async (req, res) => {
     // Zusatzdiagnose-Daten ermitteln (Profilbild, Schülerausweis, SPH & WebUntis Zugänge, Passwort-Status)
     let studentProfile = null;
     try {
-      studentProfile = await studentDb.getStudentProfile(userRow.id);
+      studentProfile = await studentDb.getStudentProfile(targetUser);
     } catch (e) {
       console.warn('Fehler beim Abrufen des Schülerprofils für Diagnose:', e.message);
     }
