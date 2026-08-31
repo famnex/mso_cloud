@@ -3189,9 +3189,30 @@ function renderAdminUserTable(users) {
   });
 }
 
+function switchUtcTab(tabName) {
+  ['status', 'tiles', 'groups', 'raw'].forEach(t => {
+    const btn = document.getElementById(`utc-tab-btn-${t}`);
+    const content = document.getElementById(`utc-tab-${t}`);
+    if (btn && content) {
+      if (t === tabName) {
+        btn.classList.add('active');
+        btn.style.borderBottomColor = 'var(--accent-color)';
+        btn.style.color = 'var(--accent-color)';
+        content.style.display = 'block';
+      } else {
+        btn.classList.remove('active');
+        btn.style.borderBottomColor = 'transparent';
+        btn.style.color = 'var(--text-secondary)';
+        content.style.display = 'none';
+      }
+    }
+  });
+}
+
 /* --- KACHEL-ZUGRIFFSRECHTE DIAGNOSE TOOL --- */
 async function openUserTilesCheckModal(userId) {
   openModal('user-tiles-check-modal');
+  switchUtcTab('status');
   document.getElementById('user-tiles-check-loading').style.display = 'block';
   document.getElementById('user-tiles-check-body').style.display = 'none';
   const searchInput = document.getElementById('utc-tile-search');
@@ -3207,27 +3228,104 @@ async function openUserTilesCheckModal(userId) {
 
     currentUtcData = await res.json();
     const user = currentUtcData.user;
+    const diag = currentUtcData.diagnostics || {};
 
-    // Header Info
+    // Header Info & Photo
     document.getElementById('utc-username').innerText = `${user.username}${user.displayName ? ` (${user.displayName})` : ''}`;
     document.getElementById('utc-type-role').innerHTML = `${user.isLdap ? '<span style="color:var(--warn-color); font-weight:600;"><i class="fa-solid fa-network-wired"></i> LDAP</span>' : '<span style="color:var(--success-color); font-weight:600;"><i class="fa-solid fa-database"></i> Lokal</span>'} &bull; Rolle: <strong>${user.role}</strong>`;
 
-    const groupsEl = document.getElementById('utc-groups');
-    groupsEl.innerHTML = '';
-    const groups = user.effectiveGroups || [];
-    if (groups.length === 0) {
-      groupsEl.innerHTML = '<span style="color:var(--text-secondary); font-style:italic;">Keine Gruppen vorhanden</span>';
-    } else {
-      groups.forEach(g => {
-        const badge = document.createElement('span');
-        badge.className = 'user-badge';
-        badge.style.cssText = 'font-size:0.75rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);';
-        badge.innerText = g;
-        groupsEl.appendChild(badge);
-      });
+    const photoContainer = document.getElementById('utc-photo-container');
+    if (photoContainer) {
+      if (diag.photo && diag.photo.has_photo && diag.photo.preview_data) {
+        photoContainer.innerHTML = `<img src="${diag.photo.preview_data}" alt="Profilbild" style="width:100%; height:100%; object-fit:cover;">`;
+      } else {
+        photoContainer.innerHTML = `<i class="fa-solid fa-user fa-xl" style="color:var(--text-secondary);"></i>`;
+      }
     }
 
-    // Counts
+    // Passwort-Status Card
+    const passTextEl = document.getElementById('utc-diag-password-text');
+    const passBadgeEl = document.getElementById('utc-pass-status-badge');
+    if (passTextEl && diag.password) {
+      if (diag.password.type === 'ldap') {
+        passTextEl.innerHTML = `<span style="color:#60a5fa;"><i class="fa-solid fa-shield-halved"></i> ${escapeHtml(diag.password.text)}</span>`;
+        if (passBadgeEl) passBadgeEl.innerHTML = `<span class="badge" style="background:rgba(96,165,250,0.15); color:#60a5fa; border:1px solid rgba(96,165,250,0.3); font-size:0.8rem;"><i class="fa-solid fa-network-wired"></i> LDAP Passwort</span>`;
+      } else if (diag.password.is_changed) {
+        passTextEl.innerHTML = `<span style="color:#22c55e;"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(diag.password.text)}</span>`;
+        if (passBadgeEl) passBadgeEl.innerHTML = `<span class="badge badge-success" style="font-size:0.8rem;"><i class="fa-solid fa-key"></i> Passwort geändert</span>`;
+      } else {
+        passTextEl.innerHTML = `<span style="color:#f59e0b;"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(diag.password.text)}</span>`;
+        if (passBadgeEl) passBadgeEl.innerHTML = `<span class="badge badge-warning" style="font-size:0.8rem;"><i class="fa-solid fa-triangle-exclamation"></i> Erstpasswort aktiv</span>`;
+      }
+    }
+
+    // Schülerausweis Card
+    const cardStatusEl = document.getElementById('utc-diag-card-status');
+    const cardMediothekEl = document.getElementById('utc-diag-mediothek');
+    if (cardStatusEl && diag.card) {
+      const imgStatus = (diag.photo && diag.photo.has_photo)
+        ? `<span style="color:#22c55e; margin-right:4px;"><i class="fa-solid fa-image"></i> Bild ok</span>`
+        : `<span style="color:#ef4444; margin-right:4px;"><i class="fa-solid fa-image-slash"></i> Kein Bild</span>`;
+      
+      cardStatusEl.innerHTML = `${imgStatus} &bull; <span style="font-size:0.85rem;">${escapeHtml(diag.card.status)}</span>`;
+      if (cardMediothekEl) {
+        cardMediothekEl.innerHTML = diag.card.mediothek_number 
+          ? `Mediothek-Nr.: <strong style="color:var(--accent-color);">${escapeHtml(diag.card.mediothek_number)}</strong>`
+          : '<span style="color:var(--text-secondary);">Keine Mediothek-Nummer</span>';
+      }
+    }
+
+    // SPH Card
+    const sphStatusEl = document.getElementById('utc-diag-sph-status');
+    const sphUserEl = document.getElementById('utc-diag-sph-user');
+    if (sphStatusEl && diag.credentials && diag.credentials.sph) {
+      if (diag.credentials.sph.configured) {
+        sphStatusEl.innerHTML = `<span style="color:#10b981;"><i class="fa-solid fa-circle-check"></i> Zugangsdaten vorhanden</span>`;
+        if (sphUserEl) sphUserEl.innerText = `Konto: ${diag.credentials.sph.username || '-'}`;
+      } else {
+        sphStatusEl.innerHTML = `<span style="color:var(--text-secondary);"><i class="fa-solid fa-circle-xmark"></i> Keine SPH-Daten</span>`;
+        if (sphUserEl) sphUserEl.innerText = 'Nicht im Portal hinterlegt';
+      }
+    }
+
+    // WebUntis Card
+    const untisStatusEl = document.getElementById('utc-diag-untis-status');
+    const untisUserEl = document.getElementById('utc-diag-untis-user');
+    if (untisStatusEl && diag.credentials && diag.credentials.untis) {
+      if (diag.credentials.untis.configured) {
+        untisStatusEl.innerHTML = `<span style="color:#60a5fa;"><i class="fa-solid fa-circle-check"></i> Untis-Konto verknüpft</span>`;
+        if (untisUserEl) untisUserEl.innerText = `Benutzer: ${diag.credentials.untis.username || '-'}`;
+      } else {
+        untisStatusEl.innerHTML = `<span style="color:var(--text-secondary);"><i class="fa-solid fa-circle-xmark"></i> Keine Untis-ID</span>`;
+        if (untisUserEl) untisUserEl.innerText = 'Nicht zugeordnet';
+      }
+    }
+
+    // Gruppen (Reiter 3)
+    const groupsEl = document.getElementById('utc-groups');
+    if (groupsEl) {
+      groupsEl.innerHTML = '';
+      const groups = user.effectiveGroups || [];
+      if (groups.length === 0) {
+        groupsEl.innerHTML = '<span style="color:var(--text-secondary); font-style:italic;">Keine Sicherheitsgruppen zugeordnet</span>';
+      } else {
+        groups.forEach(g => {
+          const badge = document.createElement('span');
+          badge.className = 'user-badge';
+          badge.style.cssText = 'font-size:0.8rem; padding:4px 10px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); margin-right:4px; margin-bottom:4px;';
+          badge.innerText = g;
+          groupsEl.appendChild(badge);
+        });
+      }
+    }
+
+    // Rohdaten (Reiter 4)
+    const rawJsonEl = document.getElementById('utc-raw-json');
+    if (rawJsonEl) {
+      rawJsonEl.innerText = JSON.stringify(currentUtcData, null, 2);
+    }
+
+    // Counts für Reiter 2 (Kacheln)
     document.getElementById('utc-count-all').innerText = currentUtcData.tilesCount;
     document.getElementById('utc-count-visible').innerText = currentUtcData.visibleCount;
     document.getElementById('utc-count-hidden').innerText = currentUtcData.hiddenCount;

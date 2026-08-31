@@ -502,6 +502,93 @@ router.get('/check-user/:userId', async (req, res) => {
       targetSphPassword = sphCreds.sphPassword;
     }
 
+    // Zusatzdiagnose-Daten ermitteln (Profilbild, Schülerausweis, SPH & WebUntis Zugänge, Passwort-Status)
+    let studentProfile = null;
+    try {
+      studentProfile = await studentDb.getStudentProfile(userRow.id);
+    } catch (e) {
+      console.warn('Fehler beim Abrufen des Schülerprofils für Diagnose:', e.message);
+    }
+
+    const hasPhoto = Boolean(studentProfile && studentProfile.card_image && String(studentProfile.card_image).length > 20);
+    let photoPreview = null;
+    if (hasPhoto) {
+      const imgStr = String(studentProfile.card_image);
+      photoPreview = imgStr.startsWith('data:') ? imgStr : `data:image/jpeg;base64,${imgStr}`;
+    }
+
+    const cardStatusText = studentProfile ? (studentProfile.card_status || 'Kein Schülerausweis / Inaktiv') : 'Kein Schülerausweis / Inaktiv';
+    const cardStatusCode = studentProfile ? (studentProfile.card_status_code || '') : '';
+    const mediothekNumber = studentProfile ? (studentProfile.mediothek_number || null) : null;
+
+    let passwordStatus = {
+      is_changed: false,
+      type: 'unknown',
+      text: 'Lokales Konto'
+    };
+
+    if (userRow.is_ldap === 1) {
+      passwordStatus = {
+        is_changed: true,
+        type: 'ldap',
+        text: 'Verwaltet über Active Directory / LDAP'
+      };
+    } else if (studentProfile && studentProfile.start_password) {
+      const sp = String(studentProfile.start_password).trim();
+      if (sp === 'geändert' || sp.toLowerCase().includes('geändert')) {
+        passwordStatus = {
+          is_changed: true,
+          type: 'changed',
+          text: 'Passwort wurde vom Benutzer geändert'
+        };
+      } else {
+        passwordStatus = {
+          is_changed: false,
+          type: 'start_password',
+          text: `Erstpasswort aktiv (${sp})`
+        };
+      }
+    } else {
+      const log = db.prepare("SELECT * FROM system_logs WHERE action IN ('password_change', 'password_reset', 'password_changed') AND message LIKE ? LIMIT 1").get(`%${userRow.username}%`);
+      if (log) {
+        passwordStatus = {
+          is_changed: true,
+          type: 'changed',
+          text: 'Passwort wurde geändert'
+        };
+      } else {
+        passwordStatus = {
+          is_changed: false,
+          type: 'default',
+          text: 'Standard / Unverändert'
+        };
+      }
+    }
+
+    const diagnostics = {
+      photo: {
+        has_photo: hasPhoto,
+        preview_data: photoPreview
+      },
+      card: {
+        status: cardStatusText,
+        status_code: cardStatusCode,
+        mediothek_number: mediothekNumber
+      },
+      credentials: {
+        sph: {
+          configured: Boolean(targetSphUsername && targetSphPassword),
+          username: targetSphUsername || null,
+          has_password: Boolean(targetSphPassword)
+        },
+        untis: {
+          configured: Boolean(targetUntisUsername),
+          username: targetUntisUsername || null
+        }
+      },
+      password: passwordStatus
+    };
+
     // Alle Kacheln laden
     const allTiles = db.prepare('SELECT * FROM tiles ORDER BY sort_order ASC, title ASC').all();
 
@@ -532,6 +619,7 @@ router.get('/check-user/:userId', async (req, res) => {
 
     res.json({
       user: targetUser,
+      diagnostics,
       tilesCount: evaluations.length,
       visibleCount: evaluations.filter(e => e.evaluation.visible).length,
       hiddenCount: evaluations.filter(e => !e.evaluation.visible).length,
