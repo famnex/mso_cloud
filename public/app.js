@@ -3308,7 +3308,9 @@ async function openUserTilesCheckModal(userId) {
 
     if (testUserEl) testUserEl.value = user.username || '';
     if (testPassEl) {
-      if (diag.password && diag.password.type === 'start_password' && diag.password.text.includes('(')) {
+      if (diag.password && diag.password.start_password) {
+        testPassEl.value = diag.password.start_password;
+      } else if (diag.password && diag.password.text && diag.password.text.includes('(')) {
         const match = diag.password.text.match(/\(([^)]+)\)/);
         testPassEl.value = match ? match[1] : '';
       } else {

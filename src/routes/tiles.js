@@ -527,41 +527,46 @@ router.get('/check-user/:userId', async (req, res) => {
       text: 'Lokales Konto'
     };
 
-    if (userRow.is_ldap === 1) {
-      passwordStatus = {
-        is_changed: true,
-        type: 'ldap',
-        text: 'Verwaltet über Active Directory / LDAP'
-      };
-    } else if (studentProfile && studentProfile.start_password) {
+    if (studentProfile && studentProfile.start_password) {
       const sp = String(studentProfile.start_password).trim();
       if (sp === 'geändert' || sp.toLowerCase().includes('geändert')) {
         passwordStatus = {
           is_changed: true,
           type: 'changed',
-          text: 'Passwort wurde vom Benutzer geändert'
+          text: 'Passwort wurde geändert (weicht vom Startpasswort ab)'
         };
-      } else {
+      } else if (sp.length > 0 && sp !== '-') {
         passwordStatus = {
           is_changed: false,
           type: 'start_password',
-          text: `Erstpasswort aktiv (${sp})`
+          text: `Erstpasswort aus Schulanmeldung/MySQL aktiv (${sp})`,
+          start_password: sp
         };
       }
-    } else {
-      const log = db.prepare("SELECT * FROM system_logs WHERE action IN ('password_change', 'password_reset', 'password_changed') AND message LIKE ? LIMIT 1").get(`%${userRow.username}%`);
-      if (log) {
+    }
+
+    if (passwordStatus.type === 'unknown') {
+      if (userRow.is_ldap === 1) {
         passwordStatus = {
           is_changed: true,
-          type: 'changed',
-          text: 'Passwort wurde geändert'
+          type: 'ldap',
+          text: 'Verwaltet über Active Directory / LDAP'
         };
       } else {
-        passwordStatus = {
-          is_changed: false,
-          type: 'default',
-          text: 'Standard / Unverändert'
-        };
+        const log = db.prepare("SELECT * FROM system_logs WHERE action IN ('password_change', 'password_reset', 'password_changed') AND message LIKE ? LIMIT 1").get(`%${userRow.username}%`);
+        if (log) {
+          passwordStatus = {
+            is_changed: true,
+            type: 'changed',
+            text: 'Passwort wurde geändert'
+          };
+        } else {
+          passwordStatus = {
+            is_changed: false,
+            type: 'default',
+            text: 'Standard / Unverändert'
+          };
+        }
       }
     }
 
