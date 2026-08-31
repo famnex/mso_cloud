@@ -3190,7 +3190,7 @@ function renderAdminUserTable(users) {
 }
 
 function switchUtcTab(tabName) {
-  ['status', 'tiles', 'groups', 'raw'].forEach(t => {
+  ['status', 'tiles', 'groups', 'logs', 'raw'].forEach(t => {
     const btn = document.getElementById(`utc-tab-btn-${t}`);
     const content = document.getElementById(`utc-tab-${t}`);
     if (btn && content) {
@@ -3337,7 +3337,44 @@ async function openUserTilesCheckModal(userId) {
       }
     }
 
-    // Rohdaten (Reiter 4)
+    // Protokolle (Reiter 4)
+    const logsCountEl = document.getElementById('utc-count-logs');
+    const logsTbody = document.getElementById('utc-logs-table-body');
+    const logs = currentUtcData.userLogs || [];
+    if (logsCountEl) logsCountEl.innerText = logs.length;
+
+    if (logsTbody) {
+      if (logs.length === 0) {
+        logsTbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align:center; padding:25px; color:var(--text-secondary);">
+              Keine System-Protokolleinträge für diesen Benutzer vorhanden.
+            </td>
+          </tr>
+        `;
+      } else {
+        logsTbody.innerHTML = logs.map(l => {
+          let lvlBadge = '<span class="badge badge-info" style="font-size:0.7rem;">INFO</span>';
+          if (l.level === 'warn' || l.level === 'warning') {
+            lvlBadge = '<span class="badge badge-warning" style="font-size:0.7rem;"><i class="fa-solid fa-triangle-exclamation"></i> WARN</span>';
+          } else if (l.level === 'error') {
+            lvlBadge = '<span class="badge badge-danger" style="font-size:0.7rem;"><i class="fa-solid fa-bug"></i> ERROR</span>';
+          }
+          const dtStr = l.created_at ? new Date(l.created_at.includes('Z') ? l.created_at : l.created_at + 'Z').toLocaleString('de-DE') : '-';
+          return `
+            <tr>
+              <td style="white-space:nowrap; color:var(--text-secondary);"><small>${dtStr}</small></td>
+              <td>${lvlBadge}</td>
+              <td><code style="font-size:0.75rem; background:rgba(0,0,0,0.2); padding:2px 5px; border-radius:4px;">${escapeHtml(l.action || '-')}</code></td>
+              <td style="max-width:320px; word-break:break-word;">${escapeHtml(l.message || '-')}</td>
+              <td><small style="font-family:monospace; color:var(--text-secondary);">${escapeHtml(l.ip || '-')}</small></td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // Rohdaten (Reiter 5)
     const rawJsonEl = document.getElementById('utc-raw-json');
     if (rawJsonEl) {
       rawJsonEl.innerText = JSON.stringify(currentUtcData, null, 2);

@@ -622,9 +622,20 @@ router.get('/check-user/:userId', async (req, res) => {
       };
     });
 
+    // Benutzerbezogene System-Protokolle abfragen (bis zu 100 Eintragszeilen)
+    const logPattern = `%${userRow.username}%`;
+    const userLogs = db.prepare(`
+      SELECT id, level, action, message, details, ip, created_at 
+      FROM system_logs 
+      WHERE message LIKE ? OR details LIKE ? 
+      ORDER BY id DESC 
+      LIMIT 100
+    `).all(logPattern, logPattern);
+
     res.json({
       user: targetUser,
       diagnostics,
+      userLogs,
       tilesCount: evaluations.length,
       visibleCount: evaluations.filter(e => e.evaluation.visible).length,
       hiddenCount: evaluations.filter(e => !e.evaluation.visible).length,

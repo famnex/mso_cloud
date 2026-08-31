@@ -2226,6 +2226,9 @@
           <button type="button" class="utc-tab-btn" id="utc-tab-btn-groups" onclick="switchUtcTab('groups')" style="padding:8px 16px; font-weight:600; font-size:0.88rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:8px;">
             <i class="fa-solid fa-users"></i> Gruppen & Rollen
           </button>
+          <button type="button" class="utc-tab-btn" id="utc-tab-btn-logs" onclick="switchUtcTab('logs')" style="padding:8px 16px; font-weight:600; font-size:0.88rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <i class="fa-solid fa-scroll"></i> Protokolle (<span id="utc-count-logs">0</span>)
+          </button>
           <button type="button" class="utc-tab-btn" id="utc-tab-btn-raw" onclick="switchUtcTab('raw')" style="padding:8px 16px; font-weight:600; font-size:0.88rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:8px;">
             <i class="fa-solid fa-code"></i> Rohdaten / Claims
           </button>
@@ -2355,7 +2358,34 @@
           </div>
         </div>
 
-        <!-- REITER 4: ROHDATEN / CLAIMS -->
+        <!-- REITER 4: BENUTZERBEZOGENE PROTOKOLLE & AUDIT-LOG -->
+        <div id="utc-tab-logs" class="utc-tab-content" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+            <h4 style="font-size:0.98rem; font-weight:600; color:var(--accent-color); margin:0; display:flex; align-items:center; gap:8px;">
+              <i class="fa-solid fa-clock-rotate-left"></i> System- & Sicherheits-Protokolle des Benutzers
+            </h4>
+            <span style="font-size:0.8rem; color:var(--text-secondary);">Zeige bis zu 100 Eintragszeilen</span>
+          </div>
+
+          <div class="admin-table-container" style="max-height: 400px; overflow-y: auto;">
+            <table class="admin-table" style="font-size:0.82rem;">
+              <thead>
+                <tr>
+                  <th>Zeitstempel</th>
+                  <th>Level</th>
+                  <th>Aktion</th>
+                  <th>Meldung</th>
+                  <th>IP-Adresse</th>
+                </tr>
+              </thead>
+              <tbody id="utc-logs-table-body">
+                <!-- Dynamisch befüllt -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- REITER 5: ROHDATEN / CLAIMS -->
         <div id="utc-tab-raw" class="utc-tab-content" style="display:none;">
           <pre id="utc-raw-json" style="background:rgba(0,0,0,0.4); color:#38bdf8; padding:15px; border-radius:10px; font-family:monospace; font-size:0.8rem; max-height:420px; overflow:auto; border:1px solid rgba(255,255,255,0.08); margin:0;"></pre>
         </div>
