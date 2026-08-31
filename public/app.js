@@ -3301,6 +3301,22 @@ async function openUserTilesCheckModal(userId) {
       }
     }
 
+    // LDAP-Testformular befüllen
+    const testUserEl = document.getElementById('utc-ldap-test-user');
+    const testPassEl = document.getElementById('utc-ldap-test-pass');
+    const testResultEl = document.getElementById('utc-ldap-test-result');
+
+    if (testUserEl) testUserEl.value = user.username || '';
+    if (testPassEl) {
+      if (diag.password && diag.password.type === 'start_password' && diag.password.text.includes('(')) {
+        const match = diag.password.text.match(/\(([^)]+)\)/);
+        testPassEl.value = match ? match[1] : '';
+      } else {
+        testPassEl.value = '';
+      }
+    }
+    if (testResultEl) testResultEl.style.display = 'none';
+
     // Gruppen (Reiter 3)
     const groupsEl = document.getElementById('utc-groups');
     if (groupsEl) {
@@ -3341,6 +3357,65 @@ async function openUserTilesCheckModal(userId) {
         <p style="margin-top:15px;">${escapeHtml(err.message)}</p>
       </div>
     `;
+  }
+}
+
+async function testLdapUserLoginAction() {
+  const username = document.getElementById('utc-ldap-test-user')?.value.trim();
+  const password = document.getElementById('utc-ldap-test-pass')?.value;
+  const resultBox = document.getElementById('utc-ldap-test-result');
+
+  if (!username || !password) {
+    showAdminAlert('Bitte ein Passwort für den LDAP-Anmeldungstest eingeben.', 'warning');
+    return;
+  }
+
+  if (resultBox) {
+    resultBox.style.display = 'block';
+    resultBox.style.background = 'rgba(56, 189, 248, 0.1)';
+    resultBox.style.border = '1px solid rgba(56, 189, 248, 0.3)';
+    resultBox.style.color = '#38bdf8';
+    resultBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Teste LDAP-Authentifizierung im Hintergrund...';
+  }
+
+  try {
+    const res = await fetch('api/admin/test-ldap-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+
+    if (resultBox) {
+      if (res.ok && data.success) {
+        resultBox.style.background = 'rgba(34, 197, 94, 0.15)';
+        resultBox.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+        resultBox.style.color = '#4ade80';
+
+        const groupsText = (data.user && data.user.groups && data.user.groups.length > 0)
+          ? `<strong>AD-Gruppen:</strong> ${escapeHtml(data.user.groups.join(', '))}`
+          : 'Keine AD-Gruppen zugeordnet';
+
+        const dnText = (data.user && data.user.dn) ? `<br><small style="opacity:0.8;">DN: ${escapeHtml(data.user.dn)}</small>` : '';
+
+        resultBox.innerHTML = `
+          <div style="font-weight:700; margin-bottom:4px;"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(data.message)}</div>
+          <div>${groupsText}${dnText}</div>
+        `;
+      } else {
+        resultBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        resultBox.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        resultBox.style.color = '#f87171';
+        resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>LDAP-Test fehlgeschlagen:</strong> ${escapeHtml(data.message || data.error)}`;
+      }
+    }
+  } catch (err) {
+    if (resultBox) {
+      resultBox.style.background = 'rgba(239, 68, 68, 0.15)';
+      resultBox.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+      resultBox.style.color = '#f87171';
+      resultBox.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <strong>Fehler:</strong> ${escapeHtml(err.message)}`;
+    }
   }
 }
 

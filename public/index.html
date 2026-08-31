@@ -2286,6 +2286,31 @@
             </div>
 
           </div>
+
+          <!-- Live LDAP-Anmeldung Test-Box -->
+          <div style="background:rgba(0,0,0,0.22); border:1px solid rgba(56, 189, 248, 0.25); border-radius:12px; padding:18px; margin-top:15px;">
+            <h4 style="font-size:0.95rem; font-weight:600; color:var(--accent-color); margin-bottom:10px; display:flex; align-items:center; gap:8px;">
+              <i class="fa-solid fa-vial"></i> Live LDAP-Anmeldung im Hintergrund testen
+            </h4>
+            <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:12px;">
+              Führt einen echten Authentifizierungstest am Active Directory / LDAP-Server für dieses Konto durch.
+            </p>
+            
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <div style="flex:1; min-width:180px;">
+                <input type="text" id="utc-ldap-test-user" class="form-control" placeholder="Benutzername" style="height:36px; font-size:0.85rem;" readonly>
+              </div>
+              <div style="flex:1.2; min-width:200px;">
+                <input type="password" id="utc-ldap-test-pass" class="form-control" placeholder="Passwort eingeben..." style="height:36px; font-size:0.85rem;">
+              </div>
+              <button type="button" class="btn btn-primary" onclick="testLdapUserLoginAction()" style="height:36px; padding:0 16px; font-size:0.85rem; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;">
+                <i class="fa-solid fa-plug-circle-check"></i> LDAP-Login testen
+              </button>
+            </div>
+
+            <!-- Live Test Result Box -->
+            <div id="utc-ldap-test-result" style="display:none; margin-top:12px; padding:12px 15px; border-radius:8px; font-size:0.85rem;"></div>
+          </div>
         </div>
 
         <!-- REITER 2: KACHEL-SICHTBARKEIT -->

@@ -167,6 +167,53 @@ router.post('/config/test-ldap', async (req, res) => {
 });
 
 /**
+ * Testet im Hintergrund die LDAP-Authentifizierung für ein bestimmtes Benutzerkonto.
+ */
+router.post('/test-ldap-login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Bitte Benutzername und Passwort angeben.' });
+    }
+
+    const isLdapEnabled = getConfig('ldap_enabled', '0') === '1';
+    if (!isLdapEnabled) {
+      return res.status(400).json({ success: false, message: 'LDAP ist in den Admin-Einstellungen deaktiviert.' });
+    }
+
+    const ldapUser = await ldap.authenticate(username, password);
+
+    if (ldapUser) {
+      logEvent('info', 'admin_ldap_test_success', `Erfolgreicher LDAP-Login-Test für User: ${username}`, { dn: ldapUser.dn, groups: ldapUser.groups }, req.ip);
+      return res.json({
+        success: true,
+        message: `LDAP-Anmeldung für ${username} ERFOLGREICH!`,
+        user: {
+          username: ldapUser.username,
+          dn: ldapUser.dn,
+          email: ldapUser.email,
+          displayName: ldapUser.displayName,
+          groups: ldapUser.groups || []
+        }
+      });
+    } else {
+      logEvent('warn', 'admin_ldap_test_failed', `Fehlgeschlagener LDAP-Login-Test für User: ${username}`, null, req.ip);
+      return res.status(400).json({
+        success: false,
+        message: `LDAP-Anmeldung für ${username} fehlgeschlagen. Passwort ungültig oder Konto im LDAP nicht gefunden.`
+      });
+    }
+  } catch (error) {
+    logEvent('error', 'admin_ldap_test_error', `Fehler beim LDAP-Login-Test für User: ${req.body.username}`, { error: error.message }, req.ip);
+    return res.status(500).json({
+      success: false,
+      message: `LDAP-Authentifizierungsfehler: ${error.message}`
+    });
+  }
+});
+
+/**
  * Testet die SMTP-E-Mail-Verbindung live.
  */
 router.post('/config/test-smtp', async (req, res) => {
