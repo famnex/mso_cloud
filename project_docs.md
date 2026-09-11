@@ -1,272 +1,78 @@
-# MSO Cloud Launcher & Lobby - Systemdokumentation
+# MSO Cloud - System- & Entwicklerdokumentation
 
-Dieses Dokument dokumentiert die Architektur, die Funktionsweise und das Zusammenspiel der Komponenten des modernisierten MSO Cloud Launchers.
+## 1. Übersicht & Architektur
+**MSO Cloud** ist ein zentrales Schulportal und Dashboard für Schulen (z.B. Modellschule Obersberg). Es bündelt externe und interne Schul-Dienste (Untis, Schulportal Hessen / Lanis, Nextcloud, Mediothek etc.), bietet Single-Sign-On (SSO / OIDC), eine integrierte Benutzerverwaltung (Lokal & LDAP/AD) sowie einen PWA-fähigen digitalen Schülerausweis mit fälschungssicherer Online- und Offline-Prüfung.
 
----
-
-## 1. Systemarchitektur & Ablaufpläne
-
-Das System ist als **Node.js-Monolith** auf Basis von **Express** und einer eingebetteten **SQLite-Datenbank** aufgebaut. Die Struktur gewährleistet extrem schnelle Antwortzeiten, ein vereinfachtes Deployment (Single-Instance) und eine vollständige Abkoppelung von externen Diensten im Offline-Fall.
-
-### A. Erstinstallation (Wizard)
-1. Die Server-Middleware (`src/server.js`) prüft bei jedem HTTP-Request den Wert `setup_completed` in der Tabelle `config`.
-2. Ist dieser Wert nicht `'1'`, werden sämtliche Anfragen (außer statische CSS/JS-Dateien und die Setup-API) automatisch auf `/setup.html` umgeleitet.
-3. Der Installations-Assistent (`public/setup.html`) führt den Administrator durch die Anlage des ersten Admin-Kontos.
-4. Nach dem Speichern wird `setup_completed` auf `'1'` gesetzt, die Datenbank-Struktur initialisiert und vier Beispiel-Kacheln erstellt.
-
-### B. Duales Anmeldeverfahren (Lokale DB & LDAP)
-```mermaid
-sequenceDiagram
-    participant Client as Web-Browser
-    participant Server as Express Server
-    participant DB as SQLite DB
-    participant LDAP as LDAP Server
-
-    Client->>Server: POST /api/auth/login (Nutzer, Passwort)
-    Server->>DB: Suche Benutzer in 'users'
-    alt Benutzer lokal gefunden
-        Server->>Server: Prüfe Passwort via bcrypt
-        alt Passwort korrekt
-            Server-->>Client: Session-Cookie & Erfolgsmeldung
-        else Passwort falsch
-            Server-->>Client: 401 Unauthorized
-        end
-    else Benutzer nicht lokal gefunden (oder als LDAP markiert)
-        Server->>LDAP: Bind mit Admin-Reader DN & Suche nach Nutzername
-        alt LDAP-Nutzer gefunden
-            Server->>LDAP: Bind mit Benutzer-DN & eingegebenem Passwort
-            alt LDAP-Passwort korrekt
-                LDAP-->>Server: Rückgabe Attribute (E-Mail, cn, memberOf)
-                Server->>DB: Abgleich LDAP-Gruppen mit 'ldap_mappings'
-                Server->>DB: Cache Benutzerprofil & lokale Gruppen in 'users'
-                Server-->>Client: Session-Cookie & Erfolgsmeldung
-            else LDAP-Passwort falsch
-                Server-->>Client: 401 Unauthorized
-            end
-        else LDAP-Nutzer nicht gefunden
-            Server-->>Client: 401 Unauthorized
-        end
-    end
-```
+### Technologie-Stack:
+*   **Backend**: Node.js mit Express.js
+*   **Datenbank**: SQLite via `better-sqlite3` (transaktionsgesichert, synchrone SQLite-Engine)
+*   **Session-Management**: `express-session` mit SQLite-Session-Store (`better-sqlite3-session-store`)
+*   **Frontend**: Vanilla JavaScript (ES6+), HTML5, CSS3 Glassmorphism UI, Responsive PWA mit Service Worker
+*   **Kryptografie**: `node:crypto` (AES-256-GCM, PBKDF2, RSA-2048 für OIDC RS256, Bcrypt für Passwörter)
 
 ---
 
-## 2. API-Endpunkte & Berechtigungen
+## 2. Sicherheitsarchitektur
 
-### Authentifizierung & Konten (`/api/auth`)
-* `GET /me`: Gibt die Profildaten des aktuell angemeldeten Benutzers zurück.
-* `POST /login`: Führt das duale Anmeldeverfahren aus.
-* `POST /logout`: Zerstört die Express-Session und löscht das Cookie.
-* `POST /reset-request`: Generiert ein zeitlich begrenztes Reset-Token für lokale Accounts und versendet eine E-Mail per SMTP.
-* `POST /reset-password`: Setzt das Passwort für den Token-Inhaber neu.
+### 2.1 Authentifizierung & Sitzungsverwaltung (`auth_version`)
+*   Jeder Benutzer besitzt in der `users`-Tabelle eine ganzzahlige Spalte `auth_version` (Default `1`).
+*   Bei jeder Benutzer-Session wird die `auth_version` im Session-Objekt mitgeführt.
+*   Die Middleware `requireAuth` / `requireAdmin` (`src/middleware/authMiddleware.js`) prüft bei jedem autorisierten Request live gegen die Datenbank:
+    1. Existiert der Benutzer?
+    2. Ist `is_active === 1`?
+    3. Stimmt `session.auth_version === user.auth_version`?
+*   Wird das Passwort geändert, die Rolle entzogen, das Konto deaktiviert oder gelöscht, wird `auth_version` inkrementiert. Dadurch werden alle aktiven Browser-Sessions des Nutzers sofort und serverweit ungültig.
 
-### Kacheln & SSO (`/api/tiles`)
-* `GET /`: Gibt alle für die Berechtigungsstufe des Nutzers freigegebenen Kacheln zurück.
-* `GET /sso/:id`: Authentifizierungs-Gateway. Validiert den Zugriff und führt optional ein SSO-Signing durch:
-  * **Typ 'query'**: Appends `sso_user`, `sso_email`, `sso_time` und eine kryptographische HMAC-SHA256 Signatur `sso_sig`.
-  * **Typ 'jwt'**: Generiert ein symmetrisch signiertes JSON Web Token mit 1 Minute Gültigkeit und hängt `sso_token` an.
+### 2.2 Schutz vor SSO-Schlüssel-Offenlegung (DTO Whitelisting)
+*   Die Tabelle `tiles` enthält vertrauliche symmetrische `sso_key`-Geheimnisse.
+*   Der öffentliche Endpoint `GET /api/tiles` verwendet die Whitelist-Funktion `toPublicTileDTO()` in `src/routes/tiles.js`.
+*   Felder wie `sso_key` werden niemals an nicht-autorisierte Clients ausgeliefert. Die SSO-Token-Generierung erfolgt ausschließlich serverseitig über das Gateway `GET /api/tiles/sso/:id`.
 
-### Administration (`/api/admin`) – *Nur für Rolle 'admin'*
-* `GET/POST /config`: Verwaltet LDAP- und SMTP-Verbindungsparameter.
-* `POST /config/test-ldap`: Testet die Active-Directory Anbindung live.
-* `POST /config/test-smtp`: Verifiziert den Mailserver-Versand.
-* `GET/POST/PUT/DELETE /tiles`: Verwaltet das Angebot an Kacheln im Portal.
-* `GET/POST/DELETE /ldap-mappings`: Richtet Zuordnungsregeln für LDAP-Sicherheitsgruppen ein.
-* `GET/POST/PUT/DELETE /users`: Verwaltet Benutzerkonten.
-* `POST /system/update`: Triggert den asynchronen GitHub Auto-Updater.
+### 2.3 SSRF-Schutz & Statusprüfungen (`src/utils/networkHelper.js`)
+*   Die Kachel-Erreichbarkeitsprüfung (`GET /api/tiles/check-status?id=...`) führt vor jedem HTTP-Request eine DNS-Auflösung durch.
+*   IP-Adressen werden gegen RFC1918 / Private, Loopback (`127.0.0.0/8`), Link-Local (`169.254.0.0/16`) und Multicast-Ranges geprüft.
+*   Interne Adressen werden strikt blockiert.
+*   Ergebnisse werden 60 Sekunden lang im Arbeitsspeicher gecacht.
 
----
-
-## 3. GitHub-Updater & PM2-Bereitstellung
-
-### Der Update-Workflow (`src/updater.js`)
-Der Updater ermöglicht ein automatisiertes "One-Click-Update" direkt aus der Administration:
-1. **GitHub Pull**: Führt `git pull` aus.
-2. **NPM-Update**: Installiert eventuell hinzugefügte Module (`npm install`).
-3. **Datenbank-Migration**: Führt das Migrationsskript aus, welches neue `.sql`-Dateien in `/migrations` aufspürt und transaktionsgesichert importiert.
-4. **PM2 Reload**: Führt `pm2 reload mso-cloud` aus, um den Prozess im Hintergrund ohne Verbindungsunterbrechung neu zu laden.
-
-### PM2 Ecosystem Konfiguration (`ecosystem.config.js`)
-Die Anwendung ist für den stabilen Dauerbetrieb konfiguriert:
-* **Modus**: `fork` (verhindert Sperrkonflikte bei gleichzeitigem Schreiben auf die SQLite-Datei).
-* **Automatisches Memory-Limit**: Startet die Instanz ab einem Verbrauch von `300MB` automatisch neu.
-* **Auto-Start**: Startet bei Systemneustarts automatisch.
+### 2.4 Brute-Force & Rate-Limiting
+*   Fehlgeschlagene Login-Versuche werden IP-basiert getrackt (`login_max_attempts`, `login_lockout_duration_min`).
+*   Gesperrte Anfragen erhalten HTTP 429 Too Many Requests inklusive standardisiertem `Retry-After`-Header.
 
 ---
 
-## 4. Premium-Design-Tokens (CSS)
+## 3. Schülerausweis & Verifizierung
 
-Die Benutzeroberfläche nutzt ein maßgeschneidertes **Glassmorphic-Konzept** auf HSL-Basis:
-* **Blur**: `backdrop-filter: blur(14px)` erzeugt den matten Milchglaseffekt.
-* **Akzentfarben**:
-  * Neon-Blau (`#2e8bfa`) als Hauptakzent.
-  * Status Grün (`#4ade80`) signalisiert aktive, geprüfte Dienste.
-  * Status Rot (`#f87171`) signalisiert Ausfälle.
-* **Micro-Animations**:
-  * Smooth Hover: `transform: translateY(-8px)` with `cubic-bezier(0.16, 1, 0.3, 1)`.
-  * Pulsierende Online-Indikatoren über `@keyframes pulse`.
+### 3.1 Regelwerk für Gültigkeit (`src/services/cardEligibility.js`)
+Die Gültigkeit eines Schülerausweises wird zentral berechnet:
+1. **Benutzerstatus**: `is_active === 1` und Benutzer existiert.
+2. **Passbild**: Bild vorhanden und Status = `Bild genehmigt` / `genehmigt` / `1132` / `1133`.
+3. **Schuljahres-Stichtag**: Ausweise sind bis zum 31. Juli des aktuellen/kommenden Schuljahres gültig (`getSchoolYearExpirationDate()`).
+4. **Offline-Zeitraum**: Im PWA-Modus ist ein gecachter Ausweis maximal 30 Tage ohne erneuten Serverkontakt gültig.
 
----
+### 3.2 Verifizierungs-Endpoints
+*   `GET /v?n=<name>&b=<bib>` (Ultrakurz-Schema für QR-Codes)
+*   `GET /verify?name=<name>&bib=<bib>`
+*   `GET /api/student/verify-check` (JSON-API)
+*   Die Suche nutzt den Index `idx_student_profiles_mediothek` auf `student_profiles (mediothek_number)` und `users (last_name, first_name)` für $O(1)$-Abfragen.
 
-## 5. Schulportal Hessen Autologin (Option A)
-
-Wir haben eine native Schnittstelle für das automatisierte Login am Schulportal Hessen (SPH) entwickelt.
-
-### A. Funktionsweise und Ablauf
-1. **Benutzerdaten-Eingabe**: Ein Benutzer kann über das Schlüssel-Symbol auf der SPH-Kachel ein Modal öffnen und seine SPH-Zugangsdaten eingeben.
-2. **Datenbankverschlüsselung**: Die Zugangsdaten werden in der Tabelle `user_sph_credentials` gespeichert. Das Passwort wird dabei mittels **AES-256-CBC symmetrisch verschlüsselt** (unter Verwendung eines vom `SESSION_SECRET` abgeleiteten Schlüssels).
-3. **SSO-Weiterleitungs-Schutz & Auto-Login**:
-   - Wenn der Benutzer auf die SPH-Kachel klickt, prüft die Frontend-Prüfung (`public/app.js`), ob Zugangsdaten hinterlegt sind.
-   - **Sind Zugangsdaten vorhanden**, wird der Aufruf direkt an das Backend (`/api/tiles/sso/:id`) geleitet. Das Backend entschlüsselt das Passwort, generiert die passenden Formularfelder (`user` und `user2` unter Berücksichtigung des Schul-Präfixes `9743.`) und führt eine automatische POST-Übermittlung an die Login-Schnittstelle des Schulportals aus. Der Login geschieht vollautomatisch und unsichtbar.
-   - **Sind keine Zugangsdaten vorhanden**, wird ein elegantes Info-Modal eingeblendet.
-4. **Info-Modal & Opt-out**:
-   - Das Info-Modal weist darauf hin, dass separate Benutzerdaten gelten und enthält einen Link, um die Startdaten abzurufen.
-   - Es bietet eine Option zur direkten Eingabe der Zugangsdaten, um die MSO Cloud dauerhaft zu verlinken.
-   - Es warnt, dass das Startpasswort vorab geändert werden muss.
-   - Ein Opt-out-Kästchen ("Diese Meldung immer anzeigen", standardmäßig aktiv) speichert den Wunsch des Nutzers im Browser-`localStorage` (`sph_always_show_info`). Wird es abgewählt, leitet das Portal zukünftig direkt zur normalen Anmeldeseite des Schulportals weiter.
+### 3.3 Status-Zustände im Frontend
+*   **Online geprüft**: Frische Server-Antwort im Online-Betrieb.
+*   **Offline gespeichert**: Innerhalb des 30-Tage-Fensters aus dem lokalen Speicher geladen (mit Resttage-Countdown).
+*   **Erneute Onlineprüfung erforderlich**: Offline-Cache älter als 30 Tage.
+*   **Ausweis gesperrt**: Server hat Ausweis gesperrt oder Konto deaktiviert/gelöscht.
 
 ---
 
-## 6. Benutzerprofil & Zugänge
-
-Die Anwendung trennt die Benutzerdaten-Verwaltung und die Ausweisdarstellung in zwei separate, dedizierte Ansichten auf:
-
-### A. Benutzerprofil & Zugänge (ehemals Schülerportal)
-* **Funktion**: Zeigt persönliche Stammdaten, erteilte Einwilligungen, MSO- und SPH-Zugangsdaten sowie das aktuelle Passbild.
-* **Passbild-Upload**: Ermöglicht den Upload eines Porträtfotos. Wenn kein Foto eingereicht wurde oder das Foto leer ist, wird als Fallback eine lokale Dummygrafik (`media/user.png`) angezeigt. Sollte das Laden des Bildes fehlschlagen, sorgt ein `onerror`-Handler für das automatische Nachladen des Dummys.
-* **Gesichtserkennung (Pico.js)**: Ein im Browser integrierter Gesichtserkennungs-Algorithmus lokalisiert das Gesicht, schneidet das Bild automatisch in das Standard-Passbildformat (Verhältnis 3:4, zentriert) und skaliert es hochauflösend, bevor es an den Server übermittelt wird.
-
-### B. Digitaler Schülerausweis
-* **Funktion**: Präsentiert den digitalen Schülerausweis in einer premium gestalteten Ausweismatte (mit Gold-Chip, Gültigkeits-Badge, CSS-gezeichnetem Barcode und dynamischem Freigabestatus).
-* **Ausweisstatus**: 
-  * *Bild ungeprüft / Kein Bild*: Standardfall, zeigt Dummy-Foto und inaktiven Status.
-  * *Bild eingereicht*: Wartet auf manuelle Prüfung durch das IT-Büro.
-  * *Bild genehmigt*: Ausweis wird als "GÜLTIG" markiert.
-  * *Bild abgelehnt*: Ausweis inaktiv, neues Foto muss eingereicht werden.
-
-### C. Header-Navigation & Dropdown
-* Im angemeldeten Zustand zeigt der Header auf der linken Seite das MSO-Schullogo mit dem Text „Die digitalen Dienste der MSO“.
-* Auf der rechten Seite des Headers befinden sich der Admin-Bereich (falls berechtigt), die Symbole für Neuigkeiten (Megafon) und den Dark/Light-Mode sowie der vollständige Name und das kreisförmige Benutzerbild (oder die Dummy-Grafik).
-* Ein Klick auf den Benutzernamen oder das Bild öffnet ein gläsernes Dropdown-Menü mit direkten Navigations-Links zu:
-  1. *Benutzerprofil & Zugänge* (Stammdaten & Upload)
-  2. *Schülerausweis* (Digitaler Ausweis)
-  3. *Abmelden* (Logout)
-
-### D. Duale MySQL/SQLite-Datenbank-Architektur (Schülerdaten & Erstlogin)
-*   **MySQL-Routing im Produktivbetrieb**: Wenn MySQL-Umgebungsvariablen (`MYSQL_HOST`, `MYSQL_USER` etc.) konfiguriert sind, greift die Anwendung für das Benutzerprofil, den Schülerausweis und den Erstlogin (Tokenverwaltung & E-Mail-Authentifizierung) auf eine externe MySQL-Datenbank zu. Alle anderen Systembereiche (News, Kacheln, SMTP/LDAP-Konfigurationen) verbleiben unbeeinflusst auf der lokalen SQLite-Datenbank.
-*   **Dynamische Feldzuordnung (Dynamic Fields Mapping)**: Die in MySQL als Zeilen abgelegten Datensätze aus `fieldvalues` (joins mit `fields` und `subfields`) werden durch den Adapter (`src/student_db.js`) in ein flaches JavaScript-Objekt übersetzt und an API und Frontend ausgeliefert. Schreibzugriffe werden automatisch als Zeilenänderungen (`INSERT ... ON DUPLICATE KEY UPDATE` für Stammdaten, `REPLACE` für Bilder) zurückgeschrieben.
-*   **Erstlogin-Tokens**: Generierte Anmeldelinks und Logeinträge werden in den MySQL-Tabellen `schueleremailtokens` und `documentation` verwaltet. Veraltete E-Mail-Tokens werden bei jeder Verifikation automatisch gelöscht.
-*   **Nahtloser SQLite-Fallback**: Fehlen die MySQL-Umgebungsvariablen (z. B. bei Offline-Entwicklung oder automatisierten Tests), schaltet der Adapter vollautomatisch und transparent auf die lokale SQLite-Datenbank um. Die Frontend- und API-Schichten müssen dadurch an keiner Stelle angepasst werden.
-
-## 7. Microsoft 365 & Outlook login_hint SSO Integration
-
-Um das Einloggen bei Microsoft 365 und Outlook Web App für Benutzer so komfortabel wie möglich zu gestalten (True Single Sign-On), besitzt das Backend in `src/routes/tiles.js` eine dynamische Parameter-Injektion:
-
-1. **Outlook-Weiterleitung**:
-   - Erkennt Links zu `outlook.office.com`, `outlook.com` oder `outlook.office365.com`.
-   - Fügt den Parameter `login_hint=USER_EMAIL` nur dann an die Weiterleitungs-URL an, wenn die E-Mail-Adresse des Benutzers auf `@mso-hef.de` endet (LehrerInnen).
-   - Bei anderen E-Mail-Domains (SchülerInnen) wird kein Hint übergeben, um Fehlleitungen zu vermeiden.
-2. **Microsoft 365 Weiterleitung**:
-   - Erkennt Links zu `portal.office.com`, `login.microsoftonline.com` oder `office.com`.
-   - **LehrerInnen (E-Mail endet auf `@mso-hef.de`)**: Es wird die im Profil hinterlegte E-Mail-Adresse als `login_hint` übergeben.
-   - **SchülerInnen (alle anderen)**: Es wird automatisch der UPN im Format `[Benutzername]@msohef.onmicrosoft.com` generiert und als `login_hint` übergeben (gemäß FAQ-Vorgabe).
-
-Dies ermöglicht ein vollautomatisches Überspringen der Benutzernamens-Eingabe auf den Microsoft-Login-Seiten.
+## 4. Single-Sign-On & OIDC Provider
+*   MSO Cloud agiert als vollständiger OpenID Connect (OIDC) Identity Provider (IdP) für verbundene Schulplattformen.
+*   Discovery: `GET /.well-known/openid-configuration`
+*   JWKS: `GET /jwks` mit dynamisch generiertem/persistiertem RSA-2048 Schlüsselpaar (`RS256`).
+*   Basis-URLs und Pfade sind über `PUBLIC_BASE_URL` und `BASE_PATH` konfigurierbar und unterstützen Reverse-Proxy-Setups (`X-Forwarded-Proto`, `X-Forwarded-Host`).
 
 ---
 
-## 8. Neue Funktionen & Sicherheitserweiterungen
-
-### A. Halloween-Thema Interaktivitäts-Fix (Schülerausweis)
-* Die Steuerungselemente (`.top-controls`, `.top-left-controls`, `.special-design-btns`, `.lang-switcher`) besitzen nun `z-index: 1005` und explizit `pointer-events: auto`.
-* Sämtliche Partikel-Layer (`.snowflake-layer`, `.confetti-layer`, `.firework-layer`, `.halloween-layer`) haben `z-index: 500` und `pointer-events: none !important`.
-* Dadurch sind alle Buttons, Sprachauswahlelemente und Ausweisfunktionen im Halloween-Modus uneingeschränkt klick- und tippbar.
-
-### B. Mobile Akkordeon-Ansicht in der Administration
-* Auf mobilen Bildschirmen (`max-width: 768px`) werden die Tabellen für **Dienste (Kacheln)** und **Systemprotokolle** als responsive Akkordeons dargestellt:
-  * **Dienste (Kacheln)**: Geschlossene Ansicht zeigt den Dienstnamen (Titel) sowie ein Aufklapp-Symbol. Nach dem Aufklappen werden alle Detailspalten (Beschreibung, Icon, Sichtbarkeit, SSO-Typ, Sortierung, Aktionen) angezeigt.
-  * **Systemprotokolle**: Geschlossene Ansicht zeigt `Aktion (Benutzername)` (z. B. `login_failed (admin)`) sowie das Level-Badge. Nach dem Aufklappen werden Zeitstempel, Level, Aktion, Meldung, IP-Adresse und der Details-Button eingeblendet.
-
-### C. 3-Sekunden Cache-Fallback für den Schülerausweis
-* Beim Abruf des Schülerausweises (`loadCardData()`) startet ein 3-Sekunden-Timer (`3000 ms`).
-* Dauert die Netzwerkverbindung länger als 3 Sekunden oder liegt ein Verbindungsengpass vor, wird der Schülerausweis vorab aus dem `localStorage`-Cache (`mso_cached_card`) geladen und angezeigt.
-* Sobald die Netzwerkanfrage erfolgreich abschließt, werden die Ausweisdaten im Hintergrund auf den neuesten Stand aktualisiert und der Cache erneuert.
-
-### D. IP-Rate-Limiting für Anmeldeversuche
-* Bei mehr als 5 fehlgeschlagenen Anmeldeversuchen (`login_failed`) von derselben IP-Adresse wird diese IP für **5 Minuten** (300 Sekunden) für die Anmeldung gesperrt.
-* Das Anmeldefenster zeigt verbleibende Versuche (z. B. "Noch 4 Anmeldeversuche verbleibend") und im Sperrfall die verbleibende Sperrzeit an.
-* **Wichtig**: Die Sperre beschränkt sich ausschließlich auf den Anmeldevorgang (`POST /api/auth/login`). Alle übrigen Portalbereiche (öffentliche Dienst-Kacheln, Hauptseite, gepufferte Ausweisansichten) bleiben für die betreffende IP weiterhin voll funktionsfähig.
-
-### E. Dynamisches "Tara" für Gyroskop-Neigung & Ausrichtungs-Fix
-* Das Drehen/Rotieren des Schülerausweises wurde unterbunden (`screen.orientation.lock('portrait')` & Entfernung von Z-Rotationen).
-* **Dynamisches Tara (Sliding Zero Baseline)**: Beim Kippen des Smartphones über die maximale Neigungsgrenze (15°) hinaus schiebt sich die Nullpunkt-Baseline (`baseBeta` / `baseGamma`) dynamisch mit der Bewegung mit. Sobald das Gerät zurückgekippt wird, reagiert der Ausweis sofort ohne Totpunkt oder Verzögerung.
-
----
-
-## 9. WebUntis Single Sign-On (OIDC) Integration
-
-Das MSO Cloud Portal stellt als OpenID Connect (OIDC) Provider Endpunkte für die Anbindung von **WebUntis** bereit.
-
-### A. OIDC Endpunkte
-* **Discovery URL**: `https://cloud.mso-hef.de/novus/.well-known/openid-configuration`
-* **Authorization Server Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/authorize`
-* **Token Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/token`
-* **User Info Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/userinfo`
-* **Logout Endpoint**: `https://cloud.mso-hef.de/novus/api/oauth/logout`
-
-### B. OIDC Attribute & Claims Mapping für WebUntis
-* **Attributname für Benutzeridentifikation**: `preferred_username`
-* **Mailattribut**: `email`
-* **Rollenattribut**: `user_role`
-* **Rollenwerte**:
-  * `lehrer` -> wird in WebUntis der Personenrolle `lehrer` (Gruppe: *Lehrkräfte*) zugeordnet.
-  * `schueler` -> wird in WebUntis der Personenrolle `schueler` (Gruppe: *Schüler*innen*) zugeordnet.
-
-### C. Troubleshooting Personenzuordnung (`ERR_UNIDENTIFIED_PERSON`)
-Wenn WebUntis `UnidentifiedPersonException ERR_UNIDENTIFIED_PERSON` ausgibt, war der OIDC-Login an der MSO Cloud zwar erfolgreich, aber WebUntis konnte die OIDC-Attribute keiner Person (Lehrer/Schüler) in den WebUntis-Stammdaten zuordnen.
-
-* **Fehlerquelle 1 (Typo in Rollenidentifizierung)**:
-  * Bei *Rollenidentifizierung* = `Einzelattribut` darf im *Authentifizierungsattribut* nur ein einzelnes Attribut stehen (z. B. `preferred_username`). Steht dort `family_name,given_name`, schlägt die Zuordnung fehl.
-  * Bei *Rollenidentifizierung* = `Attribut für Familienname und Vorname` müssen im *Authentifizierungsattribut* zwei Attribute angegeben sein (`family_name,given_name`).
-* **Fehlerquelle 2 (Namensabweichung)**:
-  * Bei Zuordnung nach Namen vergleicht WebUntis Vor- und Nachname exakt mit den WebUntis-Stammdaten. Bei Abweichungen (z. B. "Max" vs "Maximilian") schlägt der Login fehl.
-* **Fehlerquelle 3 (Person fehlt in WebUntis)**:
-  * WebUntis kann automatisch neue *Benutzerkonten* anlegen, aber keine neuen *Personen* in den Stammdaten erzeugen. Die Person muss vorab in WebUntis angelegt sein.
-
-### D. Namensauflösung über MySQL (Schulanmeldungs-DB) & LDAP Rollen-Mappings
-Das MSO Cloud Backend löst Namen, Rollen und den Untis-Benutzernamen in `src/routes/oauth.js` wie folgt auf:
-* **MySQL Schulanmeldungs-Datenbank (student_db)**: 
-  * OIDC greift für Schüler primär auf `studentDb.getStudentProfile()` zu – genau wie die Seite *Benutzerprofil & Zugänge*.
-  * Feld 1 der Schulanmeldung wird als `given_name` / `firstname` (z. B. `Hazim Alaa Hadi`) und Feld 2 als `family_name` / `lastname` (z. B. `Al-Gburi`) an OIDC / WebUntis geliefert.
-  * **Feld 167 (Untis Username)**: Der Wert aus Feld 167 wird direkt als OIDC Claim `untis_username` ausgeliefert (Fallback: MSO-Benutzername `user.username`).
-* **LDAP Gruppen-Mappings & Custom Claim Rollen**:
-  * `determineUserRole()` prüft primär die in den **LDAP-Gruppen-Mappings** konfigurierten Regeln. Ist die LDAP-Gruppe des Benutzers gemappt, wird exakt der dort eingetragene Wert für *Custom Claim Rolle* (`user_role`) an OIDC geliefert.
-* **Prüfung über Systemprotokolle**:
-  * Jedes OIDC Token / Userinfo-Request loggt die exakt ausgelieferten JSON-Claims unter `oidc_token_claims` bzw. `oidc_userinfo_claims`.
-  * Im Admin-Bereich unter **Systemprotokolle** sowie in der Server-Konsole (`[OIDC DEBUG]`) können die übermittelten Werte live eingesehen werden.
-
-### E. Automatische WebUntis- & Schulportal-Kachelsperre bei fehlenden Einrichtungsdaten
-* **WebUntis**: Hat ein Schüler Zugriff auf die WebUntis-Kachel, ist jedoch für seinen Account noch **kein `untis_username`** hinterlegt (weder in MySQL Feld 167 noch im Profil), wird die Kachel im Launcher automatisch als **gesperrt** dargestellt (Status: `Einrichtung erforderlich`).
-* **Schulportal (SPH)**: Hat ein Schüler Zugriff auf die Schulportal-Kachel, fehlen jedoch **Feld 165 (`sph_username`) oder Feld 164 (`sph_password`)** bzw. sind diese leer, wird die Kachel ebenfalls automatisch als **gesperrt** dargestellt (Status: `Einrichtung erforderlich`).
-* **Hinweistext im Modal**: Ein Klick auf die gesperrte Kachel öffnet das Status-Info-Modal mit der klaren Information, dass die Systeme eingerichtet werden und der Benutzer nichts tun kann/muss, sondern einfach abwarten soll:  
-  *„Diese Systeme müssen für deinen Account erst noch eingerichtet werden. Eine Anmeldung bei WebUntis [bzw. Schulportal] ist erst nach dieser automatischen Einrichtung möglich. Du musst aktuell nichts weiter tun und kannst diesen Vorgang nicht beschleunigen. Bitte warte einfach ab, bis die Einrichtung abgeschlossen ist.“*
-* **Ausnahme für Lehrkräfte & Administratoren**: Lehrkräfte und Admins sind von diesen automatischen Sperren **vollständig ausgenommen**, da für sie keine Schüler-Stammdaten hinterlegt sind und sie eigene/direkte Zugänge zu beiden Systemen nutzen.
-* **SSO-Schutz**: Direkte Aufrufe über `/api/tiles/sso/:id` werden für Schüler ohne entsprechende Daten mit HTTP 403 und derselben Meldung blockiert.
-
----
-
-## 10. Schülerausweis Status-Matrix & Ausweisbild-Verifikation
-
-Die Gültigkeit des digitalen Schülerausweises wird über die Kombination von **Feld 158** (Ausweisstatus) und **Feld 37** (Passfoto-Blob) gesteuert:
-
-| Feld 158 (Code) | Passfoto (Feld 37) | Status (`card_status`) | Bedeutung & Prüfungsprozess | Ausweis-Gültigkeit | Foto-Upload | Ausweis-Ansicht (`student_card.html`) | Profilanzeige (`app.js`) | Zusatzmarker |
-| :---: | :---: | :--- | :--- | :---: | :---: | :--- | :--- | :---: |
-| **`1130`** | ❌ **Nein** | `Bild ungeprüft / Kein Bild` | **Kein Foto vorhanden**: Schüler hat noch kein Passbild hochgeladen | ❌ **Inaktiv / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Kein Foto hinterlegt — Bitte lade ein Foto hoch.“* | ⚪ *Inaktiv / Kein Foto* | — |
-| **`1130`** | ✅ **Ja** | `Bild eingereicht` | **In Prüfung (Neu eingereicht)**: Foto hochgeladen, wartet auf Erstprüfung | ⏳ **In Prüfung / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Foto in Prüfung — Dein Ausweisfoto wird momentan noch geprüft.“* | 🟡 *In Prüfung* | — |
-| **`1131`** | ✅/❌ | `Bild eingereicht` | **In Prüfung (Stufe 1 akzeptiert)**: Foto in Stufe 1 akzeptiert, wartet auf finale Freigabe | ⏳ **In Prüfung / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Foto in Prüfung — Dein Ausweisfoto wird momentan noch geprüft.“* | 🟡 *In Prüfung* | — |
-| **`1134`** | ✅/❌ | `Bild abgelehnt` | **Foto abgelehnt**: Foto entspricht nicht den Vorgaben und wurde abgelehnt | ❌ **Abgelehnt / Gesperrt** | ✅ **Erlaubt** | Warnbanner: *„Foto abgelehnt — Bitte lade ein neues Foto hoch.“* | 🔴 *Abgelehnt* | — |
-| **`1132`** | ✅ **Ja** | `Bild genehmigt` | **Gültig (Final verifiziert)**: Foto final geprüft, genehmigt & verifiziert | ✅ **Gültig & Aktiv** | ❌ **Gesperrt** | **Vollständiger digitaler Schülerausweis** (Gültig) | 🟢 *Gültig* | — |
-| **`1133`** | ✅ **Ja** | `Ausweis gedruckt` | **Gültig (Plastikkarte gedruckt)**: Foto verifiziert & Ausweis als Plastikkarte produziert | ✅ **Gültig & Aktiv** | ❌ **Gesperrt** | **Vollständiger digitaler Schülerausweis** (Gültig) + 🪪 Marker | 🟢 *Gültig (Plastikkarte)* | 🪪 *Plastikkarte gedruckt* |
-
-> [!IMPORTANT]
-> **Zwingende Bildprüfung im Backend**: Auch bei Status `1132` oder `1133` prüfen die Routen (`/api/student/card` und `/api/student/status-check`) sowie das Frontend immer zwingend, ob in Feld 37 tatsächlich ein Bild existiert. Fehlt das Bild (`!card_image`), wird der Ausweis niemals freigeschaltet.
+## 5. System-Updater & Deployment
+*   Asynchroner Update-Mechanismus (`src/updater.js` & `src/routes/admin.js`):
+    *   `POST /api/admin/system/update` -> Startet Job im Hintergrund, antwortet mit HTTP 202 Accepted.
+    *   `GET /api/admin/system/update/status` -> Liefert aktuellen Status (`running`, `succeeded`, `failed`) und Log-Puffer.
+    *   Erstellt vor jeder Migration ein SQLite-Backup unter `data/backups/backup_pre_update_<timestamp>.sqlite`.

@@ -7,17 +7,10 @@ const mail = require('../mail');
 const updater = require('../updater');
 const studentDb = require('../student_db');
 const proxycheck = require('../proxycheck');
+const { requireAdmin } = require('../middleware/authMiddleware');
 
-function isAdmin(req, res, next) {
-  if (process.env.NODE_ENV === 'test' || (req.session.user && req.session.user.role === 'admin')) {
-    next();
-  } else {
-    res.status(403).json({ error: 'Zugriff verweigert. Nur Administratoren erlaubt.' });
-  }
-}
-
-// Admin-Schutz auf alle Unterrouten anwenden
-router.use(isAdmin);
+// Admin-Schutz mit Live-Datenbank-Rollenprüfung auf alle Unterrouten anwenden
+router.use(requireAdmin);
 
 /* ==========================================================================
    1. Konfiguration (LDAP, SMTP)
@@ -732,7 +725,7 @@ router.delete('/ldap-mappings/:id', (req, res) => {
 router.get('/users', (req, res) => {
   try {
     // Passwörter nicht auslesen!
-    const users = db.prepare('SELECT id, username, email, role, groups, is_ldap, created_at, display_name FROM users ORDER BY username ASC').all();
+    const users = db.prepare('SELECT id, username, email, role, groups, is_ldap, is_active, created_at, display_name FROM users ORDER BY username ASC').all();
     
     // JSON-String parsen und LDAP Mappings auflösen
     const formatted = users.map(user => {
@@ -767,8 +760,8 @@ router.post('/users', (req, res) => {
     const displayName = (display_name && display_name.trim() !== '') ? display_name.trim() : username.trim();
 
     db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name)
-      VALUES (?, ?, ?, ?, ?, 0, ?)
+      INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name, is_active, auth_version)
+      VALUES (?, ?, ?, ?, ?, 0, ?, 1, 1)
     `).run(username.trim(), email.trim(), hash, role, groupsJson, displayName);
 
     logEvent('info', 'user_created', `Benutzer ${username.trim()} wurde erfolgreich durch Admin angelegt`, { role, email: email.trim() }, req.ip);
@@ -785,21 +778,23 @@ router.post('/users', (req, res) => {
 router.put('/users/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { email, role, groups, password, display_name } = req.body;
+    const { email, role, groups, password, display_name, is_active } = req.body;
 
-    const user = db.prepare('SELECT is_ldap, username FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT is_ldap, username, is_active FROM users WHERE id = ?').get(id);
     if (!user) {
       return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
     }
 
+    const activeFlag = (is_active !== undefined && is_active !== null) ? (parseInt(is_active, 10) === 0 ? 0 : 1) : (user.is_active !== undefined ? user.is_active : 1);
+
     if (user.is_ldap === 1) {
-      // WICHTIG: LDAP-Benutzer sind nicht frei bearbeitbar. Nur die Rolle (Hauptrolle) darf geändert werden!
+      // WICHTIG: LDAP-Benutzer sind nicht frei bearbeitbar. Rolle & Aktivstatus dürfen geändert werden!
       if (!role) {
         return res.status(400).json({ error: 'Rolle ist erforderlich.' });
       }
-      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
-      logEvent('info', 'user_updated_ldap', `LDAP-Benutzer ${user.username} Rolle wurde auf ${role} geändert`, { userId: id }, req.ip);
-      return res.json({ success: true, message: 'Rolle des LDAP-Benutzers erfolgreich aktualisiert.' });
+      db.prepare('UPDATE users SET role = ?, is_active = ?, auth_version = auth_version + 1 WHERE id = ?').run(role, activeFlag, id);
+      logEvent('info', 'user_updated_ldap', `LDAP-Benutzer ${user.username} aktualisiert (Rolle: ${role}, is_active: ${activeFlag})`, { userId: id }, req.ip);
+      return res.json({ success: true, message: 'Rolle/Status des LDAP-Benutzers erfolgreich aktualisiert.' });
     }
 
     // Lokaler Benutzer: Normaler Ablauf
@@ -815,18 +810,18 @@ router.put('/users/:id', (req, res) => {
       const hash = bcrypt.hashSync(password, 10);
       db.prepare(`
         UPDATE users
-        SET email = ?, role = ?, groups = ?, password_hash = ?, display_name = ?
+        SET email = ?, role = ?, groups = ?, password_hash = ?, display_name = ?, is_active = ?, auth_version = auth_version + 1
         WHERE id = ?
-      `).run(email.trim(), role, groupsJson, hash, displayName, id);
+      `).run(email.trim(), role, groupsJson, hash, displayName, activeFlag, id);
       db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(id);
-      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert (inkl. Passwortänderung)`, { userId: id, role, email: email.trim() }, req.ip);
+      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert (inkl. Passwortänderung)`, { userId: id, role, email: email.trim(), is_active: activeFlag }, req.ip);
     } else {
       db.prepare(`
         UPDATE users
-        SET email = ?, role = ?, groups = ?, display_name = ?
+        SET email = ?, role = ?, groups = ?, display_name = ?, is_active = ?, auth_version = auth_version + 1
         WHERE id = ?
-      `).run(email.trim(), role, groupsJson, displayName, id);
-      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert`, { userId: id, role, email: email.trim() }, req.ip);
+      `).run(email.trim(), role, groupsJson, displayName, activeFlag, id);
+      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert`, { userId: id, role, email: email.trim(), is_active: activeFlag }, req.ip);
     }
 
     res.json({ success: true, message: 'Benutzer erfolgreich aktualisiert.' });
@@ -883,7 +878,7 @@ router.post('/users/:id/sync-ldap', async (req, res) => {
     // 2. Konto in der Datenbank als LDAP-Konto (is_ldap = 1) übernehmen und Gruppen/DN/Email aktualisieren
     db.prepare(`
       UPDATE users 
-      SET is_ldap = 1, groups = ?, dn = COALESCE(?, dn), email = COALESCE(?, email)
+      SET is_ldap = 1, groups = ?, dn = COALESCE(?, dn), email = COALESCE(?, email), auth_version = auth_version + 1
       WHERE id = ?
     `).run(groupsJson, dnVal, emailVal, id);
 
@@ -925,19 +920,37 @@ router.delete('/users/:id', (req, res) => {
  * Triggert den asynchronen GitHub-Updater.
  */
 router.post('/system/update', (req, res) => {
+  const currentStatus = updater.getUpdateStatus();
+  if (currentStatus.status === 'running') {
+    return res.status(409).json({
+      success: false,
+      message: 'Ein Update-Vorgang läuft bereits im Hintergrund.',
+      job: currentStatus
+    });
+  }
+
   // Asynchron im Hintergrund ausführen
   updater.performUpdate()
     .then(result => {
-      console.log('Hintergrundupdate abgeschlossen:', result);
+      logEvent('info', 'system_update_finished', 'Hintergrundupdate abgeschlossen', { success: result.success }, req.ip);
     })
     .catch(err => {
-      console.error('Hintergrundupdate fehlgeschlagen:', err);
+      logEvent('error', 'system_update_failed', 'Hintergrundupdate fehlgeschlagen', { error: err.message }, req.ip);
     });
 
-  res.json({ 
+  const startedJob = updater.getUpdateStatus();
+  res.status(202).json({ 
     success: true, 
-    message: 'System-Update im Hintergrund gestartet. Der Server zieht die neusten Änderungen von GitHub, führt Migrationen aus und lädt sich unter PM2 neu. Das kann bis zu einer Minute dauern.' 
+    message: 'System-Update im Hintergrund gestartet. Der Server zieht die neuesten Änderungen von GitHub, führt Migrationen aus und lädt sich neu.',
+    job: startedJob
   });
+});
+
+/**
+ * Fragt den aktuellen Status des Updater-Hintergrundjobs ab.
+ */
+router.get('/system/update/status', (req, res) => {
+  res.json(updater.getUpdateStatus());
 });
 
 /* ==========================================================================

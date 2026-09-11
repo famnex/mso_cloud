@@ -54,6 +54,7 @@ Verwaltet lokale Accounts und dient als Cache für angemeldete LDAP-Nutzer.
 | `groups` | TEXT | JSON-Array zugeordneter Gruppen (z.B. `["Lehrer", "Admin"]`) |
 | `is_ldap` | INTEGER | Flag für LDAP-Benutzer (`0` = lokal, `1` = LDAP) |
 | `is_active` | INTEGER | Aktivitätsstatus des Benutzers (`0` = inaktiv, `1` = aktiv) |
+| `auth_version` | INTEGER | Session-Sicherheitsversionsnummer (`DEFAULT 1`), wird bei Passwortänderung, Rollenentzug, Sperre oder Deaktivierung inkrementiert |
 | `display_name` | TEXT | Anzeigename des Benutzers (z. B. LDAP-displayName) |
 | `dn` | TEXT | Distinguished Name des LDAP-Benutzers (falls über LDAP authentifiziert) |
 | `first_name` | TEXT | Vorname des LDAP-Benutzers (aus givenName) |
@@ -390,5 +391,22 @@ Speichert die Abfrageergebnisse von ProxyCheck.io für 30 Tage, um externe API-A
 | `expires_at` | DATETIME | Ablaufdatum des Cache-Eintrags (Default: `+30 Tage`) |
 
 *   **Index**: `idx_proxycheck_cache_expires` auf `expires_at` für performanten Cleanup.
+
+---
+
+### Migration: `022_add_auth_version_to_users.sql`
+Fügt der Tabelle `users` das Feld `auth_version` hinzu.
+*   `ALTER TABLE users ADD COLUMN auth_version INTEGER DEFAULT 1 NOT NULL;`
+*   **Zweck**: Ermöglicht die sofortige, kryptografisch sichere Ungültigmachung bestehender Browser-Sessions bei Passwortänderung, Rollenentzug, Konto-Deaktivierung (`is_active = 0`) oder Löschung ohne Neustart des Servers.
+
+---
+
+### Migration: `023_add_mediothek_and_user_indexes.sql`
+Erstellt gezielte Performance- und Abfrage-Indizes für Schülerausweis-Verifizierungen und Benutzerverwaltung.
+*   `CREATE INDEX IF NOT EXISTS idx_student_profiles_mediothek ON student_profiles(mediothek_number);`
+*   `CREATE INDEX IF NOT EXISTS idx_student_profiles_user_id ON student_profiles(user_id);`
+*   `CREATE INDEX IF NOT EXISTS idx_users_active_role ON users(is_active, role);`
+*   **Zweck**: Beschleunigt die Echtheitsprüfung von Schülerausweisen (`/v` und `/api/student/verify-check`) von $O(N)$ Tabellenscans auf $O(1)$ direkte Index-Lookups.
+
 
 

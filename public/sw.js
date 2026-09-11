@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mso-student-card-v7';
+const CACHE_NAME = 'mso-student-card-v8';
 const ASSETS = [
   'student_card.html',
   'style.css',
@@ -43,8 +43,8 @@ self.addEventListener('activate', (e) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            log('Lösche alten Cache:', key);
+          if (key !== CACHE_NAME && (key.startsWith('mso-student-card-') || key.startsWith('mso-'))) {
+            log('Lösche alten MSO Cache:', key);
             return caches.delete(key);
           }
         })
@@ -55,18 +55,24 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (event) => {
   // 1. Alle Nicht-GET Anfragen (POST, PUT, DELETE) sowie Nicht-HTTP(S) URLs NICHT abfangen.
-  // Ohne event.respondWith() übernimmt der Browser das Request-Handling nativ!
   if (event.request.method !== 'GET' || (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://'))) {
     return;
   }
 
-  // 2. Auth-, Admin- & System-APIs nicht abfangen
-  if (event.request.url.includes('/api/auth/') || event.request.url.includes('/api/admin/')) {
+  // 2. Auth-, Admin- & Status-/Verifizierungs-APIs NIEMALS cachen (Network Only)
+  if (
+    event.request.url.includes('/api/auth/') ||
+    event.request.url.includes('/api/admin/') ||
+    event.request.url.includes('/api/student/status-check') ||
+    event.request.url.includes('/api/student/verify-check') ||
+    event.request.url.includes('/v?') ||
+    event.request.url.includes('/verify')
+  ) {
     return;
   }
 
-  // 3. Bei Schülerausweis-APIs: Versuche Netzwerk mit 1500ms Timeout, sonst Fallback aus Cache
-  if (event.request.url.includes('/api/student/')) {
+  // 3. Bei Schülerausweis-Stammdaten: Versuche Netzwerk mit 1500ms Timeout, sonst Fallback aus Cache
+  if (event.request.url.includes('/api/student/card')) {
     event.respondWith(
       Promise.race([
         fetch(event.request).then((res) => {
@@ -99,7 +105,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Für App-Shell / Schriften / CSS / Assets (Cache First mit Revalidierung im Hintergrund)
+  // 4. Für App-Shell / Schriften / CSS / Assets (Cache First mit Revalidierung im Hintergrund)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {

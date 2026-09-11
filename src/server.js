@@ -9,7 +9,10 @@ const proxyCheckMiddleware = require('./middleware/proxyCheckMiddleware');
 const { cleanExpiredCache } = require('./proxycheck');
 
 const app = express();
-app.set('trust proxy', true);
+
+// Trust Proxy konfigurierbar halten (z. B. 'loopback', Anzahl Hops oder Subnetze statt pauschalem true)
+const trustProxyConfig = process.env.TRUST_PROXY || 'loopback';
+app.set('trust proxy', trustProxyConfig === 'true' ? true : (trustProxyConfig === 'false' ? false : trustProxyConfig));
 const PORT = process.env.PORT || 8080;
 
 // Middleware für JSON & Formular-Daten (erhöhtes Limit für Base64 Bilder)
@@ -18,18 +21,26 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const SqliteSessionStore = require('./sessionStore');
 
-// Session-Konfiguration (Persistent in SQLite mit 1 Jahr Laufzeit & Auto-Verlängerung)
+const sessionSecret = process.env.SESSION_SECRET || 'mso-cloud-secure-session-key-3849';
+if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
+  console.warn('WARNUNG: SESSION_SECRET ist nicht gesetzt! Im Produktionsbetrieb sollte ein sicheres Secret über Umgebungsvariablen gesetzt werden.');
+}
+
+const isSecureCookie = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+
+// Session-Konfiguration (Persistent in SQLite mit 30 Tagen rollender Laufzeit)
 app.use(session({
   name: 'sid',
   store: new SqliteSessionStore(),
-  secret: process.env.SESSION_SECRET || 'mso-cloud-secure-session-key-3849',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
-  rolling: true, // Verlängert die Session-Laufzeit bei jeder Aktivität des Nutzers automatisch!
+  rolling: true,
   cookie: {
-    secure: false, // Auf true setzen, falls HTTPS genutzt wird
+    secure: isSecureCookie,
     httpOnly: true,
-    maxAge: 1000 * 60 * 60 * 24 * 365 // 1 Jahr Gültigkeit (wird durch rolling:true stetig erneuert)
+    sameSite: 'lax',
+    maxAge: 1000 * 60 * 60 * 24 * 30 // 30 Tage Gültigkeit
   }
 }));
 
@@ -119,8 +130,18 @@ const { openidConfigurationHandler, jwksHandler } = require('./oidcHelper');
 app.get(['/.well-known/openid-configuration', '/novus/.well-known/openid-configuration'], openidConfigurationHandler);
 app.get(['/jwks', '/novus/jwks'], jwksHandler);
 
-// Fallback für SPA (sendet immer index.html, falls kein statischer Ordner matched)
+// Fallback für SPA (sendet index.html nur für echte Seitennavigation)
 app.get('*', (req, res) => {
+  // Nicht gefundene API-Routen mit JSON 404 beantworten
+  if (req.path.startsWith('/api/') || req.path.startsWith('/novus/api/')) {
+    return res.status(404).json({ error: 'API-Endpunkt nicht gefunden' });
+  }
+
+  // Fehlende Bilder, Skripte, Stylesheets und Fonts mit 404 beantworten (nicht mit HTML überschreiben!)
+  if (/\.(png|jpg|jpeg|gif|svg|ico|css|js|map|woff|woff2|ttf|eot)$/i.test(req.path)) {
+    return res.status(404).send('Datei nicht gefunden');
+  }
+
   const setupCompleted = getConfig('setup_completed') === '1';
   if (!setupCompleted) {
     res.sendFile(path.join(__dirname, '../public/setup.html'));

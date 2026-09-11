@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MSO Digitaler Schülerausweis</title>
   
   <!-- PWA Manifest & Icons -->
@@ -1347,10 +1347,13 @@
     </div>
   </div>
 
-  <!-- Top Left Controls (Reload Button & Offline Indicator) -->
+  <!-- Top Left Controls (Reload Button, Purge Button & Offline Indicator) -->
   <div class="top-left-controls">
     <button class="control-btn" id="reload-card-btn" onclick="triggerCardReload()" title="Ausweis aktualisieren" style="display: flex;">
       <i class="fa-solid fa-rotate"></i>
+    </button>
+    <button class="control-btn" id="purge-card-btn" onclick="confirmPurgeLocalCard()" title="Ausweis von diesem Gerät entfernen" style="display: flex;">
+      <i class="fa-solid fa-trash-can"></i>
     </button>
     <div class="control-btn" id="offline-indicator" title="Offline-Modus aktiv" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #f59e0b; cursor: default; font-weight: 800;"></div>
   </div>
@@ -2457,6 +2460,18 @@
       }
     });
 
+    function confirmPurgeLocalCard() {
+      if (confirm('Möchten Sie die gespeicherten Schülerausweis-Daten wirklich vollständig von diesem Gerät entfernen?')) {
+        localStorage.removeItem('mso_cached_card');
+        localStorage.removeItem('mso_cached_card_time');
+        localStorage.removeItem('mso_card_offline_blocked');
+        localStorage.removeItem('mso_cached_card_user');
+        cardData = null;
+        alert('Ausweis-Daten wurden erfolgreich von diesem Gerät gelöscht.');
+        window.location.reload();
+      }
+    }
+
     // Fetch Card Data
 
     async function loadCardData(isBackgroundRetry = false) {
@@ -2592,6 +2607,7 @@
         } else {
           localStorage.setItem('mso_cached_card', JSON.stringify(data));
           localStorage.setItem('mso_cached_card_time', Date.now().toString());
+          if (data.username) localStorage.setItem('mso_cached_card_user', data.username);
           
           renderCard(data, false);
           updateControlsState(false);
@@ -2978,28 +2994,31 @@
 
       // 7. Status Label
       const statusLabel = document.getElementById('card-status-label');
-      
-      if (isOffline) {
-        const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
-        const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : Date.now();
-        const daysAgo = Math.max(0, Math.floor((Date.now() - cachedTime) / (24 * 60 * 60 * 1000)));
-        
-        let offlineText = '';
-        const lang = typeof currentLang !== 'undefined' ? currentLang : 'de';
-        
-        if (lang === 'en') {
-          offlineText = daysAgo === 1 ? 'Online Verified 1 day ago' : `Online Verified ${daysAgo} days ago`;
-        } else if (lang === 'fr') {
-          offlineText = daysAgo === 1 ? 'Vérifié en ligne il y a 1 jour' : `Vérifié en ligne il y a ${daysAgo} jours`;
+      if (statusLabel) {
+        if (isRevoked) {
+          statusLabel.innerText = 'Ausweis gesperrt';
+          statusLabel.style.color = 'var(--danger)';
+        } else if (isOfflineExpired) {
+          statusLabel.innerText = 'Erneute Onlineprüfung erforderlich';
+          statusLabel.style.color = 'var(--danger)';
+        } else if (isOffline) {
+          const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
+          const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : Date.now();
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          const timePassed = Date.now() - cachedTime;
+          const daysLeft = Math.max(0, Math.ceil((thirtyDaysMs - timePassed) / (24 * 60 * 60 * 1000)));
+          
+          if (timePassed > thirtyDaysMs) {
+            statusLabel.innerText = 'Erneute Onlineprüfung erforderlich';
+            statusLabel.style.color = 'var(--danger)';
+          } else {
+            statusLabel.innerText = `Offline gespeichert (${daysLeft} Tage verbleibend)`;
+            statusLabel.style.color = '#f59e0b';
+          }
         } else {
-          offlineText = daysAgo === 1 ? 'Online verifiziert vor 1 Tag' : `Online verifiziert vor ${daysAgo} Tagen`;
+          statusLabel.innerText = 'Online geprüft';
+          statusLabel.style.color = 'var(--success)';
         }
-        
-        statusLabel.innerText = offlineText;
-        statusLabel.style.color = 'var(--success)';
-      } else {
-        statusLabel.innerText = translations[currentLang].statusOnline;
-        statusLabel.style.color = 'var(--success)';
       }
 
       // 8. Sperrung, Bildfehler & Ablaufprüfung (Overlay Management)

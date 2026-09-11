@@ -8,68 +8,80 @@ const { URL } = require('url');
 const { db, logEvent, getConfig } = require('../db');
 const ldap = require('../ldap');
 const studentDb = require('../student_db');
+const { checkUrlAvailability } = require('../utils/networkHelper');
+const { optionalAuth } = require('../middleware/authMiddleware');
+
+/**
+ * Wandelt ein internes Datenbank-Kachelobjekt in ein sicheres öffentliches DTO um.
+ * Enthält eine strikte Positivliste und filtert vertrauliche Felder wie sso_key vollständig aus.
+ */
+function toPublicTileDTO(tile, extraFlags = {}) {
+  let allowedGroups = [];
+  try {
+    allowedGroups = typeof tile.allowed_groups === 'string' ? JSON.parse(tile.allowed_groups || '[]') : (tile.allowed_groups || []);
+  } catch (e) {
+    allowedGroups = [];
+  }
+
+  return {
+    id: tile.id,
+    title: tile.title,
+    description: tile.description || '',
+    icon: tile.icon,
+    link: tile.link,
+    visibility: tile.visibility || 'public',
+    allowed_groups: allowedGroups,
+    sso_type: tile.sso_type || 'none',
+    sort_order: tile.sort_order,
+    time_limit_enabled: tile.time_limit_enabled || 0,
+    time_limit_start: tile.time_limit_start || '08:00',
+    time_limit_end: tile.time_limit_end || '16:00',
+    open_in_new_tab: tile.open_in_new_tab || 0,
+    disable_status_check: tile.disable_status_check || 0,
+    is_time_locked: extraFlags.is_time_locked ? 1 : 0,
+    is_untis_locked: extraFlags.is_untis_locked ? 1 : 0,
+    is_sph_locked: extraFlags.is_sph_locked ? 1 : 0
+  };
+}
 
 /**
  * Native Backend Status-Checker Endpoint: Prüft die Erreichbarkeit einer Kachel-URL vom Server aus.
- * Erkennt auch Verbindungsabbrüche (ERR_CONNECTION_CLOSED / ECONNRESET / ETIMEDOUT).
+ * Schützt vor SSRF, DNS-Rebinding und unberechtigtem internen Netzwerk-Scanning.
  */
-router.get('/check-status', async (req, res) => {
-  const targetUrl = req.query.link;
-  if (!targetUrl) {
-    return res.status(400).json({ online: false, reason: 'Keine URL angegeben' });
-  }
-
-  let hasResponded = false;
-  const sendResult = (data) => {
-    if (hasResponded || res.headersSent) return;
-    hasResponded = true;
-    return res.json(data);
-  };
-
+router.get('/check-status', optionalAuth, async (req, res) => {
   try {
-    const parsedUrl = new URL(targetUrl);
-    const protocol = parsedUrl.protocol === 'https:' ? https : http;
+    const tileId = req.query.tile_id || req.query.id;
+    let targetUrl = req.query.link;
+    const user = req.user;
 
-    const requestOptions = {
-      method: 'HEAD',
-      host: parsedUrl.hostname,
-      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
-      path: parsedUrl.pathname + parsedUrl.search,
-      timeout: 5000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MSO-Cloud-Checker/1.0',
-        'Accept': '*/*'
+    if (tileId) {
+      const tile = db.prepare('SELECT * FROM tiles WHERE id = ?').get(tileId);
+      if (!tile) {
+        return res.status(404).json({ online: false, reason: 'Kachel nicht gefunden' });
       }
-    };
-
-    const checkReq = protocol.request(requestOptions, (checkRes) => {
-      // Alle Statuscodes von 200 bis 499 bedeuten, dass der Webserver aktiv antwortet und erreichbar ist
-      const isOnline = checkRes.statusCode >= 200 && checkRes.statusCode < 500;
-      if (isOnline) {
-        sendResult({ online: true, statusCode: checkRes.statusCode, reason: `Erreichbar (HTTP ${checkRes.statusCode})` });
-      } else {
-        // Status 5xx (500, 502 Bad Gateway, 503 Service Unavailable, 504 Timeout) bedeuten echten Serverausfall
-        sendResult({ online: false, statusCode: checkRes.statusCode, reason: `Dienst meldet Serverfehler (HTTP ${checkRes.statusCode})` });
+      const vis = evaluateTileVisibility(tile, user);
+      if (!vis.visible) {
+        return res.status(403).json({ online: false, reason: 'Keine Berechtigung für diese Kachel' });
       }
-    });
+      targetUrl = tile.link;
+    } else if (targetUrl) {
+      // Wenn direkte URL übergeben wird, prüfen ob diese URL einer existierenden sichtbaren Kachel gehört
+      const matchingTile = db.prepare('SELECT * FROM tiles WHERE link = ?').get(targetUrl);
+      if (matchingTile) {
+        const vis = evaluateTileVisibility(matchingTile, user);
+        if (!vis.visible) {
+          return res.status(403).json({ online: false, reason: 'Keine Berechtigung für diese Kachel' });
+        }
+      }
+    } else {
+      return res.status(400).json({ online: false, reason: 'tile_id oder link erforderlich' });
+    }
 
-    checkReq.on('timeout', () => {
-      checkReq.destroy();
-      sendResult({ online: false, reason: 'Zeitüberschreitung (Timeout nach 5s)' });
-    });
-
-    checkReq.on('error', (err) => {
-      console.warn(`[MSO Status-Checker] Verbindung fehlgeschlagen für ${targetUrl}: ${err.code || err.message}`);
-      sendResult({ 
-        online: false, 
-        errorCode: err.code || 'CONNECTION_ERROR', 
-        reason: 'Dienst nicht erreichbar (Verbindung fehlgeschlagen / Server geschlossen)' 
-      });
-    });
-
-    checkReq.end();
+    const result = await checkUrlAvailability(targetUrl);
+    return res.json(result);
   } catch (err) {
-    sendResult({ online: false, reason: 'Ungültige URL oder Netzwerkfehler: ' + err.message });
+    console.error('[MSO Status-Checker Fehler]:', err);
+    return res.status(500).json({ online: false, reason: 'Statusprüfung fehlgeschlagen: ' + err.message });
   }
 });
 
@@ -363,15 +375,15 @@ function evaluateTileVisibility(tile, user) {
  * Ruft alle für den aktuellen Benutzer sichtbaren Kacheln ab.
  * Aktualisiert vorab die Benutzergruppen des Benutzers (aus DB & LDAP).
  */
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    let user = req.session.user;
+    let user = req.user || req.session.user;
     
     // Live-Aktualisierung der Benutzergruppen vor der Kachelauswertung
     if (user && user.id) {
       try {
-        const freshUser = db.prepare('SELECT id, username, email, role, groups, is_ldap FROM users WHERE id = ?').get(user.id);
-        if (freshUser) {
+        const freshUser = db.prepare('SELECT id, username, email, role, groups, is_ldap, is_active FROM users WHERE id = ?').get(user.id);
+        if (freshUser && freshUser.is_active === 1) {
           let userGroups = [];
           try {
             userGroups = typeof freshUser.groups === 'string' ? JSON.parse(freshUser.groups || '[]') : (freshUser.groups || []);
@@ -393,10 +405,12 @@ router.get('/', async (req, res) => {
             }
           }
 
-          req.session.user.groups = userGroups;
-          req.session.user.role = freshUser.role;
-          req.session.user.isLdap = freshUser.is_ldap === 1;
-          user = req.session.user;
+          if (req.session && req.session.user) {
+            req.session.user.groups = userGroups;
+            req.session.user.role = freshUser.role;
+            req.session.user.isLdap = freshUser.is_ldap === 1;
+            user = req.session.user;
+          }
         }
       } catch (userErr) {
         console.warn('[MSO Server Tiles] Fehler bei Live-Aktualisierung der Benutzergruppen:', userErr.message);
@@ -423,7 +437,7 @@ router.get('/', async (req, res) => {
       sphPassword = sphCreds.sphPassword;
     }
 
-    // Zeitsperren- & WebUntis/SPH-Sperren-Flag dynamisch anfügen
+    // Zeitsperren- & WebUntis/SPH-Sperren-Flag dynamisch anfügen und über DTO filtern
     const mappedTiles = visibleTiles.map(tile => {
       const locked = isTileTimeLocked(tile);
       const isUntis = isWebUntisTile(tile);
@@ -432,12 +446,11 @@ router.get('/', async (req, res) => {
       const isUntisLocked = Boolean(user && !isExempt && isUntis && !userUntisUsername);
       const isSphLocked = Boolean(user && !isExempt && isSph && (!sphUsername || !sphPassword));
 
-      return {
-        ...tile,
-        is_time_locked: locked ? 1 : 0,
-        is_untis_locked: isUntisLocked ? 1 : 0,
-        is_sph_locked: isSphLocked ? 1 : 0
-      };
+      return toPublicTileDTO(tile, {
+        is_time_locked: locked,
+        is_untis_locked: isUntisLocked,
+        is_sph_locked: isSphLocked
+      });
     });
 
     res.json(mappedTiles);
@@ -981,4 +994,8 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
+router.toPublicTileDTO = toPublicTileDTO;
+router.evaluateTileVisibility = evaluateTileVisibility;
+
 module.exports = router;
+

@@ -63,6 +63,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Tooltip initialisieren
   initTooltips();
+
+  // 8. Hash-basiertes Routing beim Laden auflösen
+  handleHashRoute();
 });
 
 /* ==========================================================================
@@ -339,15 +342,16 @@ function renderAnonymousHeader() {
 
 async function handleLogin(e) {
   e.preventDefault();
-  let user = document.getElementById('login-username').value.trim();
-  
-  // E-Mail-Fehlerhilfe: Alles ab dem @-Zeichen ignorieren
-  if (user.includes('@')) {
-    user = user.split('@')[0];
-  }
-  
+  const user = document.getElementById('login-username').value.trim();
   const pass = document.getElementById('login-password').value;
   const alertBox = document.getElementById('login-alert');
+  const submitBtn = e.target ? e.target.querySelector('button[type="submit"]') : null;
+  const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Anmelden...';
+  }
 
   alertBox.style.display = 'none';
   console.log(`[MSO Login] Sende Login-Anfrage für Benutzer: "${user}"...`);
@@ -452,6 +456,11 @@ async function handleLogin(e) {
       alertBox.innerText = err.message || String(err);
     }
     alertBox.style.display = 'block';
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnHtml;
+    }
   }
 }
 
@@ -460,6 +469,12 @@ async function handleLogout() {
     const res = await fetch('api/auth/logout', { method: 'POST' });
     if (res.ok) {
       currentUser = null;
+      // Schülerausweis-Cache auf geteilten Geräten sicher bereinigen
+      localStorage.removeItem('mso_cached_card');
+      localStorage.removeItem('mso_cached_card_time');
+      localStorage.removeItem('mso_cached_card_user');
+      localStorage.removeItem('mso_card_offline_blocked');
+
       clearStudentViewDOM();
       renderAnonymousHeader();
       closeAdminView();
@@ -1197,10 +1212,30 @@ async function checkMainLoginLockStatus() {
 }
 
 /* ==========================================================================
-   5. Modals Helper
+   5. Modals, Routing, Live-Search & Helpers
    ========================================================================== */
+let lastFocusedElement = null;
+let isFormDirty = false;
+
+// Dirty Form Tracking
+document.addEventListener('input', (e) => {
+  if (e.target.closest('form') && (e.target.closest('#admin-view') || e.target.closest('#student-view'))) {
+    isFormDirty = true;
+  }
+});
+
+function markFormClean() {
+  isFormDirty = false;
+}
+
 function openModal(id) {
-  document.getElementById(id).style.display = 'flex';
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  lastFocusedElement = document.activeElement;
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.style.display = 'flex';
+
   if (id === 'login-modal') {
     checkMainLoginLockStatus();
     setTimeout(() => {
@@ -1211,14 +1246,68 @@ function openModal(id) {
         document.getElementById('login-username')?.focus();
       }
     }, 100);
+  } else {
+    setTimeout(() => {
+      const focusable = modal.querySelector('input:not([type="hidden"]), button:not([disabled]), textarea, select, [tabindex]:not([tabindex="-1"])');
+      if (focusable) focusable.focus();
+    }, 100);
   }
 }
 
 function closeModal(id) {
-  document.getElementById(id).style.display = 'none';
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  modal.style.display = 'none';
   // Alerts im Modal verstecken
   const alert = document.querySelector(`#${id} .alert`);
   if (alert) alert.style.display = 'none';
+  if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+    try { lastFocusedElement.focus(); } catch (e) {}
+  }
+}
+
+// Live Search Filter for Tiles
+function filterTilesLive(query) {
+  const q = (query || '').toLowerCase().trim();
+  const clearBtn = document.getElementById('tiles-search-clear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+
+  const cards = document.querySelectorAll('.tile-card');
+  let matchCount = 0;
+  cards.forEach(card => {
+    const title = (card.querySelector('.tile-title')?.textContent || '').toLowerCase();
+    const desc = (card.querySelector('.tile-description')?.textContent || '').toLowerCase();
+    if (!q || title.includes(q) || desc.includes(q)) {
+      card.style.display = 'flex';
+      matchCount++;
+    } else {
+      card.style.display = 'none';
+    }
+  });
+
+  const emptyMsgId = 'tiles-search-empty';
+  let emptyMsg = document.getElementById(emptyMsgId);
+  if (matchCount === 0 && q) {
+    if (!emptyMsg) {
+      emptyMsg = document.createElement('div');
+      emptyMsg.id = emptyMsgId;
+      emptyMsg.style.cssText = 'grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);';
+      emptyMsg.innerHTML = '<i class="fa-solid fa-magnifying-glass fa-2xl" style="margin-bottom:10px;"></i><p>Keine passenden Dienste gefunden.</p>';
+      tilesContainer.appendChild(emptyMsg);
+    }
+    emptyMsg.style.display = 'block';
+  } else if (emptyMsg) {
+    emptyMsg.style.display = 'none';
+  }
+}
+
+function clearTileSearch() {
+  const input = document.getElementById('tiles-search-input');
+  if (input) {
+    input.value = '';
+    filterTilesLive('');
+    input.focus();
+  }
 }
 
 function openProfileAndStartUpload(event) {
@@ -1236,10 +1325,36 @@ function openProfileAndStartUpload(event) {
   }, 350);
 }
 
+// Escape-Taste schließt geöffnete Modals und Dropdowns
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    const openModals = document.querySelectorAll('.modal');
+    openModals.forEach(m => {
+      if (m.style.display === 'flex' || m.style.display === 'block') {
+        m.style.display = 'none';
+        const alert = m.querySelector('.alert');
+        if (alert) alert.style.display = 'none';
+      }
+    });
+
+    const userDropdown = document.getElementById('header-user-dropdown');
+    if (userDropdown) userDropdown.style.display = 'none';
+    const newsDropdown = document.getElementById('news-dropdown');
+    if (newsDropdown) newsDropdown.style.display = 'none';
+
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      try { lastFocusedElement.focus(); } catch (err) {}
+    }
+  }
+});
+
 // Schließen per Klick außerhalb des Modals oder Dropdowns
 window.onclick = function(event) {
-  if (event.target.classList.contains('modal')) {
+  if (event.target.classList && event.target.classList.contains('modal')) {
     event.target.style.display = 'none';
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      try { lastFocusedElement.focus(); } catch (e) {}
+    }
   }
   
   // User Dropdown schließen bei Klick außerhalb
@@ -1254,9 +1369,41 @@ window.onclick = function(event) {
 };
 
 /* ==========================================================================
-   6. Admin Control Panel Logik
+   6. Admin Control Panel Logik & Hash-Router
    ========================================================================== */
-function openAdminView(e) {
+function handleHashRoute() {
+  const hash = window.location.hash || '#/services';
+  
+  if (hash.startsWith('#/admin') || hash.startsWith('#admin')) {
+    if (!currentUser || currentUser.role !== 'admin') {
+      closeAllViews(false);
+      return;
+    }
+    const cleanHash = hash.replace(/^#\/?admin\/?/, '');
+    const tabName = cleanHash ? (cleanHash.startsWith('tab-') ? cleanHash : `tab-${cleanHash}`) : 'tab-tiles';
+    
+    openAdminView(null, false);
+    const navItem = document.querySelector(`.admin-nav-item[data-tab="${tabName}"]`);
+    if (navItem) {
+      switchTab(tabName, navItem, false);
+    } else {
+      const fallbackItem = document.querySelector('.admin-nav-item[data-tab="tab-tiles"]') || document.querySelector('.admin-nav-item');
+      if (fallbackItem) switchTab('tab-tiles', fallbackItem, false);
+    }
+  } else if (hash === '#/profile' || hash === '#profile') {
+    if (currentUser) {
+      openStudentView(null, false);
+    } else {
+      closeAllViews(false);
+    }
+  } else {
+    closeAllViews(false);
+  }
+}
+
+window.addEventListener('hashchange', handleHashRoute);
+
+function openAdminView(e, updateHash = true) {
   if (e) {
     e.preventDefault();
     const dropdown = document.getElementById('header-user-dropdown');
@@ -1272,28 +1419,57 @@ function openAdminView(e) {
     adminView.style.display = 'block';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-  loadAdminTabContent('tab-tiles');
+
+  if (updateHash) {
+    window.location.hash = '#/admin/tiles';
+  } else {
+    loadAdminTabContent('tab-tiles');
+  }
 }
 
-function closeAdminView() {
+function closeAdminView(updateHash = true) {
+  if (isFormDirty && !confirm('Sie haben ungespeicherte Änderungen in der Administration. Möchten Sie wirklich zurück zur Startseite?')) {
+    return;
+  }
+  isFormDirty = false;
+
   adminView.style.display = 'none';
   mainView.style.display = 'block';
-  loadTiles(); // Kacheln aktualisieren
+  if (updateHash) {
+    window.location.hash = '#/services';
+  }
+  loadTiles();
 }
 
-function switchTab(tabId, element) {
+function switchTab(tabId, element, updateHash = true) {
+  if (isFormDirty && !confirm('Sie haben möglicherweise ungespeicherte Eingaben. Möchten Sie den Tab wirklich wechseln?')) {
+    return;
+  }
+  isFormDirty = false;
+
   // Aktiven Menüpunkt umschalten
   document.querySelectorAll('.admin-nav-item').forEach(item => item.classList.remove('active'));
-  element.classList.add('active');
+  if (element) {
+    element.classList.add('active');
+  } else {
+    const item = document.querySelector(`.admin-nav-item[data-tab="${tabId}"]`);
+    if (item) item.classList.add('active');
+  }
 
   // Tab-Inhalte umschalten
   document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
+  const tabTarget = document.getElementById(tabId);
+  if (tabTarget) tabTarget.classList.add('active');
 
   // Sidebar schliessen bei mobiler Ansicht
   const sidebar = document.querySelector('.admin-sidebar');
   if (sidebar) {
     sidebar.classList.remove('open');
+  }
+
+  if (updateHash) {
+    const routeName = tabId.replace('tab-', '');
+    window.location.hash = `#/admin/${routeName}`;
   }
 
   // Daten für den ausgewählten Tab laden
@@ -1302,7 +1478,8 @@ function switchTab(tabId, element) {
 
 function loadAdminTabContent(tabId) {
   // Alert ausblenden
-  document.getElementById('admin-alert').style.display = 'none';
+  const alertEl = document.getElementById('admin-alert');
+  if (alertEl) alertEl.style.display = 'none';
 
   if (tabId === 'tab-tiles') {
     loadAdminTiles();
@@ -5213,7 +5390,11 @@ function copyOnboardingValue(elementId, btnEl) {
   });
 }
 
-function openStudentView() {
+function openStudentView(e, updateHash = true) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  const dropdown = document.getElementById('header-user-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+
   const mainView = document.getElementById('main-view');
   const studentView = document.getElementById('student-view');
   const adminView = document.getElementById('admin-view');
@@ -5226,11 +5407,15 @@ function openStudentView() {
     studentView.style.display = 'block';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  if (updateHash) {
+    window.location.hash = '#/profile';
+  }
   loadStudentProfile();
 }
 
-function closeStudentView() {
-  closeAllViews();
+function closeStudentView(updateHash = true) {
+  closeAllViews(updateHash);
 }
 
 function clearStudentViewDOM() {
@@ -5760,7 +5945,7 @@ function closeCardView() {
   closeAllViews();
 }
 
-function closeAllViews() {
+function closeAllViews(updateHash = true) {
   const mainView = document.getElementById('main-view');
   const adminView = document.getElementById('admin-view');
   const studentView = document.getElementById('student-view');
@@ -5771,6 +5956,9 @@ function closeAllViews() {
   if (cardView) cardView.style.display = 'none';
   if (mainView) mainView.style.display = 'block';
 
+  if (updateHash) {
+    window.location.hash = '#/services';
+  }
   loadTiles();
 }
 

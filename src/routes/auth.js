@@ -18,13 +18,25 @@ router.get('/me', async (req, res) => {
   const cardLogo = getConfig('card_logo', '');
 
   if (req.session.user) {
-    // 1. Prüfen, ob der Benutzer noch in der lokalen Datenbank existiert und aktiv ist
-    const dbUser = db.prepare('SELECT id, is_active FROM users WHERE id = ?').get(req.session.user.id);
+    // 1. Prüfen, ob der Benutzer noch in der lokalen Datenbank existiert, aktiv ist und auth_version übereinstimmt
+    const dbUser = db.prepare('SELECT id, username, email, role, groups, is_ldap, is_active, display_name, dn, first_name, last_name, auth_version FROM users WHERE id = ?').get(req.session.user.id);
     if (!dbUser || dbUser.is_active === 0) {
       console.log(`[Express /me] Lokales Konto für Benutzer ${req.session.user.username} ist inaktiv oder existiert nicht mehr.`);
-      req.session.destroy();
+      req.session.destroy(() => {});
       return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
     }
+
+    const sessionAuthVersion = req.session.user.auth_version || 1;
+    const dbAuthVersion = dbUser.auth_version || 1;
+    if (sessionAuthVersion !== dbAuthVersion) {
+      console.log(`[Express /me] Sitzung für ${req.session.user.username} invalidiert (auth_version Mismatch).`);
+      req.session.destroy(() => {});
+      return res.json({ logged_in: false, error: 'Ihre Berechtigungen oder Ihr Passwort wurden geändert. Bitte melden Sie sich erneut an.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
+    }
+
+    // Frische Rolle und Daten aus der Datenbank übernehmen
+    req.session.user.role = dbUser.role;
+    req.session.user.auth_version = dbAuthVersion;
 
     // 2. LDAP-Live-Prüfung oder periodische tägliche Prüfung
     const liveCheckEnabled = getConfig('ldap_live_check_enabled', '0') === '1';
@@ -52,7 +64,7 @@ router.get('/me', async (req, res) => {
         req.session.user.lastLdapCheck = now - (23 * 60 * 60 * 1000); 
       } else if (!ldapStatus.active) {
         console.log(`[Express /me] Kicke Benutzer ${req.session.user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
-        req.session.destroy();
+        req.session.destroy(() => {});
         logEvent('warn', 'user_deactivated_ldap', `Sitzung beendet: Benutzer ${req.session.user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: req.session.user.id });
         return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
       } else {
@@ -214,6 +226,7 @@ router.post('/login', async (req, res) => {
 
   if (lockStatus.isLocked) {
     const minutes = Math.ceil(lockStatus.remainingSeconds / 60);
+    res.set('Retry-After', String(lockStatus.remainingSeconds));
     return res.status(429).json({
       error: `Zu viele fehlgeschlagene Anmeldeversuche. Diese IP ist noch für ${lockStatus.remainingSeconds} Sekunden (ca. ${minutes} Min.) für die Anmeldung gesperrt.`,
       locked: true,
@@ -230,14 +243,12 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // 0. Wartungsmodus prüfen
-    if (getConfig('maintenance_enabled', '0') === '1') {
-      const maintMsg = getConfig('maintenance_message', 'Das System wird momentan gewartet. Bitte versuchen Sie es später wieder.');
-      logEvent('info', 'login_blocked_maintenance', `Login blockiert (Wartungsmodus) für: ${username}`, null, clientIp);
-      return res.status(503).json({ error: maintMsg, maintenance: true });
-    }
-
     const ldapEnabled = getConfig('ldap_enabled') === '1';
+    const maintenanceEnabled = getConfig('maintenance_enabled', '0') === '1';
+    const maintMsg = getConfig('maintenance_message', 'Das System wird momentan gewartet. Bitte versuchen Sie es später wieder.');
+
+    let authenticatedUser = null;
+    let isLdapAuth = false;
 
     // 1. LDAP Login-Versuch durchführen (wenn LDAP in den Einstellungen aktiviert ist)
     if (ldapEnabled) {
@@ -253,28 +264,38 @@ router.post('/login', async (req, res) => {
         });
       }
 
-      const ldapUser = ldapResult; // null = falsches Passwort oder User nicht gefunden
-      
-      if (ldapUser) {
-        // LDAP-Login erfolgreich! Synchronisiere mit lokaler Cache-Datenbank
-        resetFailedLogin(clientIp);
+      if (ldapResult) {
+        // LDAP-Login erfolgreich!
+        const ldapUser = ldapResult;
         let localCache = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
-        let userId;
 
-        const groupsJson = JSON.stringify(ldapUser.rawGroups);
-        
-        // Bestimme Rolle: Wenn eine der LDAP-Gruppen dem Admin-Mapping entspricht
-        let role = 'user';
-        if (ldapUser.roles.includes('Admin')) {
-          role = 'admin';
-        } else if (localCache) {
-          role = localCache.role; // Bestehende Rolle beibehalten
+        // Deaktiviertes Konto ablehnen!
+        if (localCache && localCache.is_active === 0) {
+          logEvent('warn', 'login_rejected_inactive', `Login verweigert für inaktives LDAP-Konto: ${username}`, { userId: localCache.id }, clientIp);
+          return res.status(401).json({ error: 'Ihr Konto ist deaktiviert. Bitte wenden Sie sich an die Administration.' });
         }
 
+        let role = 'user';
+        if (ldapUser.roles && ldapUser.roles.includes('Admin')) {
+          role = 'admin';
+        } else if (localCache && localCache.role) {
+          role = localCache.role;
+        }
+
+        // Wartungsmodus prüfen: Wenn Wartungsmodus aktiv, dürfen nur Admins rein
+        if (maintenanceEnabled && role !== 'admin') {
+          logEvent('info', 'login_blocked_maintenance', `Login blockiert (Wartungsmodus) für Nicht-Admin: ${username}`, null, clientIp);
+          return res.status(503).json({ error: maintMsg, maintenance: true });
+        }
+
+        resetFailedLogin(clientIp);
+        const groupsJson = JSON.stringify(ldapUser.rawGroups || []);
         const emailLower = (ldapUser.email || '').trim().toLowerCase();
+        let userId;
+        let authVersion = 1;
 
         if (localCache) {
-          // Cache aktualisieren
+          authVersion = localCache.auth_version || 1;
           db.prepare(`
             UPDATE users 
             SET email = ?, role = ?, groups = ?, is_ldap = 1, display_name = ?, dn = ?, first_name = ?, last_name = ?
@@ -282,99 +303,116 @@ router.post('/login', async (req, res) => {
           `).run(emailLower, role, groupsJson, ldapUser.name, ldapUser.dn, ldapUser.givenName, ldapUser.sn, localCache.id);
           userId = localCache.id;
         } else {
-          // Neu anlegen
           const info = db.prepare(`
-            INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name, dn, first_name, last_name)
-            VALUES (?, ?, NULL, ?, ?, 1, ?, ?, ?, ?)
+            INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name, dn, first_name, last_name, is_active, auth_version)
+            VALUES (?, ?, NULL, ?, ?, 1, ?, ?, ?, ?, 1, 1)
           `).run(username, emailLower, role, groupsJson, ldapUser.name, ldapUser.dn, ldapUser.givenName, ldapUser.sn);
           userId = info.lastInsertRowid;
+          authVersion = 1;
         }
 
         const ldapStudentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(userId);
 
-        req.session.user = {
+        authenticatedUser = {
           id: userId,
           username: username,
           email: emailLower,
           role: role,
-          groups: ldapUser.rawGroups,
+          groups: ldapUser.rawGroups || [],
           isLdap: true,
           display_name: ldapUser.name,
           dn: ldapUser.dn,
           givenName: ldapUser.givenName,
           sn: ldapUser.sn,
-          card_image: ldapStudentRow ? ldapStudentRow.card_image : null
+          card_image: ldapStudentRow ? ldapStudentRow.card_image : null,
+          auth_version: authVersion
         };
-        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
-        const returnTo = req.session.returnTo || null;
-        if (returnTo) {
-          delete req.session.returnTo;
-        }
-
-        const isOauth = !!req.session.oauthQuery;
-        logEvent('info', 'login_success', `LDAP-Login erfolgreich für: ${ldapUser.username}`, { userId: userId, role: role, groups: ldapUser.rawGroups }, clientIp);
-        res.cookie('mso_remember_user', username, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
-        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
+        isLdapAuth = true;
       }
     }
 
-    // 2. Lokalen Login-Versuch durchführen (falls LDAP deaktiviert ist oder der Benutzer ein reines lokales Konto nutzt)
-    const localUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
-    
-    if (localUser && localUser.password_hash) {
-      // Wenn das Konto als LDAP-Konto markiert ist, aber der LDAP-Login fehlschlug -> Fehler
-      if (ldapEnabled && localUser.is_ldap === 1) {
-        console.warn(`LDAP-Authentifizierung für LDAP-Konto ${username} fehlgeschlagen.`);
-        const failStatus = recordFailedLogin(clientIp);
-        const maxAttempts = getMaxLoginAttempts();
-        if (failStatus.isLocked) {
-          const lockMin = Math.ceil(failStatus.remainingSeconds / 60);
-          return res.status(429).json({
-            error: `Zu viele fehlgeschlagene Anmeldeversuche (${maxAttempts} von ${maxAttempts}). Diese IP wurde für ${lockMin} Minuten für die Anmeldung gesperrt.`,
-            locked: true,
-            remaining_seconds: failStatus.remainingSeconds,
-            attempts_left: 0
-          });
-        }
-        return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort.' });
-      }
+    // 2. Lokaler Login-Versuch
+    if (!authenticatedUser) {
+      const localUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
 
-      const match = bcrypt.compareSync(password, localUser.password_hash);
-      if (match) {
-        // Lokaler Login erfolgreich!
-        resetFailedLogin(clientIp);
-        const groups = JSON.parse(localUser.groups || '[]');
-        const studentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(localUser.id);
-        req.session.user = {
-          id: localUser.id,
-          username: localUser.username,
-          email: localUser.email,
-          role: localUser.role,
-          groups: groups,
-          isLdap: false,
-          display_name: localUser.display_name || '',
-          card_image: studentRow ? studentRow.card_image : null
-        };
-        req.session.plain_password = password; // Passwort für Autologin-Verfahren zwischenspeichern
-        const returnTo = req.session.returnTo || null;
-        if (returnTo) {
-          delete req.session.returnTo;
+      if (localUser && localUser.password_hash) {
+        if (localUser.is_active === 0) {
+          logEvent('warn', 'login_rejected_inactive', `Login verweigert für inaktives lokales Konto: ${username}`, { userId: localUser.id }, clientIp);
+          return res.status(401).json({ error: 'Ihr Konto ist deaktiviert. Bitte wenden Sie sich an die Administration.' });
         }
 
-        const isOauth = !!req.session.oauthQuery;
-        logEvent('info', 'login_success', `Lokaler Login erfolgreich für: ${localUser.username}`, { userId: localUser.id, role: localUser.role }, clientIp);
-        res.cookie('mso_remember_user', localUser.username, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
-        return res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo });
+        if (ldapEnabled && localUser.is_ldap === 1) {
+          console.warn(`LDAP-Authentifizierung für LDAP-Konto ${username} fehlgeschlagen.`);
+          const failStatus = recordFailedLogin(clientIp);
+          const maxAttempts = getMaxLoginAttempts();
+          if (failStatus.isLocked) {
+            const lockMin = Math.ceil(failStatus.remainingSeconds / 60);
+            res.set('Retry-After', String(failStatus.remainingSeconds));
+            return res.status(429).json({
+              error: `Zu viele fehlgeschlagene Anmeldeversuche (${maxAttempts} von ${maxAttempts}). Diese IP wurde für ${lockMin} Minuten für die Anmeldung gesperrt.`,
+              locked: true,
+              remaining_seconds: failStatus.remainingSeconds,
+              attempts_left: 0
+            });
+          }
+          return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort.' });
+        }
+
+        const match = bcrypt.compareSync(password, localUser.password_hash);
+        if (match) {
+          // Wartungsmodus prüfen
+          if (maintenanceEnabled && localUser.role !== 'admin') {
+            logEvent('info', 'login_blocked_maintenance', `Login blockiert (Wartungsmodus) für Nicht-Admin: ${username}`, null, clientIp);
+            return res.status(503).json({ error: maintMsg, maintenance: true });
+          }
+
+          resetFailedLogin(clientIp);
+          const groups = JSON.parse(localUser.groups || '[]');
+          const studentRow = db.prepare('SELECT card_image FROM student_profiles WHERE user_id = ?').get(localUser.id);
+          authenticatedUser = {
+            id: localUser.id,
+            username: localUser.username,
+            email: localUser.email,
+            role: localUser.role,
+            groups: groups,
+            isLdap: false,
+            display_name: localUser.display_name || '',
+            card_image: studentRow ? studentRow.card_image : null,
+            auth_version: localUser.auth_version || 1
+          };
+        }
       }
     }
 
-    // Wenn beide fehlschlagen
+    if (authenticatedUser) {
+      const returnTo = req.session ? req.session.returnTo : null;
+      const isOauth = Boolean(req.session && req.session.oauthQuery);
+      const oauthQuery = req.session ? req.session.oauthQuery : null;
+
+      // Session Regeneration gegen Session Fixation
+      return new Promise((resolve) => {
+        req.session.regenerate((regenErr) => {
+          if (regenErr) {
+            console.error('[Session Regenerate Error]:', regenErr);
+          }
+          req.session.user = authenticatedUser;
+          if (oauthQuery) req.session.oauthQuery = oauthQuery;
+          if (returnTo) req.session.returnTo = returnTo;
+
+          logEvent('info', 'login_success', `${isLdapAuth ? 'LDAP' : 'Lokaler'}-Login erfolgreich für: ${authenticatedUser.username}`, { userId: authenticatedUser.id, role: authenticatedUser.role }, clientIp);
+          res.cookie('mso_remember_user', authenticatedUser.username, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
+          resolve(res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo }));
+        });
+      });
+    }
+
+    // Fehlversuch
     logEvent('warn', 'login_failed', `Fehlgeschlagener Login-Versuch für: ${username}`, null, clientIp);
     const failStatus = recordFailedLogin(clientIp);
     const maxAttempts = getMaxLoginAttempts();
-
     if (failStatus.isLocked) {
       const lockMin = Math.ceil(failStatus.remainingSeconds / 60);
+      res.set('Retry-After', String(failStatus.remainingSeconds));
       return res.status(429).json({
         error: `Zu viele fehlgeschlagene Anmeldeversuche (${maxAttempts} von ${maxAttempts}). Diese IP wurde für ${lockMin} Minuten für die Anmeldung gesperrt.`,
         locked: true,
@@ -383,11 +421,8 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    res.status(401).json({
-      error: failStatus.isWhitelisted 
-        ? `Ungültiger Benutzername oder Passwort.`
-        : `Ungültiger Benutzername oder Passwort. Verbleibende Anmeldeversuche: ${failStatus.attemptsLeft} von ${maxAttempts}.`,
-      locked: false,
+    return res.status(401).json({
+      error: 'Ungültiger Benutzername oder Passwort.',
       attempts_left: failStatus.attemptsLeft
     });
   } catch (error) {
@@ -590,15 +625,21 @@ router.post('/reset-password', async (req, res) => {
 });
 
 /**
- * Passwort für angemeldete User ändern
+ * Passwort für angemeldete User ändern (unterstützt lokale Konten und LDAP)
  */
 router.post('/change-password-logged-in', async (req, res) => {
-  const user = req.session.user;
-  if (!user) {
+  const sessionUser = req.session.user;
+  if (!sessionUser) {
     return res.status(401).json({ error: 'Nicht angemeldet.' });
   }
 
-  const { password, confirmPassword } = req.body;
+  const dbUser = db.prepare('SELECT id, username, email, role, is_ldap, dn, password_hash, auth_version, is_active FROM users WHERE id = ?').get(sessionUser.id);
+  if (!dbUser || dbUser.is_active === 0) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: 'Konto existiert nicht mehr oder ist deaktiviert.' });
+  }
+
+  const { password, confirmPassword, currentPassword } = req.body;
   if (!password) {
     return res.status(400).json({ error: 'Neues Passwort ist erforderlich.' });
   }
@@ -619,39 +660,54 @@ router.post('/change-password-logged-in', async (req, res) => {
   }
 
   try {
-    // 1. DN des Users holen (falls nicht in Session)
-    let userDn = user.dn;
-    if (!userDn) {
-      const userRow = db.prepare('SELECT dn FROM users WHERE id = ?').get(user.id);
-      if (userRow) userDn = userRow.dn;
+    if (dbUser.is_ldap === 1) {
+      // LDAP-Passwortwechsel
+      let userDn = dbUser.dn || sessionUser.dn;
+      if (!userDn) {
+        return res.status(400).json({ error: 'LDAP-DN des Benutzers nicht gefunden.' });
+      }
+
+      await ldap.changePassword(userDn, password);
+      const newAuthVersion = (dbUser.auth_version || 1) + 1;
+      db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(dbUser.id);
+      db.prepare("UPDATE users SET auth_version = ? WHERE id = ?").run(newAuthVersion, dbUser.id);
+      req.session.user.auth_version = newAuthVersion;
+
+      logEvent('info', 'password_change_logged_in_success', `LDAP-Passwort geändert für Benutzer: ${dbUser.username}`, { userId: dbUser.id }, ip);
+      return res.json({ success: true, message: 'Passwort im Active Directory/LDAP erfolgreich geändert.' });
+    } else {
+      // Lokaler Passwortwechsel
+      if (currentPassword && dbUser.password_hash) {
+        const match = bcrypt.compareSync(currentPassword, dbUser.password_hash);
+        if (!match) {
+          return res.status(400).json({ error: 'Das aktuelle Passwort ist nicht korrekt.' });
+        }
+      }
+
+      const hash = bcrypt.hashSync(password, 10);
+      const newAuthVersion = (dbUser.auth_version || 1) + 1;
+      db.prepare("UPDATE users SET password_hash = ?, auth_version = ? WHERE id = ?").run(hash, newAuthVersion, dbUser.id);
+      db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(dbUser.id);
+      req.session.user.auth_version = newAuthVersion;
+
+      logEvent('info', 'password_change_logged_in_success', `Lokales Passwort geändert für Benutzer: ${dbUser.username}`, { userId: dbUser.id }, ip);
+      return res.json({ success: true, message: 'Passwort erfolgreich geändert.' });
     }
-
-    if (!userDn) {
-      return res.status(400).json({ error: 'LDAP-DN des Benutzers nicht gefunden.' });
-    }
-
-    // 2. Passwort im LDAP ändern
-    await ldap.changePassword(userDn, password);
-
-    // 3. Startpasswort in student_profiles als geändert markieren
-    db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(user.id);
-
-    logEvent('info', 'password_change_logged_in_success', `Passwort über Portal geändert für Benutzer: ${user.username}`, { userId: user.id }, ip);
-    res.json({ success: true, message: 'Passwort erfolgreich geändert.' });
   } catch (error) {
     console.error('Fehler beim Ändern des Passworts:', error);
-    logEvent('error', 'password_change_logged_in_failed', `Fehler beim Ändern des Passworts für Benutzer: ${user.username}`, { error: error.message }, ip);
-    res.status(500).json({ error: 'Fehler beim Ändern des Passworts: ' + error.message });
+    logEvent('error', 'password_change_logged_in_failed', `Fehler beim Ändern des Passworts für Benutzer: ${dbUser.username}`, { error: error.message }, ip);
+    return res.status(500).json({ error: 'Fehler beim Ändern des Passworts: ' + error.message });
   }
 });
 
 /**
  * Hilfsfunktionen zur symmetrischen Ver- und Entschlüsselung der SPH-Passwörter.
  */
-const ENCRYPTION_KEY = crypto.scryptSync(process.env.SESSION_SECRET || 'mso_cloud_default_secret_key_123!', 'salt', 32);
+const ENCRYPTION_KEY = crypto.scryptSync(process.env.ENCRYPTION_KEY || process.env.SESSION_SECRET || 'mso_cloud_default_secret_key_123!', 'mso_static_salt_v1', 32);
 const IV_LENGTH = 16;
 
 function encrypt(text) {
+  if (!text) return '';
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
   let encrypted = cipher.update(text);
@@ -660,16 +716,27 @@ function encrypt(text) {
 }
 
 function decrypt(text) {
+  if (!text || typeof text !== 'string') return null;
   try {
     const textParts = text.split(':');
+    if (textParts.length < 2) return null;
     const iv = Buffer.from(textParts.shift(), 'hex');
     const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
+    try {
+      const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+      let decrypted = decipher.update(encryptedText);
+      decrypted = Buffer.concat([decrypted, decipher.final()]);
+      return decrypted.toString('utf8');
+    } catch (e1) {
+      // Fallback auf Legacy-Schlüssel
+      const legacyKey = crypto.scryptSync(process.env.SESSION_SECRET || 'mso_cloud_default_secret_key_123!', 'salt', 32);
+      const decipherLegacy = crypto.createDecipheriv('aes-256-cbc', legacyKey, iv);
+      let decryptedLegacy = decipherLegacy.update(encryptedText);
+      decryptedLegacy = Buffer.concat([decryptedLegacy, decipherLegacy.final()]);
+      return decryptedLegacy.toString('utf8');
+    }
   } catch (err) {
-    console.error('Fehler bei der Entschlüsselung:', err);
+    console.error('Fehler bei der Entschlüsselung:', err.message);
     return null;
   }
 }
@@ -891,18 +958,29 @@ router.post('/student-link', async (req, res) => {
     try {
       await mail.sendMail(email.trim(), '[MSO] Schülerportal Anmeldelink', mailHtml);
     } catch (mailError) {
-      console.warn('WARNUNG: E-Mail-Versand fehlgeschlagen (SMTP nicht konfiguriert?). Der Link wird dennoch generiert:', mailError.message);
+      console.warn('[Student Link] E-Mail-Versand fehlgeschlagen:', mailError.message);
+      // Token ungültig machen
+      try {
+        if (typeof studentDb.deleteStudentToken === 'function') {
+          await studentDb.deleteStudentToken(token);
+        } else {
+          db.prepare('DELETE FROM student_tokens WHERE token = ?').run(token);
+        }
+      } catch (delErr) {}
+
+      logEvent('error', 'student_link_mail_failed', `E-Mail-Versand für Schüler-Link an ${email.trim()} fehlgeschlagen`, { error: mailError.message }, req.ip);
+      return res.status(503).json({
+        success: false,
+        code: 'SMTP_FAILED',
+        error: 'Der Anmeldelink konnte per E-Mail nicht zugestellt werden. Bitte wenden Sie sich an die Administration oder prüfen Sie die SMTP-Einstellungen.'
+      });
     }
-    
-    // Konsolenprotokollierung zur einfachen lokalen Verifikation/Entwicklung
-    console.log(`=================================================`);
-    console.log(` Schülerportal-Link generiert für: ${email.trim()}`);
-    console.log(` Link: ${loginLink}`);
-    console.log(`=================================================`);
+
+    logEvent('info', 'student_link_sent', `Schüler-Anmeldelink erfolgreich übergeben an SMTP für: ${email.trim()}`, null, req.ip);
 
     res.json({ 
       success: true, 
-      message: 'Ein Anmeldelink wurde an Ihre E-Mail-Adresse versendet. Bitte prüfen Sie auch Ihren Spam-Ordner.' 
+      message: 'Ein Anmeldelink wurde an Ihre hinterlegte E-Mail-Adresse übergeben. Bitte prüfen Sie auch Ihren Spam-Ordner.' 
     });
   } catch (error) {
     console.error('Fehler beim Generieren des Schüler-Links:', error);
@@ -922,19 +1000,35 @@ router.post('/student-token-login', async (req, res) => {
   try {
     const result = await studentDb.verifyStudentToken(token, req.ip);
 
-    if (!result.success) {
-      return res.status(400).json({ error: result.error });
+    if (!result.success || !result.user) {
+      return res.status(400).json({ error: result.error || 'Ungültiges oder abgelaufenes Token.' });
     }
 
-    // Express-Sitzung erstellen
-    req.session.user = result.user;
+    // Prüfen, ob das Benutzerkonto in der Datenbank aktiv ist
+    const dbUser = db.prepare('SELECT id, is_active, role, auth_version FROM users WHERE id = ?').get(result.user.id);
+    if (!dbUser || dbUser.is_active === 0) {
+      logEvent('warn', 'student_token_login_inactive', `Token-Login verweigert: Konto für User ID ${result.user.id} ist inaktiv`, null, req.ip);
+      return res.status(401).json({ error: 'Ihr Schülerkonto ist deaktiviert. Bitte wenden Sie sich an die Schulleitung.' });
+    }
 
-    logEvent('info', 'student_token_login_success', `Schüler-Login via E-Mail-Link erfolgreich für: ${result.user.username}`, { userId: result.user.id, email: result.user.email }, req.ip);
+    result.user.auth_version = dbUser.auth_version || 1;
+    result.user.role = dbUser.role;
 
-    res.json({ 
-      success: true, 
-      message: 'Erfolgreich über E-Mail-Link angemeldet.', 
-      user: req.session.user 
+    return new Promise((resolve) => {
+      req.session.regenerate((regenErr) => {
+        if (regenErr) {
+          console.error('[Student Token Login Session Error]:', regenErr);
+        }
+        req.session.user = result.user;
+
+        logEvent('info', 'student_token_login_success', `Schüler-Login via E-Mail-Link erfolgreich für: ${result.user.username}`, { userId: result.user.id, email: result.user.email }, req.ip);
+
+        resolve(res.json({ 
+          success: true, 
+          message: 'Erfolgreich über E-Mail-Link angemeldet.', 
+          user: req.session.user 
+        }));
+      });
     });
   } catch (error) {
     console.error('Fehler beim E-Mail Token-Login:', error);

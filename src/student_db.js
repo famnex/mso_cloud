@@ -973,8 +973,99 @@ async function verifyStudentToken(token, ip) {
   return { success: false, error: 'Der Anmeldelink ist ungültig, bereits verwendet oder abgelaufen (Anmeldelinks sind nur 1x verwendbar und max. 20 Minuten gültig).' };
 }
 
+/**
+ * Sucht gezielt nach einem Schüler für die Ausweisverifizierung (per Bibliotheksnummer, ID oder Username).
+ * Vermeidet lineare Schleifen über alle Konten und nutzt direkte O(1) Index-Abfragen.
+ */
+async function findStudentByVerificationReference(bib, id, name) {
+  const config = getMySQLConfig();
+
+  // 1. Zuerst in lokaler SQLite suchen (sehr schnell über Indizes)
+  if (bib) {
+    const localProfile = db.prepare(`
+      SELECT u.id as user_id, u.username, u.email, u.role, u.is_active,
+             sp.first_name, sp.last_name, sp.birth_date, sp.birth_place, sp.mediothek_number,
+             sp.card_status, sp.card_image
+      FROM student_profiles sp
+      JOIN users u ON sp.user_id = u.id
+      WHERE sp.mediothek_number = ? AND u.is_active = 1
+    `).get(bib);
+
+    if (localProfile) {
+      return {
+        user: { id: localProfile.user_id, username: localProfile.username, email: localProfile.email, role: localProfile.role, is_active: localProfile.is_active },
+        profile: localProfile
+      };
+    }
+  }
+
+  if (id) {
+    const cleanId = String(id).replace(/^S-/, '').trim();
+    const localProfile = db.prepare(`
+      SELECT u.id as user_id, u.username, u.email, u.role, u.is_active,
+             sp.first_name, sp.last_name, sp.birth_date, sp.birth_place, sp.mediothek_number,
+             sp.card_status, sp.card_image
+      FROM student_profiles sp
+      JOIN users u ON sp.user_id = u.id
+      WHERE (u.username = ? OR CAST(u.id AS TEXT) = ?) AND u.is_active = 1
+    `).get(cleanId, cleanId);
+
+    if (localProfile) {
+      return {
+        user: { id: localProfile.user_id, username: localProfile.username, email: localProfile.email, role: localProfile.role, is_active: localProfile.is_active },
+        profile: localProfile
+      };
+    }
+  }
+
+  // 2. Falls MySQL aktiviert ist: Gezielte MySQL-Abfrage über fieldvalues
+  if (config.enabled && pool) {
+    try {
+      let appIds = [];
+      if (bib) {
+        // field 168 = mediothek_number
+        const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 168 AND value = ? LIMIT 1', [bib]);
+        if (rows.length > 0) {
+          appIds.push(rows[0].application);
+        }
+      }
+
+      if (appIds.length === 0 && id) {
+        const cleanId = String(id).replace(/^S-/, '').trim();
+        if (/^\d+$/.test(cleanId)) {
+          appIds.push(parseInt(cleanId, 10));
+        } else {
+          const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 146 AND value = ? LIMIT 1', [cleanId]);
+          if (rows.length > 0) {
+            appIds.push(rows[0].application);
+          }
+        }
+      }
+
+      for (const appId of appIds) {
+        const [appRows] = await pool.query('SELECT ID, status FROM applications WHERE ID = ?', [appId]);
+        if (appRows.length > 0 && appRows[0].status >= 10) {
+          const [fRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
+          const [imgRows] = await pool.query('SELECT file FROM images WHERE application = ? AND field = 37 LIMIT 1', [appId]);
+          const photo = imgRows.length > 0 ? imgRows[0].file : null;
+          const prof = buildProfileFromMySQL(null, appId, fRows, photo);
+          return {
+            user: { id: null, username: prof.username || prof.email, email: prof.email, role: 'user', is_active: 1 },
+            profile: prof
+          };
+        }
+      }
+    } catch (mysqlErr) {
+      console.error('[StudentDB] Fehler bei MySQL findStudentByVerificationReference:', mysqlErr.message);
+    }
+  }
+
+  return null;
+}
+
 module.exports = {
   getStudentProfile,
+  findStudentByVerificationReference,
   updateStudentPhoto,
   getAllStudents,
   approvePhoto,

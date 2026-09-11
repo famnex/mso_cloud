@@ -34,17 +34,29 @@ function getOrCreateOidcKeys() {
 }
 
 /**
- * Bestimmt die OIDC-Basis-URL dynamisch anhand des anfragenden Hosts.
- * Bei deployment unter cloud.mso-hef.de wird der Pfad /novus vorangestellt.
+ * Bestimmt die OIDC-Basis-URL dynamisch anhand von Umgebungsvariablen, Datenbankkonfiguration oder anfragendem Host.
  */
 function getOidcBaseUrl(req) {
-  const host = req.get('host') || '';
-  
-  // Wenn der Host cloud.mso-hef.de ist, sind wir unter Option A (/novus)
-  const isSubdir = host.toLowerCase() === 'cloud.mso-hef.de';
-  const prefix = isSubdir ? '/novus' : '';
-  
-  return `https://${host}${prefix}`;
+  // 1. Explizit konfigurierte Public Base URL prüfen
+  const configuredBaseUrl = process.env.PUBLIC_BASE_URL || getConfig('public_base_url');
+  if (configuredBaseUrl && configuredBaseUrl.trim()) {
+    return configuredBaseUrl.trim().replace(/\/+$/, '');
+  }
+
+  // 2. Host und Protokoll über Request / Forward-Header ermitteln
+  const proto = req ? (req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')) : 'https';
+  const host = req ? (req.headers['x-forwarded-host'] || req.get('host') || 'localhost:3000') : 'localhost:3000';
+
+  // 3. Optionaler Base-Path (z. B. bei Subdirectory-Deployments)
+  let basePath = process.env.BASE_PATH || getConfig('base_path', '');
+  if (!basePath && host.toLowerCase() === 'cloud.mso-hef.de') {
+    basePath = '/novus';
+  }
+  if (basePath) {
+    basePath = '/' + basePath.replace(/^\/+|\/+$/g, '');
+  }
+
+  return `${proto}://${host}${basePath}`;
 }
 
 /**
