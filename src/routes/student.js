@@ -17,7 +17,7 @@ router.get('/card', async (req, res) => {
   }
 
   // 1. Prüfen, ob der Benutzer noch in der lokalen Datenbank existiert und aktiv ist
-  const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_active, auth_version FROM users WHERE id = ?').get(user.id);
+  const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_ldap, is_active, auth_version FROM users WHERE id = ?').get(user.id);
   if (!dbUser || dbUser.is_active === 0) {
     console.log(`[Express /card] Lokales Konto für Benutzer ${user.username} ist inaktiv oder existiert nicht mehr.`);
     req.session.destroy(() => {});
@@ -28,7 +28,17 @@ router.get('/card', async (req, res) => {
     return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im System deaktiviert.', account_deleted: true });
   }
 
-  // 2. LDAP-Live-Prüfung oder periodische tägliche Prüfung
+  // 1b. Prüfen, ob die Sitzung widerrufen wurde (z.B. nach Passwortänderung oder Rechteanpassung)
+  if (user.auth_version !== undefined && dbUser.auth_version !== undefined && dbUser.auth_version !== user.auth_version) {
+    console.log(`[Express /card] Sitzung für Benutzer ${user.username} wurde widerrufen (auth_version: session=${user.auth_version}, db=${dbUser.auth_version}).`);
+    req.session.destroy(() => {});
+    if (typeof logEvent === 'function') {
+      logEvent('warn', 'student_card_session_revoked', `Schülerausweis-Abruf verweigert: Sitzung für User ${user.username} wurde widerrufen`, { userId: user.id }, clientIp);
+    }
+    return res.status(401).json({ error: 'Sitzung wurde widerrufen (Passwort oder Berechtigungen geändert). Bitte erneut anmelden.', session_revoked: true });
+  }
+
+  // 2. LDAP-Live-Prüfung oder periodische tägliche Prüfung (für LDAP-Konten)
   const liveCheckEnabled = getConfig('ldap_live_check_enabled', '0') === '1';
   const ldapEnabled = getConfig('ldap_enabled', '0') === '1';
 
@@ -37,7 +47,7 @@ router.get('/card', async (req, res) => {
   const checkInterval = 24 * 60 * 60 * 1000; // 24 Stunden in ms
   const periodicCheckNeeded = ldapEnabled && (now.getTime() - lastCheck > checkInterval);
 
-  if (liveCheckEnabled || periodicCheckNeeded) {
+  if ((dbUser.is_ldap === 1 || user.isLdap === true) && (liveCheckEnabled || periodicCheckNeeded)) {
     let ldapStatus = { active: true, error: null };
     try {
       ldapStatus = await ldap.isUserActiveInLdap(user.username);

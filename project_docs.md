@@ -131,6 +131,34 @@ Die Statusanzeige ist ein Hinweis: Dienstlinks und Zugangsdaten-Schaltflächen b
 benutzbar; bestehende Berechtigungs- und Zeitsperren gelten unverändert.
 Kachel-API-Antworten werden nicht vom Service Worker aus einem alten Cache bedient.
 
-`npm test` führt QR-Tests und die Regressionstests für Login, Cookies, Gruppen,
-interne Ziele und Statusdarstellung aus. Die Regressionstests verwenden isolierte
-Datenbank-/LDAP-Adapter und kontaktieren keine produktiven Dienste.
+`npm test` führt alle Testsuiten (QR-Tests, Login-/Proxy-Regression und Ausweis-Synchronisation) aus:
+- `tests/test_all_enhancements.js`
+- `tests/login_tile_regression.test.js`
+- `tests/student_card_sync.test.js`
+
+Die Regressionstests verwenden isolierte Datenbank-/LDAP-Adapter und kontaktieren keine produktiven Dienste.
+
+---
+
+## Schülerausweis, QR-Verifizierung und Datenbank-Synchronisation
+
+### 1. Ausweis-Gültigkeit & 30-Tage-Offlinefrist
+- **Single Source of Truth:** Das Backend (`evaluateCardEligibility` in `src/services/cardEligibility.js`) bewertet die Gültigkeit deterministisch und liefert `{ valid: boolean, reason_code: string, offline_valid_until: string, expires_at: string }`.
+- **Frontend-Vertrag:** `public/student_card.html` richtet sich primär nach `data.valid` und `data.reason_code`. Wenn `data.valid === false`, werden persönliche Daten ausgeblendet (`shouldBlockContent = true`) und das entsprechende Overlay eingeblendet.
+- **Offline-Gültigkeit:** Gespeicherte Ausweise sind maximal 30 Tage ab dem letzten Online-Abruf gültig (bzw. bis zum Schuljahresende 31. Juli). Bei Überschreitung wird der Ausweis im Browser und der PWA gesperrt (`Offline-Zeitraum abgelaufen`) und eine erneute Online-Prüfung gefordert.
+
+### 2. QR-Verifizierung & Mediotheksnummer
+- Die QR-Online-Prüfung (`/api/student/verify-check`) nutzt `findStudentByVerificationReference` in `src/student_db.js`.
+- **Mediotheksnummer:** Die Suche nach der Bibliotheks-/Mediotheksnummer in MySQL erfolgt einheitlich über `field = 145` in der Tabelle `fieldvalues`.
+- **Live-Prüfung:** Bei aktiver MySQL-Verbindung (`mysql_enabled = 1`) wird vorrangig live in MySQL nach aktiven Anträgen (`status >= 10`) gesucht, damit Sperrungen sofort wirksam sind.
+
+### 3. MySQL / SQLite Synchronisation & Transaktionssicherheit
+- Methoden in `src/student_db.js` (`approvePhoto`, `rejectPhoto`, `deletePhoto`, `updateStudentPhoto`, `updateStudentProfile`):
+  - Wenn MySQL aktiv ist, muss der Schreibvorgang in MySQL erfolgreich sein.
+  - Schlägt MySQL fehl (oder wird keine zugehörige Antrags-ID gefunden), wird ein Fehler `{ success: false, error: '...' }` zurückgemeldet und SQLite nicht fälschlicherweise verändert.
+  - Dadurch laufen MySQL und SQLite nicht auseinander.
+
+### 4. Sitzungswiderruf (`auth_version`)
+- `/api/student/card` prüft die `auth_version` der Benutzersitzung gegen die Datenbank `users.auth_version`.
+- Wird das Passwort geändert, die Berechtigung angepasst oder der Benutzer deaktiviert (`auth_version++`), wird die Sitzung sofort terminiert und mit HTTP 401 (`session_revoked: true`) abgewiesen.
+

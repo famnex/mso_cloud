@@ -406,36 +406,50 @@ async function updateStudentPhoto(userId, email, base64Image) {
     debugLog.push("MySQL-Pool ist aktiv. Versuche, Application-ID zu ermitteln...");
     try {
       const applicationId = await getApplicationId(userId, email);
-      if (applicationId) {
-        debugLog.push(`Application-ID in MySQL ermittelt: ${applicationId}`);
-        
-        // Den vollständigen data:image/...;base64,... String speichern (so wie andere Apps es erwarten)
-        const imageToStore = base64Image;
-        debugLog.push(`Bild für MySQL vorbereitet. Zeichenlänge: ${imageToStore.length}, Präfix: ${imageToStore.substring(0, 30)}...`);
-
-        debugLog.push("Führe MySQL aus: INSERT INTO images (file, application, field = 37) ON DUPLICATE KEY UPDATE...");
-        await pool.query(`
-          INSERT INTO images (file, application, field)
-          VALUES (?, ?, 37)
-          ON DUPLICATE KEY UPDATE file = ?
-        `, [imageToStore, applicationId, imageToStore]);
-        debugLog.push("MySQL: INSERT INTO images erfolgreich.");
-
-        debugLog.push(`Führe MySQL aus: INSERT INTO fieldvalues (field = 158, application = ${applicationId}, value = '1130', subset = 0) ON DUPLICATE KEY UPDATE...`);
-        const [result] = await pool.query(`
-          INSERT INTO fieldvalues (field, application, value, subset)
-          VALUES (158, ?, '1130', 0)
-          ON DUPLICATE KEY UPDATE value = '1130'
-        `, [applicationId]);
-        debugLog.push(`MySQL: INSERT/UPDATE fieldvalues erfolgreich. Betroffene Zeilen: ${result.affectedRows}`);
-        
-        mysqlSuccess = true;
-      } else {
-        debugLog.push("WARNUNG: Keine Application-ID für diesen Benutzer in MySQL gefunden. MySQL-Update übersprungen.");
+      if (!applicationId) {
+        debugLog.push("FEHLER: Keine Application-ID für diesen Benutzer in MySQL gefunden.");
+        return {
+          success: false,
+          mysqlSuccess: false,
+          sqliteSuccess: false,
+          error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.',
+          debugLog
+        };
       }
+
+      debugLog.push(`Application-ID in MySQL ermittelt: ${applicationId}`);
+      
+      // Den vollständigen data:image/...;base64,... String speichern (so wie andere Apps es erwarten)
+      const imageToStore = base64Image;
+      debugLog.push(`Bild für MySQL vorbereitet. Zeichenlänge: ${imageToStore.length}, Präfix: ${imageToStore.substring(0, 30)}...`);
+
+      debugLog.push("Führe MySQL aus: INSERT INTO images (file, application, field = 37) ON DUPLICATE KEY UPDATE...");
+      await pool.query(`
+        INSERT INTO images (file, application, field)
+        VALUES (?, ?, 37)
+        ON DUPLICATE KEY UPDATE file = ?
+      `, [imageToStore, applicationId, imageToStore]);
+      debugLog.push("MySQL: INSERT INTO images erfolgreich.");
+
+      debugLog.push(`Führe MySQL aus: INSERT INTO fieldvalues (field = 158, application = ${applicationId}, value = '1130', subset = 0) ON DUPLICATE KEY UPDATE...`);
+      const [result] = await pool.query(`
+        INSERT INTO fieldvalues (field, application, value, subset)
+        VALUES (158, ?, '1130', 0)
+        ON DUPLICATE KEY UPDATE value = '1130'
+      `, [applicationId]);
+      debugLog.push(`MySQL: INSERT/UPDATE fieldvalues erfolgreich. Betroffene Zeilen: ${result.affectedRows}`);
+      
+      mysqlSuccess = true;
     } catch (err) {
       debugLog.push(`FEHLER bei MySQL-Operationen: ${err.message}`);
       console.error('MySQL Error in updateStudentPhoto:', err);
+      return {
+        success: false,
+        mysqlSuccess: false,
+        sqliteSuccess: false,
+        error: `Fehler bei der Übertragung an die Schul-Datenbank: ${err.message}`,
+        debugLog
+      };
     }
   } else {
     debugLog.push("MySQL ist nicht aktiv (pool ist null).");
@@ -453,10 +467,17 @@ async function updateStudentPhoto(userId, email, base64Image) {
   } catch (err) {
     debugLog.push(`FEHLER bei SQLite-Operation: ${err.message}`);
     console.error('SQLite Error in updateStudentPhoto:', err);
+    return {
+      success: false,
+      mysqlSuccess,
+      sqliteSuccess: false,
+      error: `Fehler beim lokalen Speichern: ${err.message}`,
+      debugLog
+    };
   }
   
   return {
-    success: mysqlSuccess || sqliteSuccess,
+    success: true,
     mysqlSuccess,
     sqliteSuccess,
     debugLog
@@ -530,15 +551,17 @@ async function approvePhoto(userId, email) {
   if (pool) {
     try {
       const applicationId = await getApplicationId(userId, email);
-      if (applicationId) {
-        await pool.query(`
-          INSERT INTO fieldvalues (field, application, value, subset)
-          VALUES (158, ?, '1132', 0)
-          ON DUPLICATE KEY UPDATE value = '1132'
-        `, [applicationId]);
+      if (!applicationId) {
+        return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
       }
+      await pool.query(`
+        INSERT INTO fieldvalues (field, application, value, subset)
+        VALUES (158, ?, '1132', 0)
+        ON DUPLICATE KEY UPDATE value = '1132'
+      `, [applicationId]);
     } catch (err) {
       console.error('MySQL Error in approvePhoto:', err);
+      return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
   }
   
@@ -557,15 +580,17 @@ async function rejectPhoto(userId, email) {
   if (pool) {
     try {
       const applicationId = await getApplicationId(userId, email);
-      if (applicationId) {
-        await pool.query(`
-          INSERT INTO fieldvalues (field, application, value, subset)
-          VALUES (158, ?, '1134', 0)
-          ON DUPLICATE KEY UPDATE value = '1134'
-        `, [applicationId]);
+      if (!applicationId) {
+        return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
       }
+      await pool.query(`
+        INSERT INTO fieldvalues (field, application, value, subset)
+        VALUES (158, ?, '1134', 0)
+        ON DUPLICATE KEY UPDATE value = '1134'
+      `, [applicationId]);
     } catch (err) {
       console.error('MySQL Error in rejectPhoto:', err);
+      return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
   }
   
@@ -584,20 +609,22 @@ async function deletePhoto(userId, email) {
   if (pool) {
     try {
       const applicationId = await getApplicationId(userId, email);
-      if (applicationId) {
-        await pool.query(
-          'UPDATE images SET file = NULL WHERE application = ? AND field = 37',
-          [applicationId]
-        );
-
-        await pool.query(`
-          INSERT INTO fieldvalues (field, application, value, subset)
-          VALUES (158, ?, '1130', 0)
-          ON DUPLICATE KEY UPDATE value = '1130'
-        `, [applicationId]);
+      if (!applicationId) {
+        return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
       }
+      await pool.query(
+        'UPDATE images SET file = NULL WHERE application = ? AND field = 37',
+        [applicationId]
+      );
+
+      await pool.query(`
+        INSERT INTO fieldvalues (field, application, value, subset)
+        VALUES (158, ?, '1130', 0)
+        ON DUPLICATE KEY UPDATE value = '1130'
+      `, [applicationId]);
     } catch (err) {
       console.error('MySQL Error in deletePhoto:', err);
+      return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
   }
   
@@ -616,29 +643,30 @@ async function updateStudentProfile(userId, email, data) {
   if (pool) {
     try {
       const applicationId = await getApplicationId(userId, email);
-      if (applicationId) {
-        const updates = [
-          { field: 1, value: data.first_name },
-          { field: 2, value: data.last_name },
-          { field: 3, value: data.birth_date },
-          { field: 11, value: data.birth_place },
-          { field: 145, value: data.mediothek_number },
-          { field: 150, value: data.account_status }
-        ];
+      if (!applicationId) {
+        return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
+      }
+      const updates = [
+        { field: 1, value: data.first_name },
+        { field: 2, value: data.last_name },
+        { field: 3, value: data.birth_date },
+        { field: 11, value: data.birth_place },
+        { field: 145, value: data.mediothek_number },
+        { field: 150, value: data.account_status }
+      ];
 
-        for (const update of updates) {
-          if (update.value !== undefined) {
-            await pool.query(`
-              INSERT INTO fieldvalues (application, field, value)
-              VALUES (?, ?, ?)
-              ON DUPLICATE KEY UPDATE value = ?
-            `, [applicationId, update.field, update.value, update.value]);
-          }
+      for (const update of updates) {
+        if (update.value !== undefined) {
+          await pool.query(`
+            INSERT INTO fieldvalues (application, field, value)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE value = ?
+          `, [applicationId, update.field, update.value, update.value]);
         }
-        return { success: true };
       }
     } catch (err) {
       console.error('MySQL Error in updateStudentProfile:', err);
+      return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
   }
 
@@ -980,7 +1008,58 @@ async function verifyStudentToken(token, ip) {
 async function findStudentByVerificationReference(bib, id, name) {
   const config = getMySQLConfig();
 
-  // 1. Zuerst in lokaler SQLite suchen (sehr schnell über Indizes)
+  // 1. Falls MySQL aktiviert ist: Gezielte Live-MySQL-Abfrage über fieldvalues (Feld 145 = Mediotheksnummer)
+  if (config.enabled && pool) {
+    try {
+      let appIds = [];
+      if (bib) {
+        // field 145 = mediothek_number
+        const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 145 AND value = ? LIMIT 1', [bib]);
+        if (rows.length > 0) {
+          appIds.push(rows[0].application);
+        }
+      }
+
+      if (appIds.length === 0 && id) {
+        const cleanId = String(id).replace(/^S-/, '').trim();
+        if (/^\d+$/.test(cleanId)) {
+          appIds.push(parseInt(cleanId, 10));
+        } else {
+          const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 146 AND value = ? LIMIT 1', [cleanId]);
+          if (rows.length > 0) {
+            appIds.push(rows[0].application);
+          }
+        }
+      }
+
+      for (const appId of appIds) {
+        const [appRows] = await pool.query('SELECT ID, status FROM applications WHERE ID = ?', [appId]);
+        if (appRows.length > 0 && appRows[0].status >= 10) {
+          const [fRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
+          const [imgRows] = await pool.query('SELECT file FROM images WHERE application = ? AND field = 37 LIMIT 1', [appId]);
+          const photo = imgRows.length > 0 ? imgRows[0].file : null;
+          const prof = buildProfileFromMySQL(null, appId, fRows, photo);
+
+          let localUser = null;
+          if (prof.email) {
+            localUser = db.prepare('SELECT id, username, email, role, is_active FROM users WHERE LOWER(email) = LOWER(?)').get(prof.email);
+          }
+          if (!localUser && prof.username) {
+            localUser = db.prepare('SELECT id, username, email, role, is_active FROM users WHERE username = ?').get(prof.username);
+          }
+
+          return {
+            user: localUser || { id: null, username: prof.username || prof.email, email: prof.email, role: 'user', is_active: 1 },
+            profile: prof
+          };
+        }
+      }
+    } catch (mysqlErr) {
+      console.error('[StudentDB] Fehler bei MySQL findStudentByVerificationReference:', mysqlErr.message);
+    }
+  }
+
+  // 2. Fallback auf lokale SQLite (für Offline-Betrieb oder lokale Test-Konten)
   if (bib) {
     const localProfile = db.prepare(`
       SELECT u.id as user_id, u.username, u.email, u.role, u.is_active,
@@ -1015,48 +1094,6 @@ async function findStudentByVerificationReference(bib, id, name) {
         user: { id: localProfile.user_id, username: localProfile.username, email: localProfile.email, role: localProfile.role, is_active: localProfile.is_active },
         profile: localProfile
       };
-    }
-  }
-
-  // 2. Falls MySQL aktiviert ist: Gezielte MySQL-Abfrage über fieldvalues
-  if (config.enabled && pool) {
-    try {
-      let appIds = [];
-      if (bib) {
-        // field 168 = mediothek_number
-        const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 168 AND value = ? LIMIT 1', [bib]);
-        if (rows.length > 0) {
-          appIds.push(rows[0].application);
-        }
-      }
-
-      if (appIds.length === 0 && id) {
-        const cleanId = String(id).replace(/^S-/, '').trim();
-        if (/^\d+$/.test(cleanId)) {
-          appIds.push(parseInt(cleanId, 10));
-        } else {
-          const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 146 AND value = ? LIMIT 1', [cleanId]);
-          if (rows.length > 0) {
-            appIds.push(rows[0].application);
-          }
-        }
-      }
-
-      for (const appId of appIds) {
-        const [appRows] = await pool.query('SELECT ID, status FROM applications WHERE ID = ?', [appId]);
-        if (appRows.length > 0 && appRows[0].status >= 10) {
-          const [fRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
-          const [imgRows] = await pool.query('SELECT file FROM images WHERE application = ? AND field = 37 LIMIT 1', [appId]);
-          const photo = imgRows.length > 0 ? imgRows[0].file : null;
-          const prof = buildProfileFromMySQL(null, appId, fRows, photo);
-          return {
-            user: { id: null, username: prof.username || prof.email, email: prof.email, role: 'user', is_active: 1 },
-            profile: prof
-          };
-        }
-      }
-    } catch (mysqlErr) {
-      console.error('[StudentDB] Fehler bei MySQL findStudentByVerificationReference:', mysqlErr.message);
     }
   }
 
