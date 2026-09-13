@@ -391,6 +391,10 @@ async function handleLogin(e) {
       }
       
       await checkAuthStatus();
+      if (!currentUser) {
+        openModal('login-modal');
+        throw new Error('Die Anmeldung konnte nicht gespeichert werden. Bitte Cookies zulassen; die Administration sollte HTTPS und die Proxy-Einstellungen prüfen.');
+      }
       await loadTiles();
       await loadActiveMessages();
     } else {
@@ -737,44 +741,30 @@ function checkTileStatus(tileId, link, tileTitle) {
   const badge = document.getElementById(`tile-badge-${tileId}`);
   const keyBtn = document.getElementById(`tile-key-btn-${tileId}`);
 
-  let pingLink = link;
-  if (link && link.includes('/auth/oauth2/login.php')) {
-    pingLink = link.split('/auth/oauth2/login.php')[0] + '/';
-  }
+  const showStatus = (state, reason) => {
+    if (dot) {
+      dot.className = `status-dot ${state}`;
+      dot.setAttribute('title', reason);
+    }
+    if (badge) {
+      badge.style.display = state === 'online' ? 'none' : 'inline-flex';
+      badge.className = `tile-badge ${state === 'offline' ? 'badge-offline' : 'badge-unknown'}`;
+      badge.textContent = state === 'offline' ? 'Offline' : 'Status unbekannt';
+      badge.setAttribute('title', reason);
+    }
+    // Availability is advisory; retain href, click handlers and credential controls.
+  };
 
-  fetch(`api/tiles/check-status?link=${encodeURIComponent(pingLink)}`)
-    .then(res => res.json())
-    .then(result => {
-      if (result.online) {
-        if (dot) {
-          dot.className = 'status-dot online';
-          dot.setAttribute('title', result.reason || 'Erreichbar');
-        }
-        if (badge) badge.style.display = 'none';
+  return fetch(`api/tiles/check-status?id=${encodeURIComponent(tileId)}`)
+    .then(async res => {
+      const result = await res.json();
+      if (!res.ok || result.blocked || result.online == null) {
+        showStatus('unknown', result.reason || 'Statusprüfung derzeit nicht möglich');
       } else {
-        if (dot) {
-          dot.className = 'status-dot offline';
-          dot.setAttribute('title', result.reason || 'Dienst aktuell nicht erreichbar');
-        }
-        if (badge) {
-          badge.style.display = 'inline-flex';
-          badge.setAttribute('title', result.reason || 'Dienst aktuell nicht erreichbar');
-        }
-        disableTileCard(card, keyBtn, tileTitle, result.reason);
+        showStatus(result.online ? 'online' : 'offline', result.reason || 'Status geprüft');
       }
     })
-    .catch(err => {
-      console.warn(`[MSO Status Check] Direct-Backend Check failed for tile ${tileId}:`, err.message);
-      if (dot) {
-        dot.className = 'status-dot offline';
-        dot.setAttribute('title', 'Verbindungsfehler bei der Prüfung');
-      }
-      if (badge) {
-        badge.style.display = 'inline-flex';
-        badge.setAttribute('title', 'Verbindung fehlgeschlagen');
-      }
-      disableTileCard(card, keyBtn, tileTitle, 'Verbindung fehlgeschlagen');
-    });
+    .catch(() => showStatus('unknown', 'Statusprüfung derzeit nicht möglich'));
 }
 
 function disableTileCard(card, keyBtn, tileTitle, reason) {

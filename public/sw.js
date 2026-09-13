@@ -63,6 +63,7 @@ self.addEventListener('fetch', (event) => {
   if (
     event.request.url.includes('/api/auth/') ||
     event.request.url.includes('/api/admin/') ||
+    event.request.url.includes('/api/tiles') ||
     event.request.url.includes('/api/student/status-check') ||
     event.request.url.includes('/api/student/verify-check') ||
     event.request.url.includes('/v?') ||

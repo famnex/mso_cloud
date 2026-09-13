@@ -2111,3 +2111,6 @@ html, body {
     padding: 6px 10px !important;
   }
 }
+
+.status-dot.unknown { background: #b7791f; box-shadow: none; animation: none; }
+.badge-unknown { background: #fef3c7; color: #78350f; }

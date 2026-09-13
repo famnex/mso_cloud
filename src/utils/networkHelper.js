@@ -9,6 +9,13 @@ const { URL } = require('url');
  */
 function isPrivateOrLoopbackIp(ip) {
   if (!ip) return true;
+  ip = ip.toLowerCase();
+  // URL/IPv6 canonicalization can encode mapped IPv4 as hexadecimal words.
+  const mapped = ip.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mapped) {
+    const hi = parseInt(mapped[1], 16), lo = parseInt(mapped[2], 16);
+    ip = [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+  }
   
   // IPv4-mapped IPv6 normalisieren (z.B. ::ffff:127.0.0.1 -> 127.0.0.1)
   if (ip.startsWith('::ffff:')) {
@@ -67,109 +74,79 @@ const CACHE_TTL_MS = 60 * 1000;
  * Führt eine sichere HTTP/HTTPS Statusabfrage für eine Kachel-URL aus.
  * Schützt vor SSRF, DNS-Rebinding, Endlosschleifen und Timeouts.
  */
-async function checkUrlAvailability(targetUrl, options = {}) {
-  const allowPrivate = options.allowPrivate === true;
-
-  if (!targetUrl || typeof targetUrl !== 'string') {
-    return { online: false, reason: 'Keine gültige URL angegeben' };
-  }
-
-  // Cache-Check
-  const cached = statusCache.get(targetUrl);
-  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-    return cached.result;
-  }
-
+async function checkUrlAvailability(targetUrl) {
+  const unknown = reason => ({ online: null, state: 'unknown', reason });
   let parsedUrl;
+  try { parsedUrl = new URL(targetUrl); }
+  catch { return unknown('Ungültiges URL-Format'); }
+  if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+    return unknown('Nur HTTP/HTTPS ohne Zugangsdaten in der URL erlaubt');
+  }
+
+  // Exact origins, controlled by the server administrator, never by request input.
+  const allowedOrigins = (process.env.STATUS_CHECK_PRIVATE_ORIGINS || '').split(',')
+    .map(value => value.trim()).filter(Boolean);
+  const allowPrivate = allowedOrigins.includes(parsedUrl.origin);
+  const cacheKey = `${allowPrivate}:${parsedUrl.href}`;
+  const cached = statusCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) return cached.result;
+  const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, '');
+  let records;
+  let dnsTimer;
   try {
-    parsedUrl = new URL(targetUrl);
-  } catch (err) {
-    return { online: false, reason: 'Ungültiges URL-Format' };
+    records = net.isIP(hostname) ? [{ address: hostname, family: net.isIP(hostname) }]
+      : await Promise.race([
+        dns.lookup(hostname, { all: true }),
+        new Promise((_, reject) => {
+          dnsTimer = setTimeout(() => reject(new Error('DNS timeout')), 4000);
+        })
+      ]);
+  } catch { return unknown('DNS-Auflösung fehlgeschlagen'); }
+  finally { clearTimeout(dnsTimer); }
+  if (!records.length) return unknown('DNS-Auflösung fehlgeschlagen');
+  if (!allowPrivate && records.some(record => isPrivateOrLoopbackIp(record.address))) {
+    return { ...unknown('Interner Dienst: Statusprüfung nicht freigegeben'), blocked: true };
   }
 
-  // Nur HTTP und HTTPS erlauben
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return { online: false, reason: 'Nicht unterstütztes Protokoll (nur HTTP/HTTPS erlaubt)' };
-  }
-
-  const hostname = parsedUrl.hostname;
-  const port = parsedUrl.port ? parseInt(parsedUrl.port, 10) : (parsedUrl.protocol === 'https:' ? 443 : 80);
-
-  // 1. DNS-Auflösung vorab prüfen (SSRF-Schutz)
-  try {
-    let resolvedIps = [];
-    if (net.isIP(hostname)) {
-      resolvedIps = [hostname];
-    } else {
-      const records = await dns.lookup(hostname, { all: true });
-      resolvedIps = records.map(r => r.address);
-    }
-
-    if (!resolvedIps || resolvedIps.length === 0) {
-      return { online: false, reason: 'DNS-Auflösung fehlgeschlagen' };
-    }
-
-    if (!allowPrivate) {
-      for (const ip of resolvedIps) {
-        if (isPrivateOrLoopbackIp(ip)) {
-          return { 
-            online: false, 
-            blocked: true,
-            reason: 'Zugriff auf interne/private Netzwerkadressen aus Sicherheitsgründen blockiert (SSRF-Schutz)' 
-          };
-        }
-      }
-    }
-  } catch (dnsErr) {
-    return { online: false, reason: 'DNS-Auflösung fehlgeschlagen: ' + dnsErr.message };
-  }
-
-  // 2. HTTP/HTTPS HEAD-Anfrage ausführen
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     let resolved = false;
-    const finish = (result) => {
+    let timer;
+    const finish = result => {
       if (resolved) return;
       resolved = true;
-      statusCache.set(targetUrl, { timestamp: Date.now(), result });
+      clearTimeout(timer);
+      if (statusCache.size >= 1000) statusCache.delete(statusCache.keys().next().value);
+      statusCache.set(cacheKey, { timestamp: Date.now(), result });
       resolve(result);
     };
-
     const protocol = parsedUrl.protocol === 'https:' ? https : http;
-    const requestOptions = {
+    const req = protocol.request({
+      hostname,
+      // Use a direct connection so global proxy agents cannot bypass DNS pinning.
+      agent: false,
+      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
       method: 'HEAD',
-      host: hostname,
-      port: port,
       path: parsedUrl.pathname + parsedUrl.search,
-      timeout: 4000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MSO-Cloud-Checker/2.0',
-        'Accept': '*/*'
-      }
-    };
-
-    const req = protocol.request(requestOptions, (res) => {
-      const isOnline = res.statusCode >= 200 && res.statusCode < 500;
-      if (isOnline) {
-        finish({ online: true, statusCode: res.statusCode, reason: `Erreichbar (HTTP ${res.statusCode})` });
-      } else {
-        finish({ online: false, statusCode: res.statusCode, reason: `Dienst meldet Serverfehler (HTTP ${res.statusCode})` });
-      }
+      // Pin the validated addresses; do not perform a second DNS lookup (rebinding).
+      lookup: (_host, options, callback) => {
+        if (options && options.all) return callback(null, records);
+        callback(null, records[0].address, records[0].family);
+      },
+      headers: { 'User-Agent': 'MSO-Cloud-Checker/2.1', Accept: '*/*' }
+    }, res => {
+      res.resume();
+      // Redirects prove reachability, but are never followed to another target.
+      const online = res.statusCode >= 200 && res.statusCode < 500;
+      finish({ online, state: online ? 'online' : 'offline', statusCode: res.statusCode,
+        reason: online ? `Erreichbar (HTTP ${res.statusCode})` : `Dienst meldet Serverfehler (HTTP ${res.statusCode})` });
     });
-
-    req.on('timeout', () => {
+    timer = setTimeout(() => {
+      finish(unknown('Zeitüberschreitung bei der Statusprüfung'));
       req.destroy();
-      finish({ online: false, reason: 'Zeitüberschreitung (Timeout nach 4s)' });
-    });
-
-    req.on('error', (err) => {
-      finish({ online: false, reason: `Verbindungsfehler: ${err.message}` });
-    });
-
+    }, 4000);
+    req.on('error', () => finish(unknown('Verbindung vom Portalserver zum Dienst nicht möglich')));
     req.end();
   });
 }
 
-module.exports = {
-  isPrivateOrLoopbackIp,
-  checkUrlAvailability
-};
+module.exports = { isPrivateOrLoopbackIp, checkUrlAvailability };

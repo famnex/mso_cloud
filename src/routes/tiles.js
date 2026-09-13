@@ -51,37 +51,28 @@ function toPublicTileDTO(tile, extraFlags = {}) {
 router.get('/check-status', optionalAuth, async (req, res) => {
   try {
     const tileId = req.query.tile_id || req.query.id;
-    let targetUrl = req.query.link;
-    const user = req.user;
-
-    if (tileId) {
-      const tile = db.prepare('SELECT * FROM tiles WHERE id = ?').get(tileId);
-      if (!tile) {
-        return res.status(404).json({ online: false, reason: 'Kachel nicht gefunden' });
-      }
-      const vis = evaluateTileVisibility(tile, user);
-      if (!vis.visible) {
-        return res.status(403).json({ online: false, reason: 'Keine Berechtigung für diese Kachel' });
-      }
-      targetUrl = tile.link;
-    } else if (targetUrl) {
-      // Wenn direkte URL übergeben wird, prüfen ob diese URL einer existierenden sichtbaren Kachel gehört
-      const matchingTile = db.prepare('SELECT * FROM tiles WHERE link = ?').get(targetUrl);
-      if (matchingTile) {
-        const vis = evaluateTileVisibility(matchingTile, user);
-        if (!vis.visible) {
-          return res.status(403).json({ online: false, reason: 'Keine Berechtigung für diese Kachel' });
-        }
-      }
-    } else {
-      return res.status(400).json({ online: false, reason: 'tile_id oder link erforderlich' });
+    // Legacy clients may submit a URL, but it must match a configured tile exactly.
+    const tile = tileId
+      ? db.prepare('SELECT * FROM tiles WHERE id = ?').get(tileId)
+      : (req.query.link ? db.prepare('SELECT * FROM tiles WHERE link = ?').get(req.query.link) : null);
+    if (!tile) {
+      return res.status(404).json({ online: null, state: 'unknown', reason: 'Kachel nicht gefunden' });
     }
-
+    if (!evaluateTileVisibility(tile, req.user).visible) {
+      return res.status(403).json({ online: null, state: 'unknown', reason: 'Keine Berechtigung für diese Kachel' });
+    }
+    if (tile.disable_status_check) {
+      return res.json({ online: null, state: 'unknown', reason: 'Statusprüfung deaktiviert' });
+    }
+    let targetUrl = tile.link;
+    if (targetUrl && targetUrl.includes('/auth/oauth2/login.php')) {
+      targetUrl = targetUrl.split('/auth/oauth2/login.php')[0] + '/';
+    }
     const result = await checkUrlAvailability(targetUrl);
     return res.json(result);
   } catch (err) {
     console.error('[MSO Status-Checker Fehler]:', err);
-    return res.status(500).json({ online: false, reason: 'Statusprüfung fehlgeschlagen: ' + err.message });
+    return res.status(500).json({ online: null, state: 'unknown', reason: 'Statusprüfung fehlgeschlagen' });
   }
 });
 
@@ -377,7 +368,7 @@ function evaluateTileVisibility(tile, user) {
  */
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    let user = req.user || req.session.user;
+    let user = req.user;
     
     // Live-Aktualisierung der Benutzergruppen vor der Kachelauswertung
     if (user && user.id) {

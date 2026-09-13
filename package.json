@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "update": "node src/updater.js",
-    "test": "node test_verify.js"
+    "test": "node test_verify.js && node --test tests/login_tile_regression.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

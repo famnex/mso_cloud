@@ -76,3 +76,61 @@ Die Gültigkeit eines Schülerausweises wird zentral berechnet:
     *   `POST /api/admin/system/update` -> Startet Job im Hintergrund, antwortet mit HTTP 202 Accepted.
     *   `GET /api/admin/system/update/status` -> Liefert aktuellen Status (`running`, `succeeded`, `failed`) und Log-Puffer.
     *   Erstellt vor jeder Migration ein SQLite-Backup unter `data/backups/backup_pre_update_<timestamp>.sqlite`.
+
+## Betriebsanleitung: Anmeldung und Dienststatus (Korrektur September 2026)
+
+Die Anwendung lädt `.env` aus dem Projektverzeichnis. Bereits gesetzte Prozessvariablen
+(z. B. aus PM2) haben Vorrang. Änderungen an Prozessvariablen mit
+`pm2 restart mso-cloud --update-env` übernehmen.
+
+### HTTPS und Sitzungscookies
+
+- `COOKIE_SECURE=auto` ist der Standard: Direktes HTTP funktioniert auch mit
+  `NODE_ENV=production`; bei erkanntem HTTPS erhält das Sitzungscookie das Secure-Flag.
+- Für das öffentlich per HTTPS erreichbare Schulportal ausdrücklich
+  `COOKIE_SECURE=true` verwenden. Ist HTTPS für Express nicht erkennbar, gibt die
+  Anmeldung jetzt einen verständlichen Fehler mit `SESSION_HTTPS_REQUIRED` zurück.
+- `COOKIE_SECURE=false` wird ausdrücklich berücksichtigt, auch in Produktion;
+  diese Einstellung ist für bewusst per HTTP betriebene Installationen vorgesehen.
+- `TRUST_PROXY` ist standardmäßig `loopback`. Bei einem getrennten Proxy/Container
+  dessen tatsächliche Adresse oder ein eng begrenztes Subnetz eintragen, beispielsweise
+  `TRUST_PROXY=172.20.0.5/32`. Kommagetrennte Netze und numerische Hop-Zahlen werden
+  unterstützt. Hop-Zahlen nur bei einer festen, bekannten Proxykette verwenden.
+- Der Reverse-Proxy muss `X-Forwarded-Proto` selbst korrekt setzen/überschreiben und
+  der Backend-Port darf nicht ungeschützt öffentlich erreichbar sein. Keine fremden
+  Forwarded-Header ungeprüft übernehmen. Ohne vertrauenswürdigen Proxy kann `auto`
+  externes HTTPS nicht erkennen und setzt dann kein Secure-Flag.
+
+Nach dem Neustart im Browser prüfen: `POST /api/auth/login` liefert 200 und ein
+`sid`-Cookie; anschließend liefert `GET /api/auth/me` `logged_in: true`.
+Lokale Konten werden unabhängig von LDAP angemeldet und nicht im LDAP auf Existenz
+geprüft. LDAP-Konten verwenden niemals ihren eventuell vorhandenen lokalen Hash als
+Ersatz für eine fehlgeschlagene LDAP-Anmeldung.
+
+### Interne Dienste und Statusanzeigen
+
+Die Statusprüfung akzeptiert Kachel-IDs. Alte URL-Aufrufe funktionieren nur bei einer
+exakten Übereinstimmung mit einer gespeicherten Kachel. Dieselben Gruppen und
+LDAP-Gruppenzuordnungen gelten für Sichtbarkeit und Statusprüfung.
+
+Private Ziele bleiben standardmäßig von Serveranfragen ausgeschlossen. Einzelne
+bekannte Schuldienste können mit exakten Origins (Protokoll, Host und ggf. Port,
+keine Pfade, Wildcards oder abschließenden Schrägstriche) freigegeben werden:
+
+```dotenv
+STATUS_CHECK_PRIVATE_ORIGINS=https://intranet.schule.example,http://192.168.10.20:8080
+```
+
+Nur ausdrücklich vertrauenswürdige Ziele eintragen. Die Prüfung fixiert die zuvor
+geprüften DNS-Adressen für die Verbindung und folgt keinen HTTP-Weiterleitungen.
+TLS-Zertifikate werden weiterhin geprüft.
+
+Eine blockierte Prüfung, fehlende Berechtigung, DNS-/Verbindungsfehler oder ein
+Timeout ergeben **Status unbekannt**. HTTP-Serverfehler ergeben **Offline**.
+Die Statusanzeige ist ein Hinweis: Dienstlinks und Zugangsdaten-Schaltflächen bleiben
+benutzbar; bestehende Berechtigungs- und Zeitsperren gelten unverändert.
+Kachel-API-Antworten werden nicht vom Service Worker aus einem alten Cache bedient.
+
+`npm test` führt QR-Tests und die Regressionstests für Login, Cookies, Gruppen,
+interne Ziele und Statusdarstellung aus. Die Regressionstests verwenden isolierte
+Datenbank-/LDAP-Adapter und kontaktieren keine produktiven Dienste.

@@ -58,7 +58,7 @@ async function runTests() {
   assert.strictEqual(isPrivateOrLoopbackIp('1.1.1.1'), false, '1.1.1.1 ist öffentlich');
 
   const localhostCheck = await checkUrlAvailability('http://127.0.0.1:8080/admin');
-  assert.strictEqual(localhostCheck.online, false);
+  assert.strictEqual(localhostCheck.online, null, 'Blockierte Prüfung liefert unbekannten Status');
   assert.strictEqual(localhostCheck.blocked, true, 'Lokale IP muss als blockiert markiert werden');
   console.log('  ✓ SSRF-Filter blockiert private IPs und Loopback-Adressen zuverlässig');
 

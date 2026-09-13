@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
@@ -11,8 +12,9 @@ const { cleanExpiredCache } = require('./proxycheck');
 const app = express();
 
 // Trust Proxy konfigurierbar halten (z. B. 'loopback', Anzahl Hops oder Subnetze statt pauschalem true)
-const trustProxyConfig = process.env.TRUST_PROXY || 'loopback';
-app.set('trust proxy', trustProxyConfig === 'true' ? true : (trustProxyConfig === 'false' ? false : trustProxyConfig));
+const { getSessionTransport } = require('./utils/sessionTransport');
+const { trustProxy, secureCookie } = getSessionTransport(process.env);
+app.set('trust proxy', trustProxy);
 const PORT = process.env.PORT || 8080;
 
 // Middleware für JSON & Formular-Daten (erhöhtes Limit für Base64 Bilder)
@@ -26,7 +28,7 @@ if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
   console.warn('WARNUNG: SESSION_SECRET ist nicht gesetzt! Im Produktionsbetrieb sollte ein sicheres Secret über Umgebungsvariablen gesetzt werden.');
 }
 
-const isSecureCookie = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+
 
 // Session-Konfiguration (Persistent in SQLite mit 30 Tagen rollender Laufzeit)
 app.use(session({
@@ -37,12 +39,24 @@ app.use(session({
   saveUninitialized: false,
   rolling: true,
   cookie: {
-    secure: isSecureCookie,
+    secure: secureCookie,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 1000 * 60 * 60 * 24 * 30 // 30 Tage Gültigkeit
   }
 }));
+
+// Do not report a successful login when HTTPS-only cookies cannot be issued.
+app.use((req, res, next) => {
+  if (secureCookie === true && !req.secure && req.method === 'POST' &&
+      /\/api\/auth\/(login|student-token-login)$/.test(req.path)) {
+    return res.status(503).json({
+      code: 'SESSION_HTTPS_REQUIRED',
+      error: 'Die sichere Anmeldung ist nicht korrekt konfiguriert. Bitte HTTPS und die Proxy-Einstellungen prüfen lassen.'
+    });
+  }
+  next();
+});
 
 /* ==========================================================================
    Installations-Redirect-Middleware

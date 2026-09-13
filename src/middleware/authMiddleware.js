@@ -1,5 +1,12 @@
 const { db } = require('../db');
 
+function normalizeUser(user) {
+  let groups;
+  try { groups = typeof user.groups === 'string' ? JSON.parse(user.groups) : user.groups; }
+  catch { groups = []; }
+  return { ...user, groups: Array.isArray(groups) ? groups : [], isLdap: user.is_ldap === 1 };
+}
+
 /**
  * Zentrale Authentifizierungs-Middleware:
  * Prüft bei jedem Aufruf das Vorhandensein einer gültigen Session und lädt
@@ -45,7 +52,7 @@ function requireAuth(req, res, next) {
 
     // Frische Rolle und Daten aus der Datenbank an req.user und req.session.user anheften
     req.session.user.role = dbUser.role;
-    req.user = dbUser;
+    req.user = normalizeUser(dbUser);
     next();
   } catch (err) {
     console.error('[AuthMiddleware] Fehler bei der Benutzervalidierung:', err);
@@ -99,7 +106,7 @@ function optionalAuth(req, res, next) {
     }
 
     req.session.user.role = dbUser.role;
-    req.user = dbUser;
+    req.user = normalizeUser(dbUser);
     next();
   } catch (err) {
     console.error('[AuthMiddleware] Fehler in optionalAuth:', err);

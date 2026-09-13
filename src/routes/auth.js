@@ -48,7 +48,7 @@ router.get('/me', async (req, res) => {
     const checkInterval = 24 * 60 * 60 * 1000; // 24 Stunden in ms
     const periodicCheckNeeded = ldapEnabled && (now - lastCheck > checkInterval);
 
-    if (liveCheckEnabled || periodicCheckNeeded) {
+    if (dbUser.is_ldap === 1 && ldapEnabled && (liveCheckEnabled || periodicCheckNeeded)) {
       let ldapStatus = { active: true, error: null };
       try {
         ldapStatus = await ldap.isUserActiveInLdap(req.session.user.username);
@@ -64,8 +64,9 @@ router.get('/me', async (req, res) => {
         req.session.user.lastLdapCheck = now - (23 * 60 * 60 * 1000); 
       } else if (!ldapStatus.active) {
         console.log(`[Express /me] Kicke Benutzer ${req.session.user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
+        const endedUser = req.session.user;
         req.session.destroy(() => {});
-        logEvent('warn', 'user_deactivated_ldap', `Sitzung beendet: Benutzer ${req.session.user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: req.session.user.id });
+        logEvent('warn', 'user_deactivated_ldap', `Sitzung beendet: Benutzer ${endedUser.username} ist im LDAP deaktiviert oder gelöscht`, { userId: endedUser.id });
         return res.json({ logged_in: false, error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', impressum_url: impressumUrl, platform_name: platformName, platform_logo: platformLogo, card_logo: cardLogo });
       } else {
         // Erfolgreich geprüft und aktiv -> Zeitstempel aktualisieren
@@ -247,11 +248,12 @@ router.post('/login', async (req, res) => {
     const maintenanceEnabled = getConfig('maintenance_enabled', '0') === '1';
     const maintMsg = getConfig('maintenance_message', 'Das System wird momentan gewartet. Bitte versuchen Sie es später wieder.');
 
+    const localUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
     let authenticatedUser = null;
     let isLdapAuth = false;
 
     // 1. LDAP Login-Versuch durchführen (wenn LDAP in den Einstellungen aktiviert ist)
-    if (ldapEnabled) {
+    if (ldapEnabled && (!localUser || localUser.is_ldap === 1)) {
       console.log(`Versuche LDAP-Login für Benutzer: ${username}`);
       const ldapResult = await ldap.authenticate(username, password);
 
@@ -333,7 +335,6 @@ router.post('/login', async (req, res) => {
 
     // 2. Lokaler Login-Versuch
     if (!authenticatedUser) {
-      const localUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
 
       if (localUser && localUser.password_hash) {
         if (localUser.is_active === 0) {
@@ -341,7 +342,7 @@ router.post('/login', async (req, res) => {
           return res.status(401).json({ error: 'Ihr Konto ist deaktiviert. Bitte wenden Sie sich an die Administration.' });
         }
 
-        if (ldapEnabled && localUser.is_ldap === 1) {
+        if (localUser.is_ldap === 1) {
           console.warn(`LDAP-Authentifizierung für LDAP-Konto ${username} fehlgeschlagen.`);
           const failStatus = recordFailedLogin(clientIp);
           const maxAttempts = getMaxLoginAttempts();
@@ -394,6 +395,7 @@ router.post('/login', async (req, res) => {
         req.session.regenerate((regenErr) => {
           if (regenErr) {
             console.error('[Session Regenerate Error]:', regenErr);
+            return resolve(res.status(500).json({ error: 'Die Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.' }));
           }
           req.session.user = authenticatedUser;
           if (oauthQuery) req.session.oauthQuery = oauthQuery;
@@ -401,7 +403,10 @@ router.post('/login', async (req, res) => {
 
           logEvent('info', 'login_success', `${isLdapAuth ? 'LDAP' : 'Lokaler'}-Login erfolgreich für: ${authenticatedUser.username}`, { userId: authenticatedUser.id, role: authenticatedUser.role }, clientIp);
           res.cookie('mso_remember_user', authenticatedUser.username, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
-          resolve(res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo }));
+          req.session.save((saveErr) => {
+            if (saveErr) return resolve(res.status(500).json({ error: 'Die Sitzung konnte nicht gespeichert werden.' }));
+            resolve(res.json({ success: true, user: req.session.user, oauth_redirect: isOauth, return_to: returnTo }));
+          });
         });
       });
     }
@@ -1018,6 +1023,7 @@ router.post('/student-token-login', async (req, res) => {
       req.session.regenerate((regenErr) => {
         if (regenErr) {
           console.error('[Student Token Login Session Error]:', regenErr);
+          return resolve(res.status(500).json({ error: 'Die Sitzung konnte nicht erstellt werden.' }));
         }
         req.session.user = result.user;
 
