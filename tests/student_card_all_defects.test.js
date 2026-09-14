@@ -13,7 +13,7 @@ const studentDb = require('../src/student_db');
 console.log('=== START REGRESSION TEST SUITE: ALL 20+ STUDENT CARD SCENARIOS ===\n');
 
 let passedTests = 0;
-const totalTests = 35;
+const totalTests = 41;
 
 async function runTest(num, name, fn) {
   try {
@@ -774,6 +774,233 @@ async function runAllTests() {
     assert.ok(tempDbPath, 'tempDbPath muss definiert sein');
     assert.ok(tempDbPath.includes('mso-test-'), 'tempDbPath muss in einem temporären Verzeichnis liegen');
     assert.notStrictEqual(tempDbPath, 'data/mso_cloud.db', 'tempDbPath darf niemals der Produktionspfad sein');
+  });
+
+  // 36. LDAP-Ablehnung greift vor jedem MySQL-Ausfallpuffer
+  await runTest(36, 'LDAP-Ablehnung greift vor jedem MySQL-Ausfallpuffer (inactive, disabled, misconfigured, not_checked)', () => {
+    const testUser = { id: 8090, username: 'student.ldap_first', is_active: 1 };
+    
+    // Zunächst aktiver Grant
+    savePersistentGrant({
+      userId: 8090,
+      username: 'student.ldap_first',
+      mediothekNumber: 'BIB-8090',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0,
+      cardVersion: 'v_testversion_123'
+    });
+
+    const prof = { first_name: 'Ldap', last_name: 'First', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+
+    // 1. MySQL hat connection_error, aber LDAP ist inactive -> MUSS ungültig sein und Grant widerrufen
+    const resInactive = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'inactive', active: false, error: null },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable', error: 'ECONNREFUSED' }
+    });
+    assert.strictEqual(resInactive.valid, false, 'LDAP inactive muss vor MySQL Ausfallpuffer greifen');
+    assert.strictEqual(resInactive.reasonCode, 'ACCOUNT_INACTIVE');
+
+    const grantRevoked = getPersistentGrant('student.ldap_first');
+    assert.strictEqual(grantRevoked.is_revoked, 1, 'Grant muss sofort widerrufen sein');
+
+    // 2. MySQL hat connection_error und LDAP ist disabled
+    const resDisabled = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'disabled', active: false, error: 'Disabled in config' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' }
+    });
+    assert.strictEqual(resDisabled.valid, false);
+    assert.strictEqual(resDisabled.reasonCode, 'LDAP_DISABLED');
+
+    // 3. MySQL hat connection_error und LDAP ist misconfigured
+    const resMisconf = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'misconfigured', active: false, error: 'Bind DN missing' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' }
+    });
+    assert.strictEqual(resMisconf.valid, false);
+    assert.strictEqual(resMisconf.reasonCode, 'LDAP_MISCONFIGURED');
+
+    // 4. MySQL hat connection_error und LDAP ist not_checked
+    const resNotChecked = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'not_checked', active: false, error: null },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' }
+    });
+    assert.strictEqual(resNotChecked.valid, false);
+    assert.strictEqual(resNotChecked.reasonCode, 'NOT_CHECKED');
+  });
+
+  // 37. Nach LDAP-Widerruf: Störung beider Systeme (LDAP & MySQL) reaktiviert keinen Ausweis
+  await runTest(37, 'Nach LDAP-Widerruf: Störung beider Systeme (LDAP & MySQL) reaktiviert keinen Ausweis', () => {
+    const testUser = { id: 8090, username: 'student.ldap_first', is_active: 1 };
+    const prof = { first_name: 'Ldap', last_name: 'First', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+
+    const resBothDown = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'unavailable', active: false, error: 'LDAP Timeout' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable', error: 'ECONNREFUSED' }
+    });
+    assert.strictEqual(resBothDown.valid, false, 'Widerrufener Grant darf bei komplettem Systemausfall nicht reaktiviert werden');
+    assert.strictEqual(resBothDown.reasonCode, 'MYSQL_UNAVAILABLE_NO_BUFFER');
+  });
+
+  // 38. MySQL Verbindungsfehler + LDAP aktiv + bestehender Grant: Frist bleibt exakt unverändert
+  await runTest(38, 'MySQL Verbindungsfehler + LDAP aktiv + bestehender Grant: Frist bleibt unverändert', () => {
+    const testUser = { id: 8091, username: 'student.mysql_outage_valid', is_active: 1 };
+    const fixedDeadline = new Date(Date.now() + 15 * 86400000).toISOString();
+
+    const prof = { first_name: 'Outage', last_name: 'Valid', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+    const validCardVersion = computeCardVersion(prof, 'BIB-8091');
+
+    savePersistentGrant({
+      userId: 8091,
+      username: 'student.mysql_outage_valid',
+      mediothekNumber: 'BIB-8091',
+      lastLdapSuccessAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+      offlineValidUntil: fixedDeadline,
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0,
+      cardVersion: validCardVersion
+    });
+
+    const resOutage = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'active', active: true, error: null },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable', error: 'ETIMEDOUT' }
+    });
+    assert.strictEqual(resOutage.valid, true, 'Bestehender Grant muss bei MySQL-Verbindungsfehler gültig bleiben');
+    assert.strictEqual(resOutage.is_buffered, true, 'Muss als gepuffert gekennzeichnet sein');
+    assert.strictEqual(resOutage.reasonCode, 'VALID_BUFFERED');
+    assert.strictEqual(resOutage.offlineValidUntil, fixedDeadline, 'Offline-Frist darf nicht verlängert werden');
+  });
+
+  // 39. QR-Verifikation im Ausfallpuffer schlägt nicht wegen Placeholder-Hash fehl
+  await runTest(39, 'QR-Verifikation im Ausfallpuffer validiert Grant ohne Fehlalarm durch Placeholder-Foto', () => {
+    const testUser = { id: 8092, username: 'student.qr_outage', is_active: 1 };
+    const fixedDeadline = new Date(Date.now() + 20 * 86400000).toISOString();
+
+    // Grant besitzt die Version des echten Voll-Ausweises
+    savePersistentGrant({
+      userId: 8092,
+      username: 'student.qr_outage',
+      mediothekNumber: 'BIB-8092',
+      lastLdapSuccessAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+      offlineValidUntil: fixedDeadline,
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0,
+      cardVersion: 'v_full_card_hash_abc123'
+    });
+
+    // QR-Pfad hat nur minimales Profil mit SVG-Placeholder als Foto
+    const dummySvg = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>';
+    const qrProfile = {
+      first_name: 'Qr',
+      last_name: 'Outage',
+      mediothek_number: 'BIB-8092',
+      card_status: 'Bild genehmigt',
+      card_image: 'data:image/svg+xml;base64,' + Buffer.from(dummySvg).toString('base64')
+    };
+
+    const resQr = evaluateCardEligibility({
+      user: testUser,
+      profile: qrProfile,
+      ldapStatus: { status: 'unavailable', active: false, error: 'LDAP down' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable', error: 'ECONNREFUSED' },
+      isQrVerification: true,
+      allowSaveGrant: false
+    });
+
+    assert.strictEqual(resQr.valid, true, 'QR-Verifikation muss mit intaktem Grant im Ausfallpuffer gültig sein');
+    assert.strictEqual(resQr.reasonCode, 'VALID_BUFFERED');
+    assert.strictEqual(resQr.cardVersion, 'v_full_card_hash_abc123', 'Vollversions-Hash muss erhalten bleiben');
+  });
+
+  // 40. QR-Verifikation verlangt intakte Version in der Freigabe
+  await runTest(40, 'QR-Verifikation lehnt unvollständige Altfreigaben (v0 oder null) im Ausfallpuffer ab', () => {
+    const testUser = { id: 8093, username: 'student.qr_v0', is_active: 1 };
+
+    savePersistentGrant({
+      userId: 8093,
+      username: 'student.qr_v0',
+      mediothekNumber: 'BIB-8093',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0,
+      cardVersion: 'v0'
+    });
+
+    const qrProfile = {
+      first_name: 'Qr',
+      last_name: 'V0',
+      mediothek_number: 'BIB-8093',
+      card_status: 'Bild genehmigt',
+      card_image: 'data:image/svg+xml;base64,' + Buffer.from('<svg></svg>').toString('base64')
+    };
+
+    const resQr = evaluateCardEligibility({
+      user: testUser,
+      profile: qrProfile,
+      ldapStatus: { status: 'unavailable', active: false, error: 'LDAP down' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' },
+      isQrVerification: true
+    });
+
+    assert.strictEqual(resQr.valid, false, 'v0-Freigabe darf im Ausfallpuffer nicht als gültig bestätigt werden');
+    assert.strictEqual(resQr.reasonCode, 'VERSION_MISMATCH');
+  });
+
+  // 41. MySQL-Authentifizierungs- & Berechtigungsfehler sind KEINE Ausfälle (kein Puffer)
+  await runTest(41, 'MySQL Authentifizierungsfehler werden als query_error klassifiziert und sperren den Ausfallpuffer', () => {
+    // 1. ER_ACCESS_DENIED_ERROR
+    const errAccessDenied = { code: 'ER_ACCESS_DENIED_ERROR', message: "Access denied for user 'mso'@'localhost' (using password: YES)" };
+    const classAccess = studentDb.classifyMySQLError(errAccessDenied);
+    assert.strictEqual(classAccess.status, 'query_error', 'Access denied muss als query_error eingestuft werden');
+    assert.strictEqual(classAccess.source, 'mysql_error');
+
+    // 2. ER_DBACCESS_DENIED_ERROR
+    const errDbAccess = { code: 'ER_DBACCESS_DENIED_ERROR', message: "Access denied for user 'mso' to database 'schul_db'" };
+    const classDbAccess = studentDb.classifyMySQLError(errDbAccess);
+    assert.strictEqual(classDbAccess.status, 'query_error');
+
+    // 3. Echter Verbindungsabbruch ECONNREFUSED
+    const errConnRefused = { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED 127.0.0.1:3306' };
+    const classConn = studentDb.classifyMySQLError(errConnRefused);
+    assert.strictEqual(classConn.status, 'connection_error', 'ECONNREFUSED muss connection_error sein');
+    assert.strictEqual(classConn.source, 'mysql_unavailable');
+
+    // 4. evaluateCardEligibility mit query_error aktiviert niemals einen Puffer
+    const testUser = { id: 8094, username: 'student.auth_err_test', is_active: 1 };
+    savePersistentGrant({
+      userId: 8094,
+      username: 'student.auth_err_test',
+      mediothekNumber: 'BIB-8094',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0,
+      cardVersion: 'v_valid'
+    });
+
+    const resAuthErr = evaluateCardEligibility({
+      user: testUser,
+      profile: { first_name: 'Auth', last_name: 'Err', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 },
+      ldapStatus: { status: 'active', active: true, error: null },
+      mysqlStatus: { status: 'query_error', source: 'mysql_error', error: 'Access denied' }
+    });
+
+    assert.strictEqual(resAuthErr.valid, false, 'Bei Authentifizierungsfehlern darf kein Puffer greifen');
+    assert.strictEqual(resAuthErr.reasonCode, 'DATABASE_ERROR');
   });
 
   console.log(`\n=== RESULT: ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY! ===`);

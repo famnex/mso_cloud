@@ -261,12 +261,46 @@ function getLocalAllStudents() {
 }
 
 /**
- * Klassifiziert MySQL-Fehler in Verbindungsfehler vs. Query-/Schema-/Syntaxfehler.
+ * Klassifiziert MySQL-Fehler in Verbindungsfehler vs. Query-/Schema-/Berechtigungsfehler.
  */
 function classifyMySQLError(err) {
   if (!err) return { status: 'found', source: 'mysql_live', error: null };
   const code = String(err.code || '');
   const msg = String(err.message || '').toLowerCase();
+
+  // 1. Authentifizierungs-, Berechtigungs- und Konfigurationsfehler (kein Verbindungs-Ausfallpuffer)
+  const authPermissionCodes = new Set([
+    'ER_ACCESS_DENIED_ERROR',
+    'ER_DBACCESS_DENIED_ERROR',
+    'ER_ACCESS_DENIED_NO_PASSWORD_ERROR',
+    'ER_BAD_DB_ERROR',
+    'ER_PASSWORD_NO_MATCH',
+    'ER_NOT_SUPPORTED_AUTH_MODE',
+    'ER_SPECIFIC_ACCESS_DENIED_ERROR',
+    'ER_WRONG_PASSWORD_RESET_TOKEN'
+  ]);
+  if (authPermissionCodes.has(code) || msg.includes('access denied') || msg.includes('using password:')) {
+    return { status: 'query_error', source: 'mysql_error', error: err.message };
+  }
+
+  // 2. Bekannte SQL-Syntax- und Schemafehler (kein Verbindungs-Ausfallpuffer)
+  const sqlErrorCodes = new Set([
+    'ER_NO_SUCH_TABLE',
+    'ER_BAD_FIELD_ERROR',
+    'ER_PARSE_ERROR',
+    'ER_SYNTAX_ERROR',
+    'ER_NON_UNIQ_ERROR',
+    'ER_TABLE_EXISTS_ERROR',
+    'ER_DUP_ENTRY',
+    'ER_CANT_DROP_FIELD_OR_KEY',
+    'ER_NO_DEFAULT_FOR_FIELD',
+    'ER_DATA_TOO_LONG'
+  ]);
+  if (sqlErrorCodes.has(code)) {
+    return { status: 'query_error', source: 'mysql_error', error: err.message };
+  }
+
+  // 3. Echte Netzwerk-, Socket- und Server-Verbindungsfehler
   const connCodes = new Set([
     'ECONNREFUSED',
     'ETIMEDOUT',
@@ -275,17 +309,32 @@ function classifyMySQLError(err) {
     'ECONNRESET',
     'PROTOCOL_CONNECTION_LOST',
     'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR',
-    'ER_ACCESS_DENIED_ERROR',
     'ENETUNREACH',
     'EAI_AGAIN',
+    'EPIPE',
     'ER_CON_COUNT_ERROR',
     'HANDSHAKE_ERROR',
-    'PROTOCOL_PACKETS_OUT_OF_ORDER'
+    'PROTOCOL_PACKETS_OUT_OF_ORDER',
+    'ESOCKETTIMEDOUT'
   ]);
-  
-  if (connCodes.has(code) || msg.includes('connect') || msg.includes('timeout') || msg.includes('pool') || msg.includes('dropped') || msg.includes('connection lost') || msg.includes('closed')) {
+
+  if (connCodes.has(code)) {
     return { status: 'connection_error', source: 'mysql_unavailable', error: err.message };
   }
+
+  // 4. Fallback-Prüfung auf Socket-Abbrüche (nur wenn kein SQL-/Berechtigungsfehler)
+  if (
+    msg.includes('econnrefused') ||
+    msg.includes('connection lost') ||
+    msg.includes('socket closed') ||
+    msg.includes('connection reset') ||
+    msg.includes('etimedout') ||
+    msg.includes('ehostunreach') ||
+    msg.includes('enotfound')
+  ) {
+    return { status: 'connection_error', source: 'mysql_unavailable', error: err.message };
+  }
+
   return { status: 'query_error', source: 'mysql_error', error: err.message };
 }
 

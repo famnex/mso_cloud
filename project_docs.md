@@ -46,31 +46,30 @@
 
 ### 3.1 Regelwerk für Gültigkeit & MySQL-Statusmodell (`src/services/cardEligibility.js`, `src/student_db.js`)
 Die Gültigkeit eines echten Schülerausweises wird strikt und zentral serverseitig ermittelt:
-1. **LDAP-Verpflichtung & Status-Taxonomie**:
+1. **LDAP-Verpflichtung & Zwingende Vorab-Prüfung**:
    - Ein echter Schülerausweis setzt zwingend ein aktives Konto im Schul-LDAP voraus (`status === 'active'`).
-   - `isUserActiveInLdap()` unterscheidet:
-     - `active`: Live LDAP-Konto aktiv (UAC & 2 === 0).
-     - `inactive`: Live LDAP-Konto fehlt oder ist deaktiviert -> Sofortiger Widerruf des Ausweis-Grants (`is_revoked = 1`).
+   - Die LDAP-Prüfung (`effectiveLdapStatus`) wird in `evaluateCardEligibility()` **vor jedem Ausfallpuffer** und vor jeder MySQL-Ausfallbehandlung evaluiert:
+     - `inactive`: Live LDAP-Konto fehlt oder ist deaktiviert -> Sofortige Ablehnung (`valid = false`, `ACCOUNT_INACTIVE`) und sofortiger Widerruf des persistenten Grants (`is_revoked = 1`).
+     - `disabled`: LDAP deaktiviert -> Sofortige Ablehnung (`valid = false`, `LDAP_DISABLED`).
+     - `misconfigured`: LDAP unvollständig konfiguriert -> Sofortige Ablehnung (`valid = false`, `LDAP_MISCONFIGURED`).
+     - `not_checked`: Prüfung nicht erfolgt -> Sofortige Ablehnung (`valid = false`, `NOT_CHECKED`).
      - `unavailable`: Echter Serverausfall/Timeout -> Bestehender, nicht widerrufener Grant bis zur Frist nutzbar.
-     - `disabled`: LDAP deaktiviert -> Kein echter Ausweis (`valid = false`).
-     - `misconfigured`: LDAP unvollständig konfiguriert -> Kein echter Ausweis (`valid = false`).
-     - `not_checked`: Prüfung nicht erfolgt -> Ohne bestehenden Grant niemals implizit gültig (`valid = false`).
+   - Ein nachfolgender MySQL-Ausfall oder ein bestehender Grant kann einen LDAP-Negativbefund niemals überstimmen oder wiederaufleben lassen.
    - Lokale Administratoren können sich im Verwaltungsportal anmelden; ihre Ausweisansicht ist als Muster (`is_admin_preview = true`, `valid = false`) deklariert. Fehlgeschlagene LDAP-Prüfungen terminieren niemals die lokale Admin-Sitzung.
 2. **MySQL-4-Status-Klassifikation (`src/student_db.js`)**:
    - `status: 'found'` (`mysql_live`): Autoritative Stammdaten in MySQL gefunden.
-   - `status: 'not_found'` (`mysql_live`): Schülerkonto existiert definitiv nicht (mehr) in MySQL. Bestehender Grant wird sofort widerrufen (`is_revoked = 1`), kein Ausfallpuffer möglich.
-   - `status: 'connection_error'` (`mysql_unavailable`): Echter Verbindungs-/Netzwerkausfall (`ECONNREFUSED`, `ETIMEDOUT`, `ENOTFOUND`, `PROTOCOL_CONNECTION_LOST`, etc.). Es darf **keine neue Freigabe** erstellt und **keine Frist verlängert** werden. Nur ein bereits bestehender, gültiger Grant darf als unveränderlicher Puffer weitergenutzt werden. Ohne bestehenden Grant bleibt der Ausweis ungültig (`DATABASE_UNAVAILABLE`).
-   - `status: 'query_error'` (`mysql_error`): Schema-, Syntax- oder Abfragefehler (`ER_NO_SUCH_TABLE`, `ER_BAD_FIELD_ERROR`, etc.). Wird niemals als Verbindungsausfall maskiert; darf niemals Puffer oder Freigaben aktivieren (`DATABASE_ERROR`).
+   - `status: 'not_found'` (`mysql_live`): Schülerkonto existiert definitiv nicht (mehr) in MySQL. Die Route `/card` führt `evaluateCardEligibility` vollständig aus; bestehender Grant wird sofort widerrufen (`is_revoked = 1`), lokales SQLite-Profil gelöscht, kein Ausfallpuffer möglich.
+   - `status: 'connection_error'` (`mysql_unavailable`): Echter Verbindungs-/Netzwerkausfall (`ECONNREFUSED`, `ETIMEDOUT`, `ENOTFOUND`, `PROTOCOL_CONNECTION_LOST`, `EHOSTUNREACH`, `ECONNRESET`, etc.). Es darf **keine neue Freigabe** erstellt und **keine Frist verlängert** werden. Nur ein bereits bestehender, gültiger Grant darf als unveränderlicher Puffer weitergenutzt werden.
+   - `status: 'query_error'` (`mysql_error`): Authentifizierungs-, Berechtigungs-, Schema- oder Syntaxfehler (`ER_ACCESS_DENIED_ERROR`, `ER_DBACCESS_DENIED_ERROR`, `ER_BAD_DB_ERROR`, `ER_NO_SUCH_TABLE`, etc.). Werden strikt als `query_error` eingestuft; aktivieren niemals einen Ausfallpuffer (`DATABASE_ERROR`).
 3. **Strenge Identitätsbindung (`getPersistentGrant`)**:
    - Trennt `username`, `mediothek_number` und `user_id` strikt.
    - Numerische String-Benutzernamen (z. B. `"8001"`) werden **nicht** als Integer-IDs interpretiert.
    - Sekundäre Lookups (z. B. über Mediotheksnummer) verifizieren zwingend, dass der gefundene Grant zur Primäridentität (Username / User-ID) passt; bei Konflikten wird der Sekundärtreffer verworfen.
-4. **Persistenter Ausfallpuffer & Versionssteuerung (`student_card_grants`)**:
+4. **Persistenter Ausfallpuffer & QR-Kompatible Versionsprüfung (`student_card_grants`)**:
    - Bei tatsächlicher Verbindungsstörung (LDAP oder MySQL) darf eine zuvor erfolgreich bestätigte Gültigkeit zeitlich begrenzt weiterverwendet werden.
    - Der Puffer gilt maximal 30 Tage seit der letzten erfolgreichen Vollprüfung (`offline_valid_until`) und niemals über das bestätigte Schuljahresende (31. Juli) hinaus.
    - Wiederholte Abrufe während einer Störung verlängern die Frist **nicht**.
-   - `card_version` wird auch bei Puffer-Nutzung validiert: Passt die berechnete Version nicht zur Freigabe, wird der Puffer abgewiesen.
-   - Freigaben ohne `card_version` oder mit unvollständigen Fristen werden von Migration 027 sofort widerrufen.
+   - **QR-Kompatibilität (`isQrVerification: true`)**: Im QR-Prüfpfad wird der Berechtigungsstatus und die Versionsintegrität des Grants geprüft, ohne den Hash eines temporären SVG-Platzhalterbildes gegen den Vollversions-Hash zu vergleichen. Dadurch werden Fehlalarme (`VERSION_MISMATCH`) während Ausfällen vermieden. Unvollständige Altfreigaben (`v0` oder leere Version) werden abgelehnt.
 5. **Widerruf bei Bedingungsverlust**:
    - Sobald im Live-Betrieb festgestellt wird, dass Profil, Foto, Genehmigung oder LDAP-Konto fehlen oder deaktiviert sind, wird der persistente Grant sofort widerrufen (`is_revoked = 1`).
    - Spätere Serverausfälle können widerrufene Freigaben nicht wieder aufleben lassen.
@@ -81,7 +80,7 @@ Die Gültigkeit eines echten Schülerausweises wird strikt und zentral serversei
     - Namensabgleich: Vor- und Nachname müssen beide nicht-leer sein und exakt/getrimmt matchen.
     - **Phase 2**: Nur für den gematchten Datensatz: Abfrage von Feld 146 (Username), Status (158) und Foto-Existenz (`LENGTH(file) > 20`).
 *   **Kein Passbild-Payload**: Binäre Foto-Daten werden niemals an den QR-Prüfer übertragen.
-*   **Schutz des Ausweis-Versions-Hashes**: Der öffentliche QR-Prüfendpunkt ruft `evaluateCardEligibility` mit `allowSaveGrant: false` auf. Dadurch überschreiben QR-Verifizierungen niemals den in SQLite gespeicherten echten Foto- und Datenhash mit einem Placeholder-SVG-Hash.
+*   **Schutz des Ausweis-Versions-Hashes**: Der öffentliche QR-Prüfendpunkt ruft `evaluateCardEligibility` mit `allowSaveGrant: false` und `isQrVerification: true` auf. Dadurch überschreiben QR-Verifizierungen niemals den in SQLite gespeicherten echten Foto- und Datenhash mit einem Placeholder-SVG-Hash.
 *   **Kein ID-Fallback**: Der veraltete `id`/`cleanId`-Fallback in `public/verify.html` ist entfernt; es werden zwingend `b`/`bib` und `n`/`name` verlangt.
 *   **Einheitliche Fehlerantwort**: Falsche Namen, nicht gefundene Nummern und ungültige Ausweise liefern nach außen die identische Antwort `{ verified: false, status: 'Ungültig', message: 'Schülerausweis konnte nicht verifiziert werden.' }`.
 
@@ -89,6 +88,10 @@ Die Gültigkeit eines echten Schülerausweises wird strikt und zentral serversei
 *   **Strikte Cache-Prüfung (`isSupportedValidCache`)**:
     - Gültiger Offline-Cache erfordert zwingend: `valid === true`, nicht-leeren `card_version`-String, ein parsbare und in der Zukunft liegende Frist (`offline_valid_until` / `expires_at`), und keinen Sperrstatus.
     - Fehlende oder leere Versionsangaben erzwingen eine Onlineprüfung.
+*   **Anonymer Status-Check Versionsabgleich**:
+    - Wenn die Session abgelaufen ist (401), führt der Client eine anonyme Statusprüfung (`/api/student/status-check?username=...`) durch.
+    - Der lokale Cache wird **nur dann** aktualisiert, wenn der Cache valide ist (`isSupportedValidCache`), die Serverantwort eine `card_version` liefert und `statusData.card_version === tempCached.card_version` exakt übereinstimmt.
+    - Bei Versionsabweichungen (`VERSION_MISMATCH`) oder unvollständigen Altdaten wird der Cache gesperrt und eine vollständige Neuanmeldung verlangt (`REAUTH_REQUIRED`).
 *   **Kein Zeitstempel-Refresh bei Puffer-Antworten**: Wenn das Backend eine gepufferte Antwort (`is_buffered: true`) liefert, aktualisiert das Frontend den lokalen Cache-Zeitstempel nicht, um künstliche Fristverlängerungen auf Clientseite auszuschließen.
 *   **Status-Zustände**:
     - **Online geprüft**: Frische Server-Antwort im Online-Betrieb (`is_buffered: false`).

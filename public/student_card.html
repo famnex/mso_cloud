@@ -2642,8 +2642,48 @@
               if (statusRes.ok) {
                 const statusData = await statusRes.json();
                 
-                // Prüfen, ob die Profil-/Foto-Version noch mit dem Cache übereinstimmt (Versionsmismatch)
-                if (tempCached && statusData.card_version && tempCached.card_version && statusData.card_version !== tempCached.card_version) {
+                // 1. Vorhandener Cache MUSS ein unterstützter, vollständiger und valider Ausweis-Cache sein
+                if (!tempCached || !isSupportedValidCache(tempCached)) {
+                  console.warn('[PWA Card] Vorhandener Cache ist unvollständig oder ungültig. Vollständige Neuanmeldung erforderlich.');
+                  localStorage.setItem('mso_card_offline_blocked', 'true');
+                  localStorage.removeItem('mso_cached_card');
+                  localStorage.removeItem('mso_cached_card_time');
+                  const blockedData = {
+                    card_status: 'Vollständige Anmeldung erforderlich',
+                    valid: false,
+                    reason_code: 'REAUTH_REQUIRED',
+                    status_summary: 'Ausweis veraltet – Vollständige Anmeldung erforderlich',
+                    first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
+                  };
+                  renderCard(blockedData, false);
+                  updateControlsState(false);
+                  isFreshOnlineLoaded = true;
+                  stopAutoRetry();
+                  return;
+                }
+
+                // 2. Server-Antwort MUSS eine gültige card_version besitzen
+                if (!statusData.card_version || typeof statusData.card_version !== 'string' || statusData.card_version === 'v0') {
+                  console.warn('[PWA Card] Serverantwort enthält keine gültige card_version. Vollständige Neuanmeldung erforderlich.');
+                  localStorage.setItem('mso_card_offline_blocked', 'true');
+                  localStorage.removeItem('mso_cached_card');
+                  localStorage.removeItem('mso_cached_card_time');
+                  const blockedData = {
+                    card_status: 'Vollständige Anmeldung erforderlich',
+                    valid: false,
+                    reason_code: 'REAUTH_REQUIRED',
+                    status_summary: 'Ausweis veraltet – Vollständige Anmeldung erforderlich',
+                    first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
+                  };
+                  renderCard(blockedData, false);
+                  updateControlsState(false);
+                  isFreshOnlineLoaded = true;
+                  stopAutoRetry();
+                  return;
+                }
+
+                // 3. Prüfen, ob die Profil-/Foto-Version exakt mit dem Cache übereinstimmt (Versionsmismatch)
+                if (statusData.card_version !== tempCached.card_version) {
                   console.warn('[PWA Card] Ausweis-Version hat sich geändert. Authentifizierte Aktualisierung erforderlich.');
                   localStorage.setItem('mso_card_offline_blocked', 'true');
                   localStorage.removeItem('mso_cached_card');
@@ -2652,6 +2692,7 @@
                     card_status: 'Ausweis aktualisiert – Login erforderlich',
                     valid: false,
                     reason_code: 'VERSION_MISMATCH',
+                    status_summary: 'Ausweisdaten geändert – Bitte neu anmelden',
                     first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
                   };
                   renderCard(blockedData, false);
@@ -2662,29 +2703,27 @@
                 }
 
                 if (statusData.valid === true && statusData.active === true) {
-                  // Ausweis ist online weiterhin GÜLTIG!
+                  // Ausweis ist online weiterhin GÜLTIG und Version stimmt exakt überein!
                   // Zeitstempel NUR erneuern, wenn es eine echte Live-Bestätigung war (kein Puffer)
                   if (!statusData.is_buffered) {
                     localStorage.setItem('mso_cached_card_time', Date.now().toString());
                   }
                   localStorage.setItem('mso_card_offline_blocked', 'false');
                   
-                  if (tempCached) {
-                    cardData = {
-                      ...tempCached,
-                      card_status: statusData.card_status || tempCached.card_status,
-                      card_status_code: statusData.card_status_code || tempCached.card_status_code,
-                      expires_at: statusData.expires_at || tempCached.expires_at,
-                      offline_valid_until: statusData.offline_valid_until || tempCached.offline_valid_until,
-                      valid: statusData.valid,
-                      reason_code: statusData.reason_code,
-                      status_summary: statusData.status_summary,
-                      is_buffered: statusData.is_buffered,
-                      card_version: statusData.card_version || tempCached.card_version,
-                      is_technik_scout: typeof statusData.is_technik_scout !== 'undefined' ? Boolean(statusData.is_technik_scout) : Boolean(tempCached.is_technik_scout)
-                    };
-                    localStorage.setItem('mso_cached_card', JSON.stringify(cardData));
-                  }
+                  cardData = {
+                    ...tempCached,
+                    card_status: statusData.card_status || tempCached.card_status,
+                    card_status_code: statusData.card_status_code || tempCached.card_status_code,
+                    expires_at: statusData.expires_at || tempCached.expires_at,
+                    offline_valid_until: statusData.is_buffered ? tempCached.offline_valid_until : (statusData.offline_valid_until || tempCached.offline_valid_until),
+                    valid: statusData.valid,
+                    reason_code: statusData.reason_code,
+                    status_summary: statusData.status_summary,
+                    is_buffered: Boolean(statusData.is_buffered),
+                    card_version: tempCached.card_version,
+                    is_technik_scout: typeof statusData.is_technik_scout !== 'undefined' ? Boolean(statusData.is_technik_scout) : Boolean(tempCached.is_technik_scout)
+                  };
+                  localStorage.setItem('mso_cached_card', JSON.stringify(cardData));
                   
                   renderCard(cardData, false);
                   updateControlsState(false);

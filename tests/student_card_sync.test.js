@@ -312,3 +312,68 @@ test('5. Frontend student_card.html evaluates isSupportedValidCache and enforces
   assert.equal(isSupportedValidCache(blockedEntry), false, 'Blocked card must return false');
 });
 
+test('6. Frontend student_card.html status-check requires matching card_version before merging cache', () => {
+  const htmlContent = fs.readFileSync(path.resolve(__dirname, '../public/student_card.html'), 'utf8');
+
+  // Verify that the anonymous 401 status check block in loadCardData enforces matching card_version
+  assert.ok(
+    htmlContent.includes('statusData.card_version') &&
+    htmlContent.includes('tempCached.card_version') &&
+    htmlContent.includes('statusData.card_version !== tempCached.card_version'),
+    'Frontend must verify exact matching card_version between server status-check and local cache'
+  );
+
+  // Extract isSupportedValidCache
+  const fnMatch = htmlContent.match(/function isSupportedValidCache\(entry\)\s*\{([\s\S]*?)\n\s*\}/);
+  const vmContext = vm.createContext({ Date, isNaN, isFinite, String });
+  vm.runInContext(`function isSupportedValidCache(entry) { ${fnMatch[1]} }`, vmContext);
+  const isSupportedValidCache = vmContext.isSupportedValidCache;
+
+  // Simulate cache contract logic from loadCardData
+  function simulateAnonymousCacheMerge(tempCached, statusData) {
+    if (
+      statusData &&
+      statusData.valid === true &&
+      statusData.card_version &&
+      isSupportedValidCache(tempCached) &&
+      statusData.card_version === tempCached.card_version
+    ) {
+      return {
+        success: true,
+        data: {
+          ...tempCached,
+          offline_valid_until: statusData.offline_valid_until || tempCached.offline_valid_until,
+          is_buffered: Boolean(statusData.is_buffered),
+          cached: true
+        }
+      };
+    }
+    return { success: false, reason: 'REAUTH_REQUIRED_OR_VERSION_MISMATCH' };
+  }
+
+  const validCache = {
+    valid: true,
+    card_version: 'v_abc123',
+    offline_valid_until: new Date(Date.now() + 86400000).toISOString(),
+    expires_at: '2027-07-31',
+    card_status: 'Bild genehmigt'
+  };
+
+  // Scenario A: Exact version match -> merge allowed
+  const mergeA = simulateAnonymousCacheMerge(validCache, { valid: true, card_version: 'v_abc123', offline_valid_until: '2027-07-31' });
+  assert.strictEqual(mergeA.success, true, 'Matching version must allow cache merge');
+
+  // Scenario B: Server has newer version -> blocked (requires full re-auth)
+  const mergeB = simulateAnonymousCacheMerge(validCache, { valid: true, card_version: 'v_newer_999' });
+  assert.strictEqual(mergeB.success, false, 'Mismatched version must block cache merge');
+
+  // Scenario C: Local cache has missing version -> blocked
+  const legacyCache = { ...validCache, card_version: null };
+  const mergeC = simulateAnonymousCacheMerge(legacyCache, { valid: true, card_version: 'v_abc123' });
+  assert.strictEqual(mergeC.success, false, 'Legacy unversioned cache must be blocked');
+
+  // Scenario D: Server status-check response missing version -> blocked
+  const mergeD = simulateAnonymousCacheMerge(validCache, { valid: true, card_version: null });
+  assert.strictEqual(mergeD.success, false, 'Server response without version must be blocked');
+});
+

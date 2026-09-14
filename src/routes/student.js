@@ -111,11 +111,6 @@ router.get('/card', async (req, res) => {
           card_status_code: '1132'
         };
       }
-    } else if (!profile && mysqlStatus.status !== 'connection_error') {
-      if (typeof logEvent === 'function') {
-        logEvent('warn', 'student_card_not_found', `Schülerausweis-Abruf fehlgeschlagen: Kein Schülerprofil für User ${user.username}`, { userId: user.id }, clientIp);
-      }
-      return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
     } else if (profile && metaResult.source === 'mysql_live') {
       // Profil in lokaler SQLite NUR bei echten Live-Daten synchronisieren
       db.prepare(`
@@ -148,7 +143,7 @@ router.get('/card', async (req, res) => {
       );
     }
 
-    // 4. Zentrale Gültigkeits- & Pufferbewertung
+    // 4. Zentrale Gültigkeits- & Pufferbewertung (muss IMMER vor Fehlerantworten aufgerufen werden!)
     const eligibility = evaluateCardEligibility({
       user: dbUser,
       profile: profile,
@@ -158,6 +153,30 @@ router.get('/card', async (req, res) => {
       isAdminPreview: isAdminPreview
     });
 
+    if (!isAdminPreview) {
+      if (mysqlStatus.status === 'not_found' || eligibility.reasonCode === 'PROFILE_NOT_FOUND') {
+        revokePersistentGrant(user.username);
+        db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+        if (typeof logEvent === 'function') {
+          logEvent('warn', 'student_card_not_found', `Schülerausweis-Abruf fehlgeschlagen: Kein Schülerprofil für User ${user.username}`, { userId: user.id }, clientIp);
+        }
+        return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.', valid: false, reason_code: 'PROFILE_NOT_FOUND', status_summary: 'Kein Schülerprofil vorhanden', is_buffered: false });
+      }
+
+      if (mysqlStatus.status === 'query_error' || eligibility.reasonCode === 'DATABASE_ERROR') {
+        if (typeof logEvent === 'function') {
+          logEvent('error', 'student_card_error', `Datenbankfehler bei Ausweisprüfung für User ${user.username}: ${mysqlStatus.error || 'Query-Fehler'}`, { error: mysqlStatus.error }, clientIp);
+        }
+        return res.status(500).json({ error: 'Datenbankfehler bei Profilprüfung.', valid: false, reason_code: 'DATABASE_ERROR', status_summary: 'Datenbankfehler bei Profilprüfung', is_buffered: false });
+      }
+
+      if (!profile) {
+        if (typeof logEvent === 'function') {
+          logEvent('warn', 'student_card_unavailable', `Schul-Datenbank nicht erreichbar für User ${user.username}`, { userId: user.id }, clientIp);
+        }
+        return res.status(503).json({ error: 'Schul-Datenbank nicht erreichbar.', valid: false, reason_code: eligibility.reasonCode, status_summary: eligibility.statusSummary, is_buffered: false });
+      }
+    }
 
     let statusSummary = eligibility.statusSummary;
     let logLevel = eligibility.valid ? 'info' : 'warn';
@@ -174,8 +193,9 @@ router.get('/card', async (req, res) => {
       sourceLabel = 'PWA Service Worker';
     }
 
+    const studentName = profile ? (`${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.username) : user.username;
+
     if (typeof logEvent === 'function') {
-      const studentName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.username;
       logEvent(
         logLevel,
         'student_card_access',
@@ -198,15 +218,15 @@ router.get('/card', async (req, res) => {
 
     res.json({
       username: user.username,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      birth_date: profile.birth_date,
-      birth_place: profile.birth_place,
-      mediothek_number: profile.mediothek_number,
-      card_image: profile.card_image,
-      card_status: profile.card_status,
-      card_status_code: profile.card_status_code || '1130',
-      is_card_printed: (profile.card_status_code === '1133' || profile.card_status === 'Ausweis gedruckt' || profile.card_status === 'Ausweis ausgegeben'),
+      first_name: profile ? profile.first_name : '',
+      last_name: profile ? profile.last_name : '',
+      birth_date: profile ? profile.birth_date : null,
+      birth_place: profile ? profile.birth_place : '',
+      mediothek_number: profile ? profile.mediothek_number : '',
+      card_image: profile ? profile.card_image : null,
+      card_status: profile ? profile.card_status : 'Bild ungeprüft / Kein Bild',
+      card_status_code: (profile && profile.card_status_code) || '1130',
+      is_card_printed: Boolean(profile && ((profile.card_status_code === '1133') || profile.card_status === 'Ausweis gedruckt' || profile.card_status === 'Ausweis ausgegeben')),
       is_technik_scout: Boolean(eligibility.valid && dbUser && dbUser.is_technik_scout === 1),
       expires_at: eligibility.expiresAt,
       offline_valid_until: eligibility.offlineValidUntil,
@@ -450,7 +470,8 @@ router.get('/verify-check', async (req, res) => {
       ldapStatus: ldapStatus,
       mysqlStatus: { status: match.queryStatus || 'found', source: match.source || 'mysql_live' },
       now: new Date(),
-      allowSaveGrant: false
+      allowSaveGrant: false,
+      isQrVerification: true
     });
 
     if (!eligibility.valid) {
