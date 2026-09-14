@@ -714,6 +714,15 @@ async function rejectPhoto(userId, email) {
     SET card_status = 'Bild abgelehnt'
     WHERE user_id = ?
   `).run(userId);
+
+  try {
+    const localUser = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+    if (localUser && localUser.username) {
+      const { revokePersistentGrant } = require('./services/cardEligibility');
+      revokePersistentGrant(localUser.username);
+    }
+  } catch (e) {}
+
   return { success: true };
 }
 
@@ -771,6 +780,15 @@ async function deletePhoto(userId, email) {
     SET card_image = NULL, card_status = 'Bild ungeprüft / Kein Bild'
     WHERE user_id = ?
   `).run(userId);
+
+  try {
+    const localUser = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+    if (localUser && localUser.username) {
+      const { revokePersistentGrant } = require('./services/cardEligibility');
+      revokePersistentGrant(localUser.username);
+    }
+  } catch (e) {}
+
   return { success: true };
 }
 
@@ -1153,13 +1171,13 @@ async function verifyStudentToken(token, ip) {
 }
 
 /**
- * Gezielte, datensparsame Abfrage für die QR-Code Verifikation (FEHLER 4 & 5).
+ * Gezielte, datensparsame 2-Phasen-Abfrage für die QR-Code Verifikation (FEHLER 4, 5 & 6).
  * 
- * WICHTIG:
- * - Sucht AUSSCHLIESSLICH über Mediotheksnummer (Feld 145) + vollständigen Namen.
+ * DATENSCHUTZREGELN:
+ * - Phase 1: Sucht AUSSCHLIESSLICH über Mediotheksnummer (Feld 145) + Vorname (Feld 1) + Nachname (Feld 2) bei aktiven Anträgen (status >= 10).
+ * - Namensabgleich: Vor- und Nachname müssen beide nicht-leer sein und matchen.
+ * - Phase 2: Nur bei Treffer werden Username (146), Status (158) und Foto-Existenz (LENGTH > 20) abgefragt.
  * - Lädt KEIN Foto-Blob, kein Geburtsdatum, keine Zugangsdaten.
- * - Prüft lediglich die Existenz eines Fotos (COUNT > 0) und den Status.
- * - Gibt null zurück, wenn keine exakte Übereinstimmung vorliegt.
  * 
  * @param {string} bib - Mediotheksnummer (Feld 145)
  * @param {string} name - Vollständiger Name
@@ -1176,151 +1194,112 @@ async function findStudentForVerification(bib, name) {
   const normQueryName = normalizeName(cleanName);
   const config = getMySQLConfig();
 
-  // 1. Wenn MySQL aktiv ist: Gezielte minimale Live-Abfrage
+  // 1. Wenn MySQL aktiv ist: Gezielte 2-Phasen-Live-Abfrage
   if (config.enabled && pool) {
     try {
-      const [fvRows] = await pool.query(
-        'SELECT application FROM fieldvalues WHERE field = 145 AND value = ?',
-        [cleanBib]
-      );
+      // Phase 1: Minimalabfrage der Kandidaten über Mediotheksnummer (Feld 145) mit Vor-/Nachname (Felder 1, 2) und Status >= 10
+      const [candidateRows] = await pool.query(`
+        SELECT fv.application, fv.field, fv.value
+        FROM fieldvalues fv
+        JOIN applications a ON fv.application = a.ID
+        WHERE a.status >= 10 
+          AND fv.field IN (1, 2)
+          AND fv.application IN (
+            SELECT application FROM fieldvalues WHERE field = 145 AND value = ?
+          )
+      `, [cleanBib]);
 
-      if (fvRows.length === 0) {
+      if (!candidateRows || candidateRows.length === 0) {
         return null;
       }
 
-      const matchingCandidates = [];
-
-      for (const row of fvRows) {
-        const appId = row.application;
-
-        // Status des Antrags prüfen (muss aktiv / status >= 10 sein)
-        const [appRows] = await pool.query('SELECT status FROM applications WHERE ID = ?', [appId]);
-        if (appRows.length === 0 || appRows[0].status < 10) {
-          continue;
+      // Kandidaten nach Antrags-ID gruppieren
+      const appMap = new Map();
+      for (const row of candidateRows) {
+        if (!appMap.has(row.application)) {
+          appMap.set(row.application, { first_name: '', last_name: '' });
         }
+        const obj = appMap.get(row.application);
+        if (Number(row.field) === 1) obj.first_name = String(row.value || '').trim();
+        if (Number(row.field) === 2) obj.last_name = String(row.value || '').trim();
+      }
 
-        // Minimal benötigte Felder abfragen: Vorname (1), Nachname (2), Username (146), Status (158), Mediotheksnummer (145)
-        let fieldRows = [];
-        try {
-          const [fRows] = await pool.query(`
-            SELECT fv.field, f.type,
-                   CASE WHEN f.type IN ('select', 'radio', 'checkboxes') THEN sf.value ELSE fv.value END AS value,
-                   fv.value AS raw_value,
-                   sf.value AS subfield_value
-            FROM fieldvalues fv
-            JOIN fields f ON fv.field = f.ID
-            LEFT JOIN subfields sf ON sf.ID = fv.value
-            WHERE fv.application = ?
-          `, [appId]);
-          if (fRows && fRows.length > 0) {
-            fieldRows = fRows;
-          } else {
-            const [plainRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
-            fieldRows = plainRows || [];
-          }
-        } catch (e) {
-          const [plainRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
-          fieldRows = plainRows || [];
-        }
-
-        let firstName = '';
-        let lastName = '';
-        let username = '';
-        let rawStatus = 'Bild ungeprüft / Kein Bild';
-        let statusCode = '1130';
-
-        for (const fr of fieldRows) {
-          const val = String(fr.value || '').trim();
-          const rawVal = String(fr.raw_value || '').trim();
-          const subVal = String(fr.subfield_value || '').trim();
-
-          switch (Number(fr.field)) {
-            case 1: firstName = val; break;
-            case 2: lastName = val; break;
-            case 146: username = val; break;
-            case 158: {
-              const lowerVal = val.toLowerCase();
-              const lowerRaw = rawVal.toLowerCase();
-              const lowerSub = subVal.toLowerCase();
-
-              const isRejected = lowerRaw === '1134' || lowerVal === '1134' || lowerRaw.includes('1134') ||
-                                 lowerSub.includes('abgelehnt') || lowerVal.includes('abgelehnt') ||
-                                 lowerSub.includes('deaktiviert') || lowerVal.includes('deaktiviert') ||
-                                 lowerSub.includes('gesperrt') || lowerVal.includes('gesperrt');
-
-              const isPrinted = lowerRaw === '1133' || lowerVal === '1133' || lowerRaw.includes('1133') ||
-                                lowerSub.includes('ausgegeben') || lowerVal.includes('ausgegeben') ||
-                                lowerSub.includes('gedruckt') || lowerVal.includes('gedruckt');
-
-              const isPendingStage1 = lowerRaw === '1131' || lowerVal === '1131' || lowerRaw.includes('1131') ||
-                                      lowerSub.includes('akzeptiert') || lowerVal.includes('akzeptiert') ||
-                                      lowerSub.includes('eingereicht') || lowerVal.includes('eingereicht');
-
-              const isApproved = !isRejected && (
-                lowerRaw === '1132' || lowerVal === '1132' || lowerRaw.includes('1132') ||
-                lowerSub.includes('genehmigt') || lowerVal.includes('genehmigt') ||
-                lowerSub.includes('verifiziert') || lowerVal.includes('verifiziert') ||
-                lowerSub.includes('freigegeben') || lowerVal.includes('freigegeben') ||
-                lowerSub === 'aktiviert' || lowerVal === 'aktiviert'
-              );
-
-              if (isRejected) {
-                rawStatus = 'Bild abgelehnt';
-                statusCode = '1134';
-              } else if (isPrinted) {
-                rawStatus = 'Ausweis gedruckt';
-                statusCode = '1133';
-              } else if (isPendingStage1) {
-                rawStatus = 'Bild eingereicht';
-                statusCode = '1131';
-              } else if (isApproved) {
-                rawStatus = 'Bild genehmigt';
-                statusCode = '1132';
-              } else {
-                rawStatus = 'Bild ungeprüft / Kein Bild';
-                statusCode = '1130';
-              }
-              break;
-            }
-          }
-        }
-
-        // Namensabgleich durchführen
-        const normFirst = normalizeName(firstName);
-        const normLast = normalizeName(lastName);
+      const matchingAppIds = [];
+      for (const [appId, names] of appMap.entries()) {
+        if (!names.first_name || !names.last_name) continue;
+        const normFirst = normalizeName(names.first_name);
+        const normLast = normalizeName(names.last_name);
         const normFullName1 = `${normFirst} ${normLast}`.trim();
         const normFullName2 = `${normLast} ${normFirst}`.trim();
 
         if (normQueryName === normFullName1 || normQueryName === normFullName2) {
-          // Datensparsam: Nur Existenz des Fotos prüfen (COUNT(*) bzw. 1) ohne Blob
-          const [imgCount] = await pool.query(
-            'SELECT 1 FROM images WHERE application = ? AND field = 37 AND file IS NOT NULL AND LENGTH(file) > 20 LIMIT 1',
-            [appId]
-          );
-          const hasImage = imgCount.length > 0;
-
-          matchingCandidates.push({
-            applicationId: appId,
-            username: username,
-            mediothek_number: cleanBib,
-            first_name: firstName,
-            last_name: lastName,
-            card_status: rawStatus,
-            card_status_code: statusCode,
-            has_photo: hasImage
-          });
+          matchingAppIds.push({ appId, first_name: names.first_name, last_name: names.last_name });
         }
       }
 
-      if (matchingCandidates.length === 1) {
-        return matchingCandidates[0];
-      }
-      if (matchingCandidates.length > 1) {
-        // Bei Mehrdeutigkeit (> 1 Treffer) keine willkürliche Freigabe
-        console.warn(`[StudentDB] Mehrdeutiger Treffer bei QR-Verifizierung für Bib ${cleanBib}`);
+      if (matchingAppIds.length !== 1) {
+        if (matchingAppIds.length > 1) {
+          console.warn(`[StudentDB] Mehrdeutiger Treffer bei QR-Verifizierung für Bib ${cleanBib}`);
+        }
         return null;
       }
-      return null;
+
+      const matchedCandidate = matchingAppIds[0];
+      const matchedAppId = matchedCandidate.appId;
+
+      // Phase 2: Detailfelder (146, 158) und Foto-Existenz gezielt für den gematchten Kandidaten abfragen
+      const [detailRows] = await pool.query(`
+        SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (146, 158)
+      `, [matchedAppId]);
+
+      let username = '';
+      let rawStatus = 'Bild ungeprüft / Kein Bild';
+      let statusCode = '1130';
+
+      for (const dr of detailRows || []) {
+        const val = String(dr.value || '').trim();
+        if (Number(dr.field) === 146) {
+          username = val;
+        } else if (Number(dr.field) === 158) {
+          const lowerVal = val.toLowerCase();
+          const isRejected = lowerVal === '1134' || lowerVal.includes('1134') || lowerVal.includes('abgelehnt') || lowerVal.includes('deaktiviert') || lowerVal.includes('gesperrt');
+          const isPrinted = lowerVal === '1133' || lowerVal.includes('1133') || lowerVal.includes('ausgegeben') || lowerVal.includes('gedruckt');
+          const isPendingStage1 = lowerVal === '1131' || lowerVal.includes('1131') || lowerVal.includes('akzeptiert') || lowerVal.includes('eingereicht');
+          const isApproved = !isRejected && (lowerVal === '1132' || lowerVal.includes('1132') || lowerVal.includes('genehmigt') || lowerVal.includes('verifiziert') || lowerVal.includes('freigegeben') || lowerVal === 'aktiviert');
+
+          if (isRejected) {
+            rawStatus = 'Bild abgelehnt';
+            statusCode = '1134';
+          } else if (isPrinted) {
+            rawStatus = 'Ausweis gedruckt';
+            statusCode = '1133';
+          } else if (isPendingStage1) {
+            rawStatus = 'Bild eingereicht';
+            statusCode = '1131';
+          } else if (isApproved) {
+            rawStatus = 'Bild genehmigt';
+            statusCode = '1132';
+          }
+        }
+      }
+
+      // Foto-Existenz prüfen (nur LENGTH > 20, kein Blob-Transfer!)
+      const [imgCheck] = await pool.query(
+        'SELECT 1 FROM images WHERE application = ? AND field = 37 AND file IS NOT NULL AND LENGTH(file) > 20 LIMIT 1',
+        [matchedAppId]
+      );
+      const hasPhoto = Array.isArray(imgCheck) && imgCheck.length > 0;
+
+      return {
+        applicationId: matchedAppId,
+        username: username,
+        mediothek_number: cleanBib,
+        first_name: matchedCandidate.first_name,
+        last_name: matchedCandidate.last_name,
+        card_status: rawStatus,
+        card_status_code: statusCode,
+        has_photo: hasPhoto
+      };
     } catch (err) {
       console.error('[StudentDB] MySQL Fehler in findStudentForVerification:', err.message);
       // Bei Verbindungsfehler Fallback auf lokalen Cache
@@ -1338,6 +1317,7 @@ async function findStudentForVerification(bib, name) {
   `).all(cleanBib);
 
   const matched = localProf.filter(p => {
+    if (!p.first_name || !p.last_name) return false;
     const normFirst = normalizeName(p.first_name);
     const normLast = normalizeName(p.last_name);
     return normQueryName === `${normFirst} ${normLast}`.trim() || normQueryName === `${normLast} ${normFirst}`.trim();
@@ -1377,6 +1357,7 @@ async function findStudentForVerification(bib, name) {
 
   return null;
 }
+
 
 async function findStudentByVerificationReference(bib, id, name) {
   const match = await findStudentForVerification(bib, name);

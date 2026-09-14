@@ -17,6 +17,22 @@ if (process.env.MOCK_LDAP === '1') {
     changePassword: async (userDn, newPassword) => {
       if (newPassword.includes('fail')) throw new Error('LDAP Constraint Violation');
       return true;
+    },
+    mapLdapGroupsToLocal: () => [],
+    isUserActiveInLdap: async (username) => {
+      if (username === 'inactive_ldap_user' || username === 'inactive') {
+        return { status: 'inactive', active: false, error: null };
+      }
+      if (username === 'unavailable_ldap_user' || username === 'unavailable') {
+        return { status: 'unavailable', active: false, error: 'Mock LDAP Timeout' };
+      }
+      if (username === 'disabled_ldap_user' || username === 'disabled') {
+        return { status: 'disabled', active: false, error: 'LDAP ist in den Einstellungen deaktiviert.' };
+      }
+      if (username === 'misconfigured_ldap_user' || username === 'misconfigured') {
+        return { status: 'misconfigured', active: false, error: 'LDAP unvollständig konfiguriert.' };
+      }
+      return { status: 'active', active: true, error: null };
     }
   };
   return;
@@ -647,17 +663,26 @@ async function isUserActiveInLdap(username) {
   console.log(`[LDAP-Live-Prüfung] Starte Prüfung für Benutzer: ${username}`);
   
   if (process.env.MOCK_LDAP === '1') {
-    console.log(`[LDAP-Live-Prüfung] Mock-Modus aktiv. Benutzer ${username} wird als AKTIV gewertet.`);
-    if (username === 'inactive_ldap_user') {
-      return { active: false, error: null };
+    console.log(`[LDAP-Live-Prüfung] Mock-Modus aktiv. Prüfe Benutzer ${username}...`);
+    if (username === 'inactive_ldap_user' || username === 'inactive') {
+      return { status: 'inactive', active: false, error: null };
     }
-    return { active: true, error: null };
+    if (username === 'unavailable_ldap_user' || username === 'unavailable') {
+      return { status: 'unavailable', active: false, error: 'Mock LDAP Timeout' };
+    }
+    if (username === 'disabled_ldap_user' || username === 'disabled') {
+      return { status: 'disabled', active: false, error: 'LDAP ist in den Einstellungen deaktiviert.' };
+    }
+    if (username === 'misconfigured_ldap_user' || username === 'misconfigured') {
+      return { status: 'misconfigured', active: false, error: 'LDAP unvollständig konfiguriert.' };
+    }
+    return { status: 'active', active: true, error: null };
   }
 
   const enabled = getConfig('ldap_enabled') === '1';
   if (!enabled) {
     console.log(`[LDAP-Live-Prüfung] LDAP-Authentifizierung ist in Einstellungen deaktiviert. Überspringe.`);
-    return { active: true, error: null };
+    return { status: 'disabled', active: false, error: 'LDAP ist in den Einstellungen deaktiviert.' };
   }
 
   const bindDn = getConfig('ldap_bind_dn');
@@ -667,7 +692,7 @@ async function isUserActiveInLdap(username) {
 
   if (!bindDn || !baseDn) {
     console.warn(`[LDAP-Live-Prüfung] Warnung: ldap_bind_dn oder ldap_base_dn ist nicht konfiguriert. Überspringe.`);
-    return { active: true, error: 'LDAP-Zugangsdaten (Bind DN/Base DN) unvollständig konfiguriert.' };
+    return { status: 'misconfigured', active: false, error: 'LDAP-Zugangsdaten (Bind DN/Base DN) unvollständig konfiguriert.' };
   }
 
   const userFilter = `(&(objectClass=user)(${userAttr}=${username}))`;
@@ -698,7 +723,7 @@ async function isUserActiveInLdap(username) {
         completed = true;
         console.error(`[LDAP-Live-Prüfung] Timeout: Verbindung zu LDAP überschritt 3s bei Benutzer ${username}`);
         cleanup();
-        resolve({ active: true, error: 'LDAP-Verbindungstimeout (3 Sekunden überschritten)' });
+        resolve({ status: 'unavailable', active: false, error: 'LDAP-Verbindungstimeout (3 Sekunden überschritten)' });
       }
     }, 3000);
 
@@ -710,7 +735,7 @@ async function isUserActiveInLdap(username) {
         if (!completed) {
           completed = true;
           cleanup();
-          resolve({ active: true, error: 'Verbindungsfehler: ' + err.message });
+          resolve({ status: 'unavailable', active: false, error: 'Verbindungsfehler: ' + err.message });
         }
       });
 
@@ -721,7 +746,7 @@ async function isUserActiveInLdap(username) {
           if (!completed) {
             completed = true;
             cleanup();
-            resolve({ active: true, error: 'Admin-Bind fehlgeschlagen: ' + err.message });
+            resolve({ status: 'unavailable', active: false, error: 'Admin-Bind fehlgeschlagen: ' + err.message });
           }
           return;
         }
@@ -741,7 +766,7 @@ async function isUserActiveInLdap(username) {
             if (!completed) {
               completed = true;
               cleanup();
-              resolve({ active: true, error: 'Suche fehlgeschlagen: ' + err.message });
+              resolve({ status: 'unavailable', active: false, error: 'Suche fehlgeschlagen: ' + err.message });
             }
             return;
           }
@@ -760,7 +785,7 @@ async function isUserActiveInLdap(username) {
             if (!completed) {
               completed = true;
               cleanup();
-              resolve({ active: true, error: 'Suchstrom-Fehler: ' + err.message });
+              resolve({ status: 'unavailable', active: false, error: 'Suchstrom-Fehler: ' + err.message });
             }
           });
 
@@ -771,18 +796,18 @@ async function isUserActiveInLdap(username) {
 
               if (!userEntry) {
                 console.log(`[LDAP-Live-Prüfung] Benutzer ${username} existiert nicht im LDAP.`);
-                return resolve({ active: false, error: null });
+                return resolve({ status: 'inactive', active: false, error: null });
               }
 
               const uac = parseInt(userEntry.useraccountcontrol || userEntry.userAccountControl || '0', 10);
               console.log(`[LDAP-Live-Prüfung] Benutzer ${username} gefunden. UAC = ${uac}`);
               if ((uac & 2) !== 0) {
                 console.log(`[LDAP-Live-Prüfung] Benutzer ${username} ist deaktiviert.`);
-                return resolve({ active: false, error: null });
+                return resolve({ status: 'inactive', active: false, error: null });
               }
 
               console.log(`[LDAP-Live-Prüfung] Benutzer ${username} ist aktiv.`);
-              resolve({ active: true, error: null });
+              resolve({ status: 'active', active: true, error: null });
             }
           });
         });
@@ -792,7 +817,7 @@ async function isUserActiveInLdap(username) {
       if (!completed) {
         completed = true;
         cleanup();
-        resolve({ active: true, error: 'Unerwarteter Fehler: ' + err.message });
+        resolve({ status: 'unavailable', active: false, error: 'Unerwarteter Fehler: ' + err.message });
       }
     }
   });

@@ -1,13 +1,13 @@
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
+const { db, getConfig, setConfig } = require('./test_helper');
 
 async function runTests() {
   console.log('=== STARTE VOLLSTÄNDIGEN MSO CLOUD VERIFIKATIONS-TEST ===\n');
 
   // 1. Datenbank & Migrationen Test
   console.log('[Test 1] Datenbank-Initialisierung & Migrationen 022 + 023...');
-  const { db, getConfig, setConfig } = require('../src/db');
   
   const userColumns = db.prepare("PRAGMA table_info(users)").all();
   const hasAuthVersion = userColumns.some(c => c.name === 'auth_version');
@@ -80,32 +80,35 @@ async function runTests() {
   const expiryAutumn = getSchoolYearExpirationDate(new Date('2026-09-15'));
   assert.strictEqual(expiryAutumn.expiresAt, '2027-07-31', 'Stichtag im Herbst 2026 muss 2027-07-31 sein');
 
-  // Test: Gültiger Schüler
-  const validStudent = evaluateCardEligibility(
-    { id: 1, is_active: 1, role: 'user' },
-    { card_status: 'Bild genehmigt', card_image: 'data:image/jpeg;base64,mockLongValidImageBase64StringForTesting1234567890', is_card_printed: 1, mediothek_number: '12345' }
-  );
+  // Test: Gültiger Schüler mit aktivem LDAP
+  const validStudent = evaluateCardEligibility({
+    user: { id: 1, is_active: 1, role: 'user', username: 'student.valid' },
+    profile: { card_status: 'Bild genehmigt', card_image: 'data:image/jpeg;base64,mockLongValidImageBase64StringForTesting1234567890', is_card_printed: 1, mediothek_number: '12345' },
+    ldapStatus: { status: 'active', active: true, error: null }
+  });
   assert.strictEqual(validStudent.valid, true);
   assert.strictEqual(validStudent.reasonCode, 'VALID');
 
   // Test: Deaktivierter Schüler (is_active = 0)
-  const inactiveStudent = evaluateCardEligibility(
-    { id: 2, is_active: 0, role: 'user' },
-    { card_status: 'Bild genehmigt', card_image: 'data:image/jpeg;base64,mockLongValidImageBase64StringForTesting1234567890', is_card_printed: 1, mediothek_number: '12345' }
-  );
+  const inactiveStudent = evaluateCardEligibility({
+    user: { id: 2, is_active: 0, role: 'user', username: 'student.inactive' },
+    profile: { card_status: 'Bild genehmigt', card_image: 'data:image/jpeg;base64,mockLongValidImageBase64StringForTesting1234567890', is_card_printed: 1, mediothek_number: '12345' },
+    ldapStatus: { status: 'active', active: true, error: null }
+  });
   assert.strictEqual(inactiveStudent.valid, false);
   assert.strictEqual(inactiveStudent.reasonCode, 'ACCOUNT_INACTIVE');
 
   // Test: Foto abgelehnt
-  const rejectedStudent = evaluateCardEligibility(
-    { id: 3, is_active: 1, role: 'user' },
-    { card_status: 'Bild abgelehnt', card_image: 'data:image/jpeg;base64,mockLongValidImageBase64StringForTesting1234567890', is_card_printed: 0, mediothek_number: '12345' }
-  );
+  const rejectedStudent = evaluateCardEligibility({
+    user: { id: 3, is_active: 1, role: 'user', username: 'student.rejected' },
+    profile: { card_status: 'Bild abgelehnt', card_image: 'data:image/jpeg;base64,mockLongValidImageBase64StringForTesting1234567890', is_card_printed: 0, mediothek_number: '12345' },
+    ldapStatus: { status: 'active', active: true, error: null }
+  });
   assert.strictEqual(rejectedStudent.valid, false);
   assert.strictEqual(rejectedStudent.reasonCode, 'PHOTO_NOT_APPROVED');
 
   // Test: Gelöschtes Konto (user = null)
-  const deletedStudent = evaluateCardEligibility(null, null);
+  const deletedStudent = evaluateCardEligibility({ user: null, profile: null });
   assert.strictEqual(deletedStudent.valid, false);
   assert.strictEqual(deletedStudent.reasonCode, 'ACCOUNT_INACTIVE');
   console.log('  ✓ Schülerausweis-Regelwerk und 31. Juli Stichtagslogik arbeiten fehlerfrei');

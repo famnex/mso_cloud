@@ -2,17 +2,20 @@ const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 
-const DB_DIR = path.join(__dirname, '../data');
-const DB_PATH = path.join(DB_DIR, 'mso_cloud.db');
+const DB_PATH = process.env.MSO_DB_PATH || process.env.DB_PATH || path.join(__dirname, '../data/mso_cloud.db');
+const DB_DIR = DB_PATH === ':memory:' ? null : path.dirname(DB_PATH);
 
 // Sicherstellen, dass das Datenverzeichnis existiert
-if (!fs.existsSync(DB_DIR)) {
+if (DB_DIR && !fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
 // Verbindung zur Datenbank herstellen
-const db = new Database(DB_PATH, { verbose: console.log });
-db.pragma('journal_mode = WAL'); // Performance-Optimierung für SQLite
+const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.MSO_DB_PATH || process.env.DB_PATH);
+const db = new Database(DB_PATH, { verbose: isTestEnv ? undefined : console.log });
+if (DB_PATH !== ':memory:') {
+  db.pragma('journal_mode = WAL'); // Performance-Optimierung für SQLite
+}
 
 /**
  * Führt alle noch ausstehenden SQL-Migrationen aus dem Ordner /migrations aus.

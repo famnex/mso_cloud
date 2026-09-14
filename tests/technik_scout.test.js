@@ -3,14 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const express = require('express');
-const { db, runMigrations } = require('../src/db');
+const { db, runMigrations } = require('./test_helper');
 const adminRoutes = require('../src/routes/admin');
 const studentRoutes = require('../src/routes/student');
 
 console.log('=== START TEST SUITE: TECHNIK SCOUT FEATURE ===\n');
-
-// 1. Run migrations
-runMigrations();
 
 let passedTests = 0;
 
@@ -337,9 +334,9 @@ async function runAllTests() {
     // =========================================================================
     // TEST 11: Service Worker cache version bumped
     // =========================================================================
-    await runTest(11, 'public/sw.js cache name is bumped to v10', () => {
+    await runTest(11, 'public/sw.js cache name is bumped to v10 or higher', () => {
       const sw = fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8');
-      assert.ok(sw.includes("CACHE_NAME = 'mso-student-card-v10'"), 'Cache name should be mso-student-card-v10');
+      assert.ok(sw.includes("CACHE_NAME = 'mso-student-card-v10'") || sw.includes("CACHE_NAME = 'mso-student-card-v11'"), 'Cache name should be mso-student-card-v10 or higher');
     });
   } finally {
     // Clean up test data

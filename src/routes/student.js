@@ -71,27 +71,29 @@ router.get('/card', async (req, res) => {
     ldapStatus = { active: false, error: 'Verbindungsfehler: ' + err.message };
   }
 
-  // Bei explizitem LDAP-Negativbefund Sitzung sofort terminieren & Grant widerrufen
+  // Bei explizitem LDAP-Negativbefund Sitzung sofort terminieren & Grant widerrufen (sofern kein Admin)
   if (ldapStatus && !ldapStatus.error && !ldapStatus.active) {
-    console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
-    req.session.destroy(() => {});
-    db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
-    revokePersistentGrant(user.username);
-    if (typeof logEvent === 'function') {
-      logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
+    if (dbUser.role === 'admin') {
+      console.log(`[Express /card] Admin ${user.username} hat kein aktives LDAP-Konto. Sitzung bleibt für Admin-Vorschau erhalten.`);
+    } else {
+      console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
+      req.session.destroy(() => {});
+      db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+      revokePersistentGrant(user.username);
+      if (typeof logEvent === 'function') {
+        logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
+      }
+      return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
     }
-    return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
   }
 
   try {
     // 3. Schülerprofil laden (mit Ausweispfad-Prüfung)
     let profile = await studentDb.getStudentProfile(user, { isCardPath: true });
     let isAdminPreview = false;
-
-    if (!profile) {
-      if (user.role === 'admin') {
-        isAdminPreview = true;
-        const nameParts = (user.display_name || user.username).split(' ');
+    if (user.role === 'admin') {
+      isAdminPreview = true;
+      if (!profile) {
         const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" width="147" height="196" viewBox="0 0 147 196"><rect width="147" height="196" fill="#1e293b"/><path d="M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z" fill="#38bdf8"/><text x="73.5" y="170" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="sans-serif" font-weight="bold">ADMIN VORSCHAU</text></svg>`;
         const dummyPassphotoBase64 = 'data:image/svg+xml;base64,' + Buffer.from(dummySvg).toString('base64');
 
@@ -105,12 +107,12 @@ router.get('/card', async (req, res) => {
           card_status: 'Bild verifiziert',
           card_status_code: '1132'
         };
-      } else {
-        if (typeof logEvent === 'function') {
-          logEvent('warn', 'student_card_not_found', `Schülerausweis-Abruf fehlgeschlagen: Kein Schülerprofil für User ${user.username}`, { userId: user.id }, clientIp);
-        }
-        return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
       }
+    } else if (!profile) {
+      if (typeof logEvent === 'function') {
+        logEvent('warn', 'student_card_not_found', `Schülerausweis-Abruf fehlgeschlagen: Kein Schülerprofil für User ${user.username}`, { userId: user.id }, clientIp);
+      }
+      return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
     } else {
       // Profil in lokaler SQLite synchronisieren für Offline-Puffer
       db.prepare(`
@@ -128,7 +130,7 @@ router.get('/card', async (req, res) => {
           start_password = excluded.start_password,
           account_status = excluded.account_status,
           card_status = excluded.card_status,
-          card_image = COALESCE(excluded.card_image, card_image)
+          card_image = excluded.card_image
       `).run(
         user.id,
         profile.first_name || '',
@@ -420,7 +422,7 @@ router.get('/verify-check', async (req, res) => {
     }
 
     // 3. Zentrale Gültigkeitsprüfung
-    const dummyUser = { id: match.userId || 1001, username: match.username, is_active: 1 };
+    const verifyUser = { id: match.userId || null, username: match.username, is_active: 1 };
     const minimalProfile = {
       username: match.username,
       first_name: match.first_name,
@@ -432,7 +434,7 @@ router.get('/verify-check', async (req, res) => {
     };
 
     const eligibility = evaluateCardEligibility({
-      user: dummyUser,
+      user: verifyUser,
       profile: minimalProfile,
       ldapStatus: ldapStatus,
       now: new Date()
@@ -450,10 +452,13 @@ router.get('/verify-check', async (req, res) => {
 
     return res.json({
       verified: true,
-      status: 'Gültig',
+      status: eligibility.is_buffered ? 'Gültig (Puffer)' : 'Gültig',
+      is_buffered: Boolean(eligibility.is_buffered),
       name: sanitizedFullName,
       expires_at: eligibility.expiresAt,
-      message: 'Ausweis erfolgreich verifiziert.'
+      message: eligibility.is_buffered
+        ? 'Ausweis verifiziert (Offline-Puffer / LDAP temporär nicht erreichbar).'
+        : 'Ausweis erfolgreich verifiziert.'
     });
 
   } catch (error) {

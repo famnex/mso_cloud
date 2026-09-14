@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { db, runMigrations } = require('../src/db');
+const { db, runMigrations } = require('./test_helper');
 const {
   getSchoolYearExpirationDate,
   computeCardVersion,
@@ -10,13 +10,10 @@ const {
 } = require('../src/services/cardEligibility');
 const studentDb = require('../src/student_db');
 
-console.log('=== START REGRESSION TEST SUITE: ALL 20 STUDENT CARD SCENARIOS ===\n');
-
-// Sicherstellen, dass DB-Migrationen gelaufen sind
-runMigrations();
+console.log('=== START REGRESSION TEST SUITE: ALL 20+ STUDENT CARD SCENARIOS ===\n');
 
 let passedTests = 0;
-const totalTests = 20;
+const totalTests = 24;
 
 async function runTest(num, name, fn) {
   try {
@@ -394,6 +391,127 @@ async function runAllTests() {
     });
     assert.strictEqual(adminRes.valid, false, 'Admin-Vorschau darf nicht als echter gültiger Ausweis deklariert sein');
     assert.strictEqual(adminRes.reasonCode, 'ADMIN_PREVIEW');
+  });
+
+  // 21. Migration 026: Schema-Refaktorisierung für student_card_grants (nullable user_id, unique username)
+  await runTest(21, 'Migration 026: Nullable user_id und unique username in student_card_grants', () => {
+    // Nullable user_id testen
+    savePersistentGrant({
+      userId: null,
+      username: 'student.nulluser',
+      mediothekNumber: 'BIB-NULL',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0
+    });
+
+    const grant = getPersistentGrant('student.nulluser');
+    assert.ok(grant, 'Grant mit user_id = null muss gespeichert und abrufbar sein');
+    assert.strictEqual(grant.user_id, null);
+    assert.strictEqual(grant.username, 'student.nulluser');
+
+    // Schema PRAGMA prüfen
+    const cols = db.prepare('PRAGMA table_info(student_card_grants)').all();
+    const userIdCol = cols.find(c => c.name === 'user_id');
+    assert.ok(userIdCol, 'user_id Spalte muss existieren');
+    assert.strictEqual(userIdCol.notnull, 0, 'user_id darf NICHT NOT NULL sein (muss nullable sein)');
+  });
+
+  // 22. Vollständige LDAP-Taxonomie: disabled, misconfigured und not_checked
+  await runTest(22, 'Vollständige LDAP-Taxonomie: disabled, misconfigured und not_checked', () => {
+    const prof = { first_name: 'Tax', last_name: 'Test', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+
+    // disabled
+    const resDisabled = evaluateCardEligibility({
+      user: testUserActive,
+      profile: prof,
+      ldapStatus: { status: 'disabled', active: false, error: 'LDAP deaktiviert' }
+    });
+    assert.strictEqual(resDisabled.valid, false);
+    assert.strictEqual(resDisabled.reasonCode, 'LDAP_DISABLED');
+
+    // misconfigured
+    const resMisconfig = evaluateCardEligibility({
+      user: testUserActive,
+      profile: prof,
+      ldapStatus: { status: 'misconfigured', active: false, error: 'Config missing' }
+    });
+    assert.strictEqual(resMisconfig.valid, false);
+    assert.strictEqual(resMisconfig.reasonCode, 'LDAP_MISCONFIGURED');
+
+    // not_checked ohne früheren Grant
+    const resNotChecked = evaluateCardEligibility({
+      user: { id: 8998, username: 'student.unregistered', is_active: 1 },
+      profile: prof,
+      ldapStatus: { status: 'not_checked', active: false, error: null }
+    });
+    assert.strictEqual(resNotChecked.valid, false);
+    assert.strictEqual(resNotChecked.reasonCode, 'NOT_CHECKED');
+  });
+
+  // 23. Admin-Sitzungserhalt bei negativem LDAP-Befund
+  await runTest(23, 'Admin-Sitzungserhalt bei negativem LDAP-Befund', async () => {
+    const express = require('express');
+    const http = require('http');
+    const studentRoutes = require('../src/routes/student');
+
+    const app = express();
+    app.use(express.json());
+
+    let sessionDestroyed = false;
+    let mockSessionUser = { id: 8005, username: 'admin.local', role: 'admin' };
+
+    app.use((req, res, next) => {
+      req.session = {
+        user: mockSessionUser,
+        destroy: (cb) => {
+          sessionDestroyed = true;
+          req.session.user = null;
+          if (cb) cb();
+        }
+      };
+      next();
+    });
+
+    app.use('/api/student', studentRoutes);
+
+    const server = http.createServer(app);
+    await new Promise((resolve) => server.listen(0, resolve));
+    const port = server.address().port;
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/student/card`);
+      const body = await res.json();
+
+      assert.strictEqual(res.status, 200, 'Admin-Abruf muss HTTP 200 zurückliefern');
+      assert.strictEqual(body.is_admin_preview, true, 'Muss als Admin-Vorschau markiert sein');
+      assert.strictEqual(sessionDestroyed, false, 'Admin-Session darf NIEMALS zerstört werden!');
+      assert.ok(mockSessionUser, 'Admin-Sitzungsbenutzer muss erhalten bleiben');
+    } finally {
+      server.close();
+    }
+  });
+
+  // 24. QR-Verifikation: 2-Phasen-Prüfung, Pflichtparameter bib + name, Buffered-Status
+  await runTest(24, 'QR-Verifikation: Pflichtparameter bib + name und Buffered-Status', async () => {
+    // 1. Ohne Parameter
+    const resNoParams = await studentDb.findStudentForVerification('', '');
+    assert.strictEqual(resNoParams, null);
+
+    // 2. Nur Name ohne Bib
+    const resNameOnly = await studentDb.findStudentForVerification('', 'Anna Active');
+    assert.strictEqual(resNameOnly, null);
+
+    // 3. Nur Bib ohne Name
+    const resBibOnly = await studentDb.findStudentForVerification('BIB-8001', '');
+    assert.strictEqual(resBibOnly, null);
+
+    // 4. Gültige Kombination aus Bib und Name
+    const resValid = await studentDb.findStudentForVerification('BIB-8001', 'Anna Active');
+    assert.ok(resValid);
+    assert.strictEqual(resValid.mediothek_number, 'BIB-8001');
+    assert.strictEqual(resValid.has_photo, true);
   });
 
   console.log(`\n=== RESULT: ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY! ===`);

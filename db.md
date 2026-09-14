@@ -411,12 +411,13 @@ Erstellt gezielte Performance- und Abfrage-Indizes für Schülerausweis-Verifizi
 
 ---
 
-### Tabelle: `student_card_grants` (Migration 024_student_card_grants.sql)
+### Tabelle: `student_card_grants` (Migrationen 024 und 026)
 Speichert persistente Freigaben, verifizierte Ausfallpuffer und Sperrstatus von Schülerausweisen.
 
 | Spalte | Datentyp | Beschreibung |
 | :--- | :--- | :--- |
-| `user_id` (PK) | INTEGER | Lokale User-ID (Referenz auf `users.id`) |
+| `id` (PK) | INTEGER | Auto-Increment Primärschlüssel (Migration 026) |
+| `user_id` | INTEGER | Optionale lokale User-ID (Referenz auf `users.id`, NULL bei externen Schülern) |
 | `username` (UNIQUE) | TEXT | Eindeutiger LDAP- / Systembenutzername |
 | `mediothek_number` | TEXT | Mediotheksnummer / Lesenummer (aus Feld 145) |
 | `last_ldap_success_at` | DATETIME | Zeitstempel der letzten erfolgreichen LDAP-Prüfung |
@@ -428,9 +429,10 @@ Speichert persistente Freigaben, verifizierte Ausfallpuffer und Sperrstatus von 
 | `updated_at` | DATETIME | Letzte Aktualisierung |
 
 *   **Indizes**:
-    *   `idx_student_card_grants_username` auf `username`
+    *   `idx_student_card_grants_username` (UNIQUE) auf `username`
     *   `idx_student_card_grants_mediothek` auf `mediothek_number`
-*   **Zweck**: Gewährleistet, dass Ausfallpuffer bei LDAP-/MySQL-Störungen unverändert bis zum festgelegten Fristende weitergelten, ohne bei wiederholten Abrufen künstlich verlängert zu werden oder widerrufene Ausweise zu reaktivieren.
+    *   `idx_student_card_grants_user_id` auf `user_id`
+*   **Zweck**: Gewährleistet, dass Ausfallpuffer bei LDAP-/MySQL-Störungen unverändert bis zum festgelegten Fristende weitergelten, ohne bei wiederholten Abrufen künstlich verlängert zu werden oder widerrufene Ausweise zu reaktivieren. Ermöglicht saubere Prüfung ohne künstliche Dummy-IDs.
 
 ---
 
@@ -438,3 +440,11 @@ Speichert persistente Freigaben, verifizierte Ausfallpuffer und Sperrstatus von 
 Fügt der Tabelle `users` das Feld `is_technik_scout` hinzu.
 *   `ALTER TABLE users ADD COLUMN is_technik_scout INTEGER NOT NULL DEFAULT 0;`
 *   **Zweck**: Speichert die dauerhafte Opt-In-Kennzeichnung für Technik Scouts zur Anzeige des entsprechenden Berechtigungs-Symbols und -Dialogs auf dem digitalen Schülerausweis. Wird von LDAP-Syncs oder Importen nicht überschrieben.
+
+---
+
+### Migration: `026_refactor_student_card_grants.sql`
+Strukturiert die Tabelle `student_card_grants` um:
+*   Macht `user_id` optional (NULL erlaubt), setzt `id` als AUTOINCREMENT Primärschlüssel.
+*   Erstellt Indizes auf `username` (UNIQUE), `mediothek_number` und `user_id`.
+*   Entfernt Altlasten von Fake-IDs (z. B. `id: 1001`) und sichert referenzielle Integrität bei QR-Code-Verifizierungen.

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mso-student-card-v10';
+const CACHE_NAME = 'mso-student-card-v11';
 const ASSETS = [
   'student_card.html',
   'style.css',

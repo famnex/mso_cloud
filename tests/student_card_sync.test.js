@@ -1,4 +1,5 @@
-﻿const test = require('node:test');
+require('./test_helper');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -39,23 +40,20 @@ test('1. Mediotheksnummer search in MySQL uses field = 145 (not 168) in findStud
     end: async () => {},
     query: async (sql, params) => {
       executedQueries.push({ sql, params });
-      if (sql.includes('SELECT application FROM fieldvalues WHERE field = 145')) {
-        return [[{ application: 42 }]];
-      }
-      if (sql.includes('FROM applications WHERE ID = ?')) {
-        return [[{ ID: 42, status: 10 }]];
-      }
-      if (sql.includes('FROM fieldvalues WHERE application = ?')) {
+      if (sql.includes('WHERE field = 145') || sql.includes('fv.field IN (1, 2)')) {
         return [[
-          { field: 1, value: 'Max' },
-          { field: 2, value: 'Mustermann' },
-          { field: 145, value: 'BIB-9988' },
-          { field: 18, value: 'max@schule.local' },
+          { application: 42, field: 1, value: 'Max' },
+          { application: 42, field: 2, value: 'Mustermann' }
+        ]];
+      }
+      if (sql.includes('field IN (146, 158)')) {
+        return [[
+          { field: 146, value: 'max' },
           { field: 158, value: '1132' }
         ]];
       }
       if (sql.includes('FROM images WHERE application = ?')) {
-        return [[{ file: 'data:image/png;base64,mockphoto' }]];
+        return [[{ 1: 1 }]];
       }
       return [[]];
     }
@@ -228,7 +226,7 @@ test('3. Session revocation via auth_version is enforced on /api/student/card', 
 
 test('4. 30-day offline validity contract and card evaluation', () => {
   const fixedDate = new Date('2026-10-15T12:00:00Z');
-  const user = { id: 1, is_active: 1 };
+  const user = { id: 1, is_active: 1, username: 'student.sync4' };
   const validProfile = {
     first_name: 'Max',
     last_name: 'Mustermann',
@@ -236,7 +234,12 @@ test('4. 30-day offline validity contract and card evaluation', () => {
     card_image: 'data:image/png;base64,somethingvalid'
   };
 
-  const eligibility = evaluateCardEligibility(user, validProfile, fixedDate);
+  const eligibility = evaluateCardEligibility({
+    user,
+    profile: validProfile,
+    ldapStatus: { status: 'active', active: true, error: null },
+    now: fixedDate
+  });
   assert.equal(eligibility.valid, true);
   assert.equal(eligibility.reasonCode, 'VALID');
   assert.ok(eligibility.offlineValidUntil);
@@ -246,7 +249,12 @@ test('4. 30-day offline validity contract and card evaluation', () => {
   assert.equal(offlineDate.toISOString(), expectedThirtyDaysLater.toISOString());
 
   const revokedProfile = { ...validProfile, card_status: 'Ausweis gesperrt' };
-  const revokedEval = evaluateCardEligibility(user, revokedProfile, fixedDate);
+  const revokedEval = evaluateCardEligibility({
+    user,
+    profile: revokedProfile,
+    ldapStatus: { status: 'active', active: true, error: null },
+    now: fixedDate
+  });
   assert.equal(revokedEval.valid, false);
   assert.equal(revokedEval.reasonCode, 'CARD_REVOKED');
   assert.equal(revokedEval.offlineValidUntil, null);

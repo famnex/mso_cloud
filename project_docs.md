@@ -46,31 +46,43 @@
 
 ### 3.1 Regelwerk für Gültigkeit (`src/services/cardEligibility.js`)
 Die Gültigkeit eines echten Schülerausweises wird strikt und zentral serverseitig ermittelt:
-1. **LDAP-Verpflichtung**: Ein echter Schülerausweis setzt zwingend ein aktives Konto im Schul-LDAP voraus.
-   - Meldet LDAP eindeutig „Konto fehlt“ oder „Konto deaktiviert“, wird der Ausweis sofort gesperrt und der Grant widerrufen (`is_revoked = 1`).
-   - Lokale Administratoren können sich im Verwaltungsportal anmelden; ihre Ausweisansicht ist als ungültiges Muster (`is_admin_preview = true`, `valid = false`) deklariert.
+1. **LDAP-Verpflichtung & Status-Taxonomie**:
+   - Ein echter Schülerausweis setzt zwingend ein aktives Konto im Schul-LDAP voraus (`status === 'active'`).
+   - `isUserActiveInLdap()` unterscheidet:
+     - `active`: Live LDAP-Konto aktiv (UAC & 2 === 0).
+     - `inactive`: Live LDAP-Konto fehlt oder ist deaktiviert -> Sofortiger Widerruf des Ausweis-Grants (`is_revoked = 1`).
+     - `unavailable`: Echter Serverausfall/Timeout -> Bestehender, nicht widerrufener Grant bis zur Frist nutzbar.
+     - `disabled`: LDAP deaktiviert -> Kein echter Ausweis (`valid = false`).
+     - `misconfigured`: LDAP unvollständig konfiguriert -> Kein echter Ausweis (`valid = false`).
+     - `not_checked`: Prüfung nicht erfolgt -> Ohne bestehenden Grant niemals implizit gültig (`valid = false`).
+   - Lokale Administratoren können sich im Verwaltungsportal anmelden; ihre Ausweisansicht ist als Muster (`is_admin_preview = true`, `valid = false`) deklariert. Fehlgeschlagene LDAP-Prüfungen terminieren niemals die lokale Admin-Sitzung.
 2. **Persistenter Ausfallpuffer (`student_card_grants`)**:
    - Bei tatsächlicher LDAP-Verbindungsstörung darf eine zuvor erfolgreich bestätigte Gültigkeit zeitlich begrenzt weiterverwendet werden.
    - Der Puffer gilt maximal 30 Tage seit der letzten erfolgreichen LDAP-Prüfung (`offline_valid_until`) und niemals über das bestätigte Schuljahresende (31. Juli) hinaus.
    - Wiederholte Abrufe während einer Störung verlängern die Frist NICHT.
    - Ohne vorherige erfolgreiche LDAP-Prüfung oder nach Widerruf entsteht kein Puffer.
+   - Grants besitzen eine optionale `user_id` (Migration 026) und binden sich an `username` und `mediothek_number`.
 3. **Datenbankkonsistenz & Transaktionen (`src/student_db.js`)**:
-   - Unterscheidung zwischen „MySQL erreichbar, kein Treffer“ (keine Freigabe aus SQLite) vs. „MySQL-Verbindungsfehler“ (nur begrenzter Puffer).
+   - Unterscheidung zwischen „MySQL erreichbar, kein Treffer“ (`not_found`: keine Freigabe aus SQLite) vs. „MySQL-Verbindungsfehler“ (`connection_error`: nur begrenzter Puffer mit bestehendem Grant).
    - Foto-Upload, Genehmigung, Ablehnung und Löschung erfolgen in echten MySQL-Transaktionen (`beginTransaction`, `commit`, `rollback`).
+   - Foto-Löschung oder -Ablehnung invalidiert bestehende Grants (`revokePersistentGrant`).
    - Statusbeurteilung: Exakte Trennung von `1134` / `deaktiviert` / `abgelehnt` vor positiven Statuswerten.
 
-### 3.2 Datenschutzkonforme Verifizierungs-Endpoints (`/verify-check`, `/v`, `/verify`)
-*   **Datensparsame Abfrage**: Akzeptiert ausschließlich Mediotheksnummer (Feld 145) und vollständigen Namen (`b`/`bib` und `n`/`name`).
-*   **Keine ID-Interpretation**: Numerische Parameter werden nicht als Antrags-ID interpretiert.
-*   **Minimales Laden**: Lädt vor dem Namensabgleich weder Fotos, noch Geburtsdaten, Passwörter oder Vollprofile.
-*   **Einheitliche Fehlerantwort**: Falsche Namen, nicht gefundene Nummern und ungültige Ausweise liefern nach außen die identische Antwort `{ verified: false, status: 'Ungültig', message: 'Schülerausweis konnte nicht verifiziert werden.' }` (keine Enumeration-Leaks).
+### 3.2 Datenschutzkonforme 2-Phasen-QR-Verifizierung (`/verify-check`, `/v`, `/verify`)
+*   **Datensparsame 2-Phasen-Abfrage (`findStudentForVerification`)**:
+    - **Phase 1**: Minimaler Query nur nach Mediotheksnummer (Feld 145), Vorname (1), Nachname (2) und `applications.status >= 10`.
+    - Namensabgleich: Vor- und Nachname müssen beide nicht-leer sein und matchen.
+    - **Phase 2**: Nur für den gematchten Datensatz: Abfrage von Feld 146 (Username), Status (158) und Foto-Existenz (`LENGTH(file) > 20`).
+*   **Kein Passbild-Payload**: Binäre Foto-Daten werden niemals geladen oder übertragen.
+*   **Kein ID-Fallback**: Der veraltete `id`/`cleanId`-Fallback in `public/verify.html` ist entfernt; es werden zwingend `b`/`bib` und `n`/`name` verlangt.
+*   **Einheitliche Fehlerantwort**: Falsche Namen, nicht gefundene Nummern und ungültige Ausweise liefern nach außen die identische Antwort `{ verified: false, status: 'Ungültig', message: 'Schülerausweis konnte nicht verifiziert werden.' }`.
 
 ### 3.3 Status-Zustände im Frontend & PWA
 *   **Online geprüft**: Frische Server-Antwort im Online-Betrieb (`is_buffered: false`).
-*   **Ausfallpuffer aktiv**: Innerhalb des unveränderlichen 30-Tage-Fensters bei Server-/LDAP-Störung (`is_buffered: true`).
+*   **Gültig (Puffer)**: Innerhalb des unveränderlichen 30-Tage-Fensters bei Server-/LDAP-Störung (`is_buffered: true`). In `verify.html` visuell unterscheidbar als Puffer deklariert.
 *   **Erneute Onlineprüfung erforderlich**: Offline-Cache oder Puffer älter als 30 Tage / nach Schuljahresende.
 *   **Ausweis gesperrt**: Server hat Ausweis gesperrt oder LDAP-Konto deaktiviert.
-*   **Versionsprüfung**: Bei Profil-/Fotoänderung invalidiert eine veränderte `card_version` veraltete Offline-Caches.
+*   **Versionsprüfung**: Bei Profil-/Fotoänderung invalidiert eine veränderte `card_version` veraltete Offline-Caches. Alt-Caches ohne Versionsangabe erzwingen zwingend ein Online-Reload.
 
 ### 3.4 „Technik Scout“-Kennzeichnung
 *   **Merkmal & Verwaltung**: Opt-in Kennzeichnung (`users.is_technik_scout`), die ausschließlich durch autorisierte Administratoren in der Benutzerverwaltung aktiviert werden kann.

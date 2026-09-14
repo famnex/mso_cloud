@@ -128,6 +128,11 @@
       box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.25);
     }
 
+    .status-banner.buffered {
+      border-color: var(--warning);
+      box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.25);
+    }
+
     .status-banner.invalid {
       border-color: var(--danger);
       box-shadow: 0 10px 25px -5px var(--danger-glow);
@@ -593,6 +598,9 @@
         badgeVerified: "Offizieller Schülerausweis",
         titleVerified: "Ausweis Verifiziert",
         subVerified: "Gültiger Datensatz | Modellschule Obersberg",
+        badgeBuffered: "Ausweis Verifiziert (Puffer)",
+        titleBuffered: "Gültig (Ausfallpuffer)",
+        subBuffered: "Gültiger Datensatz | Offline-Puffer aktiv",
         badgeInvalid: "Nicht Verifiziert",
         titleInvalid: "Echtheit nicht verifizierbar",
         subInvalid: "Kein übereinstimmender Datensatz in der Datenbank",
@@ -616,6 +624,9 @@
         badgeVerified: "Official Student ID",
         titleVerified: "ID Verified",
         subVerified: "Valid Record | Modellschule Obersberg",
+        badgeBuffered: "ID Verified (Buffered)",
+        titleBuffered: "Valid (Offline Buffer)",
+        subBuffered: "Valid Record | Fallback buffer active",
         badgeInvalid: "Not Verified",
         titleInvalid: "Authenticity Cannot Be Verified",
         subInvalid: "No matching record in database",
@@ -639,6 +650,9 @@
         badgeVerified: "Carte d'Étudiant Officielle",
         titleVerified: "Carte Vérifiée",
         subVerified: "Enregistrement Valide | Modellschule Obersberg",
+        badgeBuffered: "Carte Vérifiée (Tampon)",
+        titleBuffered: "Valide (Tampon hors-ligne)",
+        subBuffered: "Enregistrement Valide | Tampon de secours actif",
         badgeInvalid: "Non Vérifiée",
         titleInvalid: "Authenticité Non Vérifiable",
         subInvalid: "Aucun enregistrement correspondant dans la base de données",
@@ -662,6 +676,9 @@
         badgeVerified: "Resmi Öğrenci Kimliği",
         titleVerified: "Kimlik Doğrulandı",
         subVerified: "Geçerli Kayıt | Modellschule Obersberg",
+        badgeBuffered: "Kimlik Doğrulandı (Tampon)",
+        titleBuffered: "Geçerli (Çevrimdışı Tampon)",
+        subBuffered: "Geçerli Kayıt | Çevrimdışı tampon aktif",
         badgeInvalid: "Doğrulanmadı",
         titleInvalid: "Kimlik Doğrulanamadı",
         subInvalid: "Veritabanında eşleşen kayıt bulunamadı",
@@ -685,6 +702,9 @@
         badgeVerified: "Офіційний Учнівський Квиток",
         titleVerified: "Квиток Перевірено",
         subVerified: "Дійсний запис | Modellschule Obersberg",
+        badgeBuffered: "Квиток Перевірено (Буфер)",
+        titleBuffered: "Дійсний (Офлайн-буфер)",
+        subBuffered: "Дійсний запис | Активний буфер захисту",
         badgeInvalid: "Не підтверджено",
         titleInvalid: "Автентичність не підтверджено",
         subInvalid: "Запис у базі даних не знайдено",
@@ -708,6 +728,9 @@
         badgeVerified: "بطاقة طالب رسمية",
         titleVerified: "تم التحقق من البطاقة",
         subVerified: "سجل صالحة | Modellschule Obersberg",
+        badgeBuffered: "تم التحقق من البطاقة (مؤقت)",
+        titleBuffered: "صالحة (ذاكرة مؤقتة)",
+        subBuffered: "سجل صالحة | الذاكرة الاحتياطية نشطة",
         badgeInvalid: "غير مؤكد",
         titleInvalid: "تعذر التحقق من الأصالة",
         subInvalid: "لا يوجد سجل مطابق في قاعدة البيانات",
@@ -759,6 +782,7 @@
 
     let isDbVerified = false;
     let isDbChecked = false;
+    let isDbBuffered = false;
 
     function updateBannerText() {
       const t = translations[currentLang];
@@ -771,9 +795,15 @@
         title.textContent = t.titleChecking;
         subtitle.textContent = t.subChecking;
       } else if (isDbVerified) {
-        badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + t.badgeVerified;
-        title.textContent = t.titleVerified;
-        subtitle.textContent = t.subVerified;
+        if (isDbBuffered) {
+          badge.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i> ' + t.badgeBuffered;
+          title.textContent = t.titleBuffered;
+          subtitle.textContent = t.subBuffered;
+        } else {
+          badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + t.badgeVerified;
+          title.textContent = t.titleVerified;
+          subtitle.textContent = t.subVerified;
+        }
       } else {
         badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + t.badgeInvalid;
         title.textContent = t.titleInvalid;
@@ -805,19 +835,18 @@
       const urlParams = new URLSearchParams(window.location.search);
       const nameParam = urlParams.get('n') || urlParams.get('name') || '';
       const bibParam = urlParams.get('b') || urlParams.get('bib') || '';
-      const idParam = urlParams.get('id') || '';
 
       const cleanName = nameParam.trim();
       const cleanBib = bibParam.trim();
-      const cleanId = idParam.trim();
 
       const statusBanner = document.getElementById('status-banner');
       const studentCard = document.getElementById('student-card').parentElement;
       const invalidCard = document.getElementById('invalid-card');
 
-      if (!cleanName || (!cleanBib && !cleanId)) {
+      if (!cleanName || !cleanBib) {
         isDbChecked = true;
         isDbVerified = false;
+        isDbBuffered = false;
         statusBanner.className = 'status-banner invalid';
         studentCard.style.display = 'none';
         invalidCard.style.display = 'block';
@@ -828,14 +857,15 @@
       document.getElementById('display-name').textContent = cleanName;
 
       try {
-        const res = await fetch(`api/student/verify-check?n=${encodeURIComponent(cleanName)}&b=${encodeURIComponent(cleanBib || cleanId)}`);
+        const res = await fetch(`api/student/verify-check?n=${encodeURIComponent(cleanName)}&b=${encodeURIComponent(cleanBib)}`);
         const data = await res.json();
 
         isDbChecked = true;
 
         if (res.ok && data.verified) {
           isDbVerified = true;
-          statusBanner.className = 'status-banner';
+          isDbBuffered = Boolean(data.is_buffered);
+          statusBanner.className = isDbBuffered ? 'status-banner buffered' : 'status-banner';
           studentCard.style.display = 'block';
           invalidCard.style.display = 'none';
           if (data.name) {
@@ -843,6 +873,7 @@
           }
         } else {
           isDbVerified = false;
+          isDbBuffered = false;
           statusBanner.className = 'status-banner invalid';
           studentCard.style.display = 'none';
           invalidCard.style.display = 'block';
@@ -854,6 +885,7 @@
         console.error('Fehler bei Datenbank-Prüfung:', err);
         isDbChecked = true;
         isDbVerified = false;
+        isDbBuffered = false;
         statusBanner.className = 'status-banner invalid';
         studentCard.style.display = 'none';
         invalidCard.style.display = 'block';
