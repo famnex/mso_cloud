@@ -59,6 +59,7 @@ Verwaltet lokale Accounts und dient als Cache für angemeldete LDAP-Nutzer.
 | `dn` | TEXT | Distinguished Name des LDAP-Benutzers (falls über LDAP authentifiziert) |
 | `first_name` | TEXT | Vorname des LDAP-Benutzers (aus givenName) |
 | `last_name` | TEXT | Nachname des LDAP-Benutzers (aus sn) |
+| `is_technik_scout` | INTEGER | Opt-In Kennzeichnung für Technik Scout auf Schülerausweis (`0` = Nein, `1` = Ja, DEFAULT `0`) |
 | `created_at` | DATETIME | Erstellungszeitpunkt |
 
 ---
@@ -430,3 +431,10 @@ Speichert persistente Freigaben, verifizierte Ausfallpuffer und Sperrstatus von 
     *   `idx_student_card_grants_username` auf `username`
     *   `idx_student_card_grants_mediothek` auf `mediothek_number`
 *   **Zweck**: Gewährleistet, dass Ausfallpuffer bei LDAP-/MySQL-Störungen unverändert bis zum festgelegten Fristende weitergelten, ohne bei wiederholten Abrufen künstlich verlängert zu werden oder widerrufene Ausweise zu reaktivieren.
+
+---
+
+### Migration: `025_add_is_technik_scout_to_users.sql`
+Fügt der Tabelle `users` das Feld `is_technik_scout` hinzu.
+*   `ALTER TABLE users ADD COLUMN is_technik_scout INTEGER NOT NULL DEFAULT 0;`
+*   **Zweck**: Speichert die dauerhafte Opt-In-Kennzeichnung für Technik Scouts zur Anzeige des entsprechenden Berechtigungs-Symbols und -Dialogs auf dem digitalen Schülerausweis. Wird von LDAP-Syncs oder Importen nicht überschrieben.

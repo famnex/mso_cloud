@@ -3422,9 +3422,13 @@ function renderAdminUserTable(users) {
       ? '<span class="user-badge" style="font-size:0.75rem; background:rgba(251,191,36,0.1); color:var(--warn-color);"><i class="fa-solid fa-network-wired"></i> LDAP</span>' 
       : '<span class="user-badge" style="font-size:0.75rem; background:rgba(74,222,128,0.1); color:var(--success-color);"><i class="fa-solid fa-database"></i> Lokal</span>';
     
-    const roleLabel = user.role === 'admin' 
+    const scoutBadge = (user.is_technik_scout === 1 || user.is_technik_scout === true)
+      ? ' <span class="user-badge" style="font-size:0.75rem; background:rgba(59,130,246,0.15); color:var(--accent-color); margin-left:4px;" title="Technik Scout auf Schülerausweis"><i class="fa-solid fa-microchip"></i> Scout</span>'
+      : '';
+
+    const roleLabel = (user.role === 'admin' 
       ? '<strong style="color:var(--error-color);">Admin</strong>' 
-      : 'Benutzer';
+      : 'Benutzer') + scoutBadge;
 
     const groupsStr = user.is_ldap === 1 
       ? (user.mapped_groups || []).join(', ') 
@@ -3837,6 +3841,12 @@ function openUserForm(user = null) {
   document.getElementById('user_password').disabled = false;
   document.getElementById('user_groups').disabled = false;
   
+  const scoutCheckbox = document.getElementById('user_is_technik_scout');
+  if (scoutCheckbox) {
+    scoutCheckbox.checked = false;
+    scoutCheckbox.disabled = false;
+  }
+  
   document.getElementById('user_password').required = true;
   document.getElementById('user-pass-hint').style.display = 'none';
   document.getElementById('user-pass-hint').innerText = 'Leer lassen, um das Passwort nicht zu ändern.';
@@ -3850,12 +3860,16 @@ function openUserForm(user = null) {
     document.getElementById('user_email').value = user.email || '';
     document.getElementById('user_role').value = user.role;
     document.getElementById('user_groups').value = (user.groups || []).join('\n');
+
+    if (scoutCheckbox) {
+      scoutCheckbox.checked = Boolean(user.is_technik_scout === 1 || user.is_technik_scout === true);
+    }
     
     document.getElementById('user_password').required = false;
     document.getElementById('user-pass-hint').style.display = 'block';
 
     if (user.is_ldap === 1) {
-      // LDAP-Benutzer: Nur Rolle ist editierbar!
+      // LDAP-Benutzer: Nur Rolle & Technik Scout sind editierbar!
       document.getElementById('user_email').disabled = true;
       document.getElementById('user_password').disabled = true;
       document.getElementById('user_groups').disabled = true;
@@ -3872,13 +3886,15 @@ async function saveUserForm(e) {
   
   const groupsRaw = document.getElementById('user_groups').value;
   const groups = groupsRaw ? groupsRaw.split(/[,\n]/).map(g => g.trim()).filter(g => g) : [];
+  const scoutCheckbox = document.getElementById('user_is_technik_scout');
 
   const body = {
     username: document.getElementById('user_username').value.trim(),
     email: document.getElementById('user_email').value.trim(),
     role: document.getElementById('user_role').value,
     groups: groups,
-    password: document.getElementById('user_password').value
+    password: document.getElementById('user_password').value,
+    is_technik_scout: scoutCheckbox ? scoutCheckbox.checked : false
   };
 
   const url = id ? `api/admin/users/${id}` : 'api/admin/users';

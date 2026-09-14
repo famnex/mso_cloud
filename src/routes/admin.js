@@ -722,10 +722,28 @@ router.delete('/ldap-mappings/:id', (req, res) => {
    4. Benutzerverwaltung (Users)
    ========================================================================== */
 
+/**
+ * Validiere den booleschen Zustand von is_technik_scout sicher.
+ * Verhindert, dass String "false" versehentlich als true interpretiert wird.
+ * Behält bei undefined/null den bisherigen Wert bei.
+ */
+function parseTechnikScout(val, currentVal = 0) {
+  if (val === undefined || val === null) {
+    return currentVal;
+  }
+  if (val === true || val === 1 || val === '1' || val === 'true') {
+    return 1;
+  }
+  if (val === false || val === 0 || val === '0' || val === 'false') {
+    return 0;
+  }
+  return currentVal;
+}
+
 router.get('/users', (req, res) => {
   try {
     // Passwörter nicht auslesen!
-    const users = db.prepare('SELECT id, username, email, role, groups, is_ldap, is_active, created_at, display_name FROM users ORDER BY username ASC').all();
+    const users = db.prepare('SELECT id, username, email, role, groups, is_ldap, is_active, is_technik_scout, created_at, display_name FROM users ORDER BY username ASC').all();
     
     // JSON-String parsen und LDAP Mappings auflösen
     const formatted = users.map(user => {
@@ -736,6 +754,7 @@ router.get('/users', (req, res) => {
       }
       return {
         ...user,
+        is_technik_scout: user.is_technik_scout === 1,
         groups: rawGroups,
         mapped_groups: mappedGroups
       };
@@ -749,7 +768,7 @@ router.get('/users', (req, res) => {
 
 router.post('/users', (req, res) => {
   try {
-    const { username, email, password, role, groups, display_name } = req.body;
+    const { username, email, password, role, groups, display_name, is_technik_scout } = req.body;
 
     if (!username || !email || !password || !role) {
       return res.status(400).json({ error: 'Username, E-Mail, Passwort und Rolle sind erforderlich.' });
@@ -758,13 +777,14 @@ router.post('/users', (req, res) => {
     const hash = bcrypt.hashSync(password, 10);
     const groupsJson = JSON.stringify(groups || []);
     const displayName = (display_name && display_name.trim() !== '') ? display_name.trim() : username.trim();
+    const scoutFlag = parseTechnikScout(is_technik_scout, 0);
 
     db.prepare(`
-      INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name, is_active, auth_version)
-      VALUES (?, ?, ?, ?, ?, 0, ?, 1, 1)
-    `).run(username.trim(), email.trim(), hash, role, groupsJson, displayName);
+      INSERT INTO users (username, email, password_hash, role, groups, is_ldap, display_name, is_active, auth_version, is_technik_scout)
+      VALUES (?, ?, ?, ?, ?, 0, ?, 1, 1, ?)
+    `).run(username.trim(), email.trim(), hash, role, groupsJson, displayName, scoutFlag);
 
-    logEvent('info', 'user_created', `Benutzer ${username.trim()} wurde erfolgreich durch Admin angelegt`, { role, email: email.trim() }, req.ip);
+    logEvent('info', 'user_created', `Benutzer ${username.trim()} wurde erfolgreich durch Admin angelegt`, { role, email: email.trim(), is_technik_scout: scoutFlag }, req.ip);
 
     res.json({ success: true, message: 'Benutzer erfolgreich angelegt.' });
   } catch (error) {
@@ -778,50 +798,53 @@ router.post('/users', (req, res) => {
 router.put('/users/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { email, role, groups, password, display_name, is_active } = req.body;
+    const { email, role, groups, password, display_name, is_active, is_technik_scout } = req.body;
 
-    const user = db.prepare('SELECT is_ldap, username, is_active FROM users WHERE id = ?').get(id);
+    const user = db.prepare('SELECT id, is_ldap, username, email, role, groups, display_name, is_active, is_technik_scout FROM users WHERE id = ?').get(id);
     if (!user) {
       return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
     }
 
+    const effectiveRole = (role !== undefined && role !== null && String(role).trim() !== '') ? String(role).trim() : user.role;
+    const effectiveEmail = (email !== undefined && email !== null && String(email).trim() !== '') ? String(email).trim() : user.email;
     const activeFlag = (is_active !== undefined && is_active !== null) ? (parseInt(is_active, 10) === 0 ? 0 : 1) : (user.is_active !== undefined ? user.is_active : 1);
+    const scoutFlag = parseTechnikScout(is_technik_scout, user.is_technik_scout !== undefined ? user.is_technik_scout : 0);
 
     if (user.is_ldap === 1) {
-      // WICHTIG: LDAP-Benutzer sind nicht frei bearbeitbar. Rolle & Aktivstatus dürfen geändert werden!
-      if (!role) {
+      // WICHTIG: LDAP-Benutzer sind nicht frei bearbeitbar. Rolle, Aktivstatus & Technik Scout dürfen geändert werden!
+      if (!effectiveRole) {
         return res.status(400).json({ error: 'Rolle ist erforderlich.' });
       }
-      db.prepare('UPDATE users SET role = ?, is_active = ?, auth_version = auth_version + 1 WHERE id = ?').run(role, activeFlag, id);
-      logEvent('info', 'user_updated_ldap', `LDAP-Benutzer ${user.username} aktualisiert (Rolle: ${role}, is_active: ${activeFlag})`, { userId: id }, req.ip);
+      db.prepare('UPDATE users SET role = ?, is_active = ?, is_technik_scout = ?, auth_version = auth_version + 1 WHERE id = ?').run(effectiveRole, activeFlag, scoutFlag, id);
+      logEvent('info', 'user_updated_ldap', `LDAP-Benutzer ${user.username} aktualisiert (Rolle: ${effectiveRole}, is_active: ${activeFlag}, is_technik_scout: ${scoutFlag})`, { userId: id }, req.ip);
       return res.json({ success: true, message: 'Rolle/Status des LDAP-Benutzers erfolgreich aktualisiert.' });
     }
 
     // Lokaler Benutzer: Normaler Ablauf
-    if (!email || !role) {
+    if (!effectiveEmail || !effectiveRole) {
       return res.status(400).json({ error: 'E-Mail und Rolle sind erforderlich.' });
     }
 
-    const groupsJson = JSON.stringify(groups || []);
-    const displayName = (display_name && display_name.trim() !== '') ? display_name.trim() : user.username;
+    const groupsJson = groups !== undefined ? JSON.stringify(groups || []) : (user.groups || '[]');
+    const displayName = (display_name && display_name.trim() !== '') ? display_name.trim() : (user.display_name || user.username);
 
     // Passwort optional updaten
     if (password && password.trim() !== '') {
       const hash = bcrypt.hashSync(password, 10);
       db.prepare(`
         UPDATE users
-        SET email = ?, role = ?, groups = ?, password_hash = ?, display_name = ?, is_active = ?, auth_version = auth_version + 1
+        SET email = ?, role = ?, groups = ?, password_hash = ?, display_name = ?, is_active = ?, is_technik_scout = ?, auth_version = auth_version + 1
         WHERE id = ?
-      `).run(email.trim(), role, groupsJson, hash, displayName, activeFlag, id);
+      `).run(effectiveEmail, effectiveRole, groupsJson, hash, displayName, activeFlag, scoutFlag, id);
       db.prepare("UPDATE student_profiles SET start_password = 'geändert' WHERE user_id = ?").run(id);
-      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert (inkl. Passwortänderung)`, { userId: id, role, email: email.trim(), is_active: activeFlag }, req.ip);
+      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert (inkl. Passwortänderung)`, { userId: id, role: effectiveRole, email: effectiveEmail, is_active: activeFlag, is_technik_scout: scoutFlag }, req.ip);
     } else {
       db.prepare(`
         UPDATE users
-        SET email = ?, role = ?, groups = ?, display_name = ?, is_active = ?, auth_version = auth_version + 1
+        SET email = ?, role = ?, groups = ?, display_name = ?, is_active = ?, is_technik_scout = ?, auth_version = auth_version + 1
         WHERE id = ?
-      `).run(email.trim(), role, groupsJson, displayName, activeFlag, id);
-      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert`, { userId: id, role, email: email.trim(), is_active: activeFlag }, req.ip);
+      `).run(effectiveEmail, effectiveRole, groupsJson, displayName, activeFlag, scoutFlag, id);
+      logEvent('info', 'user_updated', `Lokaler Benutzer ${user.username} wurde aktualisiert`, { userId: id, role: effectiveRole, email: effectiveEmail, is_active: activeFlag, is_technik_scout: scoutFlag }, req.ip);
     }
 
     res.json({ success: true, message: 'Benutzer erfolgreich aktualisiert.' });

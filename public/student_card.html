@@ -344,6 +344,49 @@
       backdrop-filter: blur(4px);
     }
 
+    .technik-scout-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1.5px solid var(--accent, #3b82f6);
+      color: var(--accent, #3b82f6);
+      background: rgba(59, 130, 246, 0.15);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      position: relative;
+      cursor: pointer;
+      pointer-events: auto;
+      padding: 0;
+      margin: 0;
+      outline: none;
+      transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.3);
+      flex-shrink: 0;
+    }
+    .technik-scout-badge::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .technik-scout-badge:hover {
+      background: rgba(59, 130, 246, 0.28);
+      transform: scale(1.12);
+      box-shadow: 0 0 10px var(--accent-glow, rgba(59, 130, 246, 0.5));
+    }
+    .technik-scout-badge:focus-visible {
+      outline: 2px solid var(--accent, #3b82f6);
+      outline-offset: 2px;
+    }
+
     /* ── Geburtstagstoast (kleine Anzeige auf dem Ausweis) ─────────── */
     .birthday-cake-icon {
       display: none;
@@ -1412,6 +1455,26 @@
     </div>
   </div>
 
+  <!-- Technik Scout Modal Dialog -->
+  <div id="technik-scout-modal" class="pwa-prompt-overlay" style="display: none; justify-content: center; align-items: center; z-index: 2100; overflow-y: auto; padding: 15px 10px; box-sizing: border-box;" onclick="if(event.target === this) closeTechnikScoutModal();" role="dialog" aria-modal="true" aria-labelledby="technik-scout-modal-title" aria-describedby="technik-scout-modal-desc">
+    <div class="pwa-prompt-card" style="max-width: 360px; max-height: calc(100dvh - 30px); overflow-y: auto; padding: 25px; box-sizing: border-box; text-align: center;">
+      <button class="pwa-close-btn" id="technik-scout-modal-close-btn" onclick="closeTechnikScoutModal()" aria-label="Schließen"><i class="fa-solid fa-xmark"></i></button>
+      <div class="pwa-icon-logo" style="margin-bottom: 15px; color: var(--accent);">
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block; margin: 0 auto;">
+          <path d="M12 2.2a1.8 1.8 0 0 1 1.8 1.8v.3a1.8 1.8 0 0 0 1.1 1.65l.3.1a1.8 1.8 0 0 0 2-.3l.2-.2a1.8 1.8 0 1 1 2.55 2.55l-.2.2a1.8 1.8 0 0 0-.3 2l.1.3a1.8 1.8 0 0 0 1.65 1.1h.3a1.8 1.8 0 1 1 0 3.6h-.3a1.8 1.8 0 0 0-1.65 1.1l-.1.3a1.8 1.8 0 0 0 .3 2l.2.2a1.8 1.8 0 1 1-2.55 2.55l-.2-.2a1.8 1.8 0 0 0-2-.3l-.3.1a1.8 1.8 0 0 0-1.1 1.65v.3a1.8 1.8 0 1 1-3.6 0v-.3a1.8 1.8 0 0 0-1.1-1.65l-.3-.1a1.8 1.8 0 0 0-2 .3l-.2.2a1.8 1.8 0 1 1-2.55-2.55l.2-.2a1.8 1.8 0 0 0 .3-2l-.1-.3a1.8 1.8 0 0 0-1.65-1.1h-.3a1.8 1.8 0 1 1 0-3.6h.3a1.8 1.8 0 0 0 1.65-1.1l.1-.3a1.8 1.8 0 0 0-.3-2l-.2-.2a1.8 1.8 0 1 1 2.55-2.55l.2.2a1.8 1.8 0 0 0 2 .3l.3-.1a1.8 1.8 0 0 0 1.1-1.65V4a1.8 1.8 0 0 1 1.8-1.8z" />
+          <rect x="8" y="8" width="8" height="8" rx="1.5" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.4" />
+          <path d="M10 6v2M14 6v2M10 16v2M14 16v2M6 10h2M6 14h2M16 10h2M16 14h2" stroke-width="1.3" />
+          <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+        </svg>
+      </div>
+      
+      <h3 id="technik-scout-modal-title" style="color: var(--text); font-weight: 700; margin-bottom: 8px; font-size: 1.2rem; text-align: center;">Technik Scout</h3>
+      <p id="technik-scout-modal-desc" style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; margin-bottom: 20px; text-align: left;">Dieser Schüler / diese Schülerin ist Technik Scout. Bitte ermöglichen Sie ihr/ihm die Arbeit an der Technik der MSO – auch durch Aufschließen verschlossener Kursräume. Dies gilt nicht für Fachräume. Informatikräume dürfen jedoch ohne Aufsicht betreten werden.</p>
+
+      <button type="button" class="motion-tap-btn" onclick="closeTechnikScoutModal()" style="width: 100%; padding: 10px; border-radius: 8px; font-weight: 700;">Verstanden</button>
+    </div>
+  </div>
+
   <!-- Motion Permission Full-Screen Overlay (iOS only) -->
   <div id="motion-permission-overlay" onclick="requestMotionPermission()">
     <div class="tap-ring"></div>
@@ -1581,9 +1644,17 @@
           </div>
         </div>
 
-        <!-- Sonder-Symbole (Torte, Unter-18 & Plastikkarte) ABSOLUT links neben dem Hologramm -->
+        <!-- Sonder-Symbole (Torte, Technik-Scout, Unter-18 & Plastikkarte) ABSOLUT links neben dem Hologramm -->
         <div class="special-card-badges" id="special-card-badges">
           <span class="birthday-cake-icon" id="birthday-cake-icon">🎂</span>
+          <button type="button" class="technik-scout-badge" id="technik-scout-badge" aria-label="Technik Scout – Berechtigung anzeigen" style="display:none;" onclick="openTechnikScoutModal(this)" title="Technik Scout – Berechtigung anzeigen">
+            <svg class="technik-scout-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2.2a1.8 1.8 0 0 1 1.8 1.8v.3a1.8 1.8 0 0 0 1.1 1.65l.3.1a1.8 1.8 0 0 0 2-.3l.2-.2a1.8 1.8 0 1 1 2.55 2.55l-.2.2a1.8 1.8 0 0 0-.3 2l.1.3a1.8 1.8 0 0 0 1.65 1.1h.3a1.8 1.8 0 1 1 0 3.6h-.3a1.8 1.8 0 0 0-1.65 1.1l-.1.3a1.8 1.8 0 0 0 .3 2l.2.2a1.8 1.8 0 1 1-2.55 2.55l-.2-.2a1.8 1.8 0 0 0-2-.3l-.3.1a1.8 1.8 0 0 0-1.1 1.65v.3a1.8 1.8 0 1 1-3.6 0v-.3a1.8 1.8 0 0 0-1.1-1.65l-.3-.1a1.8 1.8 0 0 0-2 .3l-.2.2a1.8 1.8 0 1 1-2.55-2.55l.2-.2a1.8 1.8 0 0 0 .3-2l-.1-.3a1.8 1.8 0 0 0-1.65-1.1h-.3a1.8 1.8 0 1 1 0-3.6h.3a1.8 1.8 0 0 0 1.65-1.1l.1-.3a1.8 1.8 0 0 0-.3-2l-.2-.2a1.8 1.8 0 1 1 2.55-2.55l.2.2a1.8 1.8 0 0 0 2 .3l.3-.1a1.8 1.8 0 0 0 1.1-1.65V4a1.8 1.8 0 0 1 1.8-1.8z" />
+              <rect x="8" y="8" width="8" height="8" rx="1.5" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.4" />
+              <path d="M10 6v2M14 6v2M10 16v2M14 16v2M6 10h2M6 14h2M16 10h2M16 14h2" stroke-width="1.3" />
+              <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+            </svg>
+          </button>
           <span class="under18-badge" id="under18-badge" style="display:none;">18</span>
           <span class="printed-badge" id="printed-badge" style="display:none;" title="Ausweis als Plastikkarte gedruckt"><i class="fa-solid fa-id-card"></i></span>
         </div>
@@ -2594,7 +2665,8 @@
                       reason_code: statusData.reason_code,
                       status_summary: statusData.status_summary,
                       is_buffered: statusData.is_buffered,
-                      card_version: statusData.card_version || tempCached.card_version
+                      card_version: statusData.card_version || tempCached.card_version,
+                      is_technik_scout: typeof statusData.is_technik_scout !== 'undefined' ? Boolean(statusData.is_technik_scout) : Boolean(tempCached.is_technik_scout)
                     };
                     localStorage.setItem('mso_cached_card', JSON.stringify(cardData));
                   }
@@ -2936,6 +3008,12 @@
         document.getElementById('card-expiry').innerText = '—';
         document.getElementById('card-mediothek-number-display').innerText = '—';
         document.getElementById('card-name').innerText = '—';
+        const technikScoutBadge = document.getElementById('technik-scout-badge');
+        if (technikScoutBadge) technikScoutBadge.style.display = 'none';
+        const under18Badge = document.getElementById('under18-badge');
+        if (under18Badge) under18Badge.style.display = 'none';
+        const printedBadge = document.getElementById('printed-badge');
+        if (printedBadge) printedBadge.style.display = 'none';
       } else {
         document.getElementById('card-name').innerText = `${data.last_name}, ${data.first_name}`;
         adjustNameFontSize();
@@ -2963,6 +3041,13 @@
           }
         }
         document.getElementById('card-birth').textContent = birthStr;
+
+        // ── Technik-Scout-Badge ─────────────────────────────────────────
+        const technikScoutBadge = document.getElementById('technik-scout-badge');
+        if (technikScoutBadge) {
+          const isTechnikScout = Boolean(data.is_technik_scout);
+          technikScoutBadge.style.display = isTechnikScout ? 'inline-flex' : 'none';
+        }
 
         // ── Unter-18-Badge ─────────────────────────────────────────────
         const under18Badge = document.getElementById('under18-badge');
@@ -3247,9 +3332,38 @@
     window.openFullscreenQR = openFullscreenQR;
     window.closeFullscreenQR = closeFullscreenQR;
 
+    let lastTechnikScoutTrigger = null;
+
+    function openTechnikScoutModal(triggerEl) {
+      lastTechnikScoutTrigger = triggerEl || document.activeElement;
+      const modal = document.getElementById('technik-scout-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        const closeBtn = document.getElementById('technik-scout-modal-close-btn');
+        if (closeBtn) {
+          closeBtn.focus();
+        }
+      }
+    }
+
+    function closeTechnikScoutModal() {
+      const modal = document.getElementById('technik-scout-modal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+      if (lastTechnikScoutTrigger && typeof lastTechnikScoutTrigger.focus === 'function') {
+        lastTechnikScoutTrigger.focus();
+      }
+    }
+
+    window.openTechnikScoutModal = openTechnikScoutModal;
+    window.closeTechnikScoutModal = closeTechnikScoutModal;
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeFullscreenQR();
+        closeTechnikScoutModal();
+        if (typeof closeLoginModal === 'function') closeLoginModal();
       }
     });
 

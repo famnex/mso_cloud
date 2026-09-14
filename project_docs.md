@@ -72,6 +72,16 @@ Die Gültigkeit eines echten Schülerausweises wird strikt und zentral serversei
 *   **Ausweis gesperrt**: Server hat Ausweis gesperrt oder LDAP-Konto deaktiviert.
 *   **Versionsprüfung**: Bei Profil-/Fotoänderung invalidiert eine veränderte `card_version` veraltete Offline-Caches.
 
+### 3.4 „Technik Scout“-Kennzeichnung
+*   **Merkmal & Verwaltung**: Opt-in Kennzeichnung (`users.is_technik_scout`), die ausschließlich durch autorisierte Administratoren in der Benutzerverwaltung aktiviert werden kann.
+*   **Unveränderlichkeit**: Das Merkmal wird weder durch LDAP-Synchronisationen noch durch externe Schülerdaten-Imports überschrieben.
+*   **Darstellung auf dem Schülerausweis**:
+    *   Zeigt ein integriertes SVG-Symbol (Zahnrad mit integriertem Mikrochip).
+    *   Bei Schülern unter 18 Jahren unmittelbar links neben dem „nicht 18“-Symbol; ab 18 Jahren an dessen Position.
+    *   Antippen/Klicken öffnet einen barrierefreien Modal-Dialog mit Berechtigungshinweis zur Nutzung von Technik- und Informatikräumen.
+    *   Auf gesperrten oder abgelaufenen Ausweisen ist die Technik-Scout-Kennzeichnung deaktiviert.
+    *   Funktioniert offline zusammen mit dem Schülerausweis-Cache. Bei einem offline befindlichen Gerät wird ein nachträglicher Entzug wirksam, sobald wieder eine Netzwerkverbindung besteht oder der 30-Tage-Cache abläuft.
+
 ---
 
 ## 4. Single-Sign-On & OIDC Provider

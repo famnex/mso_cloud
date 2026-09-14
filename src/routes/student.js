@@ -39,7 +39,7 @@ router.get('/card', async (req, res) => {
   }
 
   // 1. Prüfen, ob der Benutzer noch in der lokalen Datenbank existiert und aktiv ist
-  const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_ldap, is_active, auth_version FROM users WHERE id = ?').get(user.id);
+  const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_ldap, is_active, auth_version, is_technik_scout FROM users WHERE id = ?').get(user.id);
   if (!dbUser || dbUser.is_active === 0) {
     console.log(`[Express /card] Lokales Konto für Benutzer ${user.username} ist inaktiv oder existiert nicht mehr.`);
     req.session.destroy(() => {});
@@ -200,6 +200,7 @@ router.get('/card', async (req, res) => {
       card_status: profile.card_status,
       card_status_code: profile.card_status_code || '1130',
       is_card_printed: (profile.card_status_code === '1133' || profile.card_status === 'Ausweis gedruckt' || profile.card_status === 'Ausweis ausgegeben'),
+      is_technik_scout: Boolean(eligibility.valid && dbUser && dbUser.is_technik_scout === 1),
       expires_at: eligibility.expiresAt,
       offline_valid_until: eligibility.offlineValidUntil,
       valid: eligibility.valid,
@@ -266,7 +267,7 @@ router.get('/status-check', async (req, res) => {
     const now = new Date();
 
     // 1. Lokales Konto prüfen
-    const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_active, auth_version FROM users WHERE username = ?').get(username);
+    const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_active, auth_version, is_technik_scout FROM users WHERE username = ?').get(username);
     if (!dbUser || dbUser.is_active === 0) {
       revokePersistentGrant(username);
       return res.json({
@@ -276,7 +277,8 @@ router.get('/status-check', async (req, res) => {
         reason_code: 'ACCOUNT_INACTIVE',
         status_summary: 'Konto deaktiviert oder gelöscht.',
         card_status: 'Ausweis gesperrt',
-        is_buffered: false
+        is_buffered: false,
+        is_technik_scout: false
       });
     }
 
@@ -289,7 +291,8 @@ router.get('/status-check', async (req, res) => {
         status_summary: 'Admin-Vorschau (Kein gültiger Schülerausweis)',
         card_status: 'Vorschau',
         is_admin_preview: true,
-        is_buffered: false
+        is_buffered: false,
+        is_technik_scout: false
       });
     }
 
@@ -313,7 +316,8 @@ router.get('/status-check', async (req, res) => {
         reason_code: 'ACCOUNT_INACTIVE',
         status_summary: 'Konto im LDAP deaktiviert oder gelöscht.',
         card_status: 'Ausweis gesperrt',
-        is_buffered: false
+        is_buffered: false,
+        is_technik_scout: false
       });
     }
 
@@ -339,6 +343,7 @@ router.get('/status-check', async (req, res) => {
       reason_code: eligibility.reasonCode,
       status_summary: eligibility.statusSummary,
       card_status: eligibility.rawStatus,
+      is_technik_scout: Boolean(eligibility.valid && dbUser && dbUser.is_technik_scout === 1),
       expires_at: eligibility.expiresAt,
       offline_valid_until: eligibility.offlineValidUntil,
       is_buffered: eligibility.is_buffered,
