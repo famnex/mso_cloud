@@ -79,7 +79,7 @@ function normalizeStatus(status, statusCode) {
 function getGrantByUsername(username) {
   if (!username) return null;
   try {
-    return db.prepare('SELECT * FROM student_card_grants WHERE username = ?').get(String(username).trim());
+    return db.prepare('SELECT * FROM student_card_grants WHERE username = ?').get(String(username).trim()) || null;
   } catch (err) {
     console.error('[CardEligibility] Fehler beim Lesen von student_card_grants nach Username:', err.message);
     return null;
@@ -92,7 +92,7 @@ function getGrantByUsername(username) {
 function getGrantByMediothekNumber(mediothekNumber) {
   if (!mediothekNumber) return null;
   try {
-    return db.prepare('SELECT * FROM student_card_grants WHERE mediothek_number = ?').get(String(mediothekNumber).trim());
+    return db.prepare('SELECT * FROM student_card_grants WHERE mediothek_number = ?').get(String(mediothekNumber).trim()) || null;
   } catch (err) {
     console.error('[CardEligibility] Fehler beim Lesen von student_card_grants nach Mediotheksnummer:', err.message);
     return null;
@@ -105,7 +105,7 @@ function getGrantByMediothekNumber(mediothekNumber) {
 function getGrantByUserId(userId) {
   if (!userId) return null;
   try {
-    return db.prepare('SELECT * FROM student_card_grants WHERE user_id = ?').get(userId);
+    return db.prepare('SELECT * FROM student_card_grants WHERE user_id = ?').get(userId) || null;
   } catch (err) {
     console.error('[CardEligibility] Fehler beim Lesen von student_card_grants nach user_id:', err.message);
     return null;
@@ -113,18 +113,19 @@ function getGrantByUserId(userId) {
 }
 
 /**
- * Liest den persistenten Ausweis-Grant aus der Datenbank (flexibler Identifier).
+ * Liest den persistenten Ausweis-Grant aus der Datenbank (nach Username, Mediotheksnummer oder expliziter numerischer user_id).
+ * WICHTIG: Numerische Strings werden als Username oder Mediotheksnummer behandelt, NICHT als user_id!
  */
 function getPersistentGrant(identifier) {
   if (!identifier) return null;
   try {
-    if (typeof identifier === 'number' || /^\d+$/.test(String(identifier))) {
-      const byUser = getGrantByUserId(parseInt(identifier, 10));
-      if (byUser) return byUser;
+    if (typeof identifier === 'number') {
+      return getGrantByUserId(identifier);
     }
-    const byUserStr = getGrantByUsername(String(identifier));
+    const strId = String(identifier).trim();
+    const byUserStr = getGrantByUsername(strId);
     if (byUserStr) return byUserStr;
-    return getGrantByMediothekNumber(String(identifier));
+    return getGrantByMediothekNumber(strId);
   } catch (err) {
     console.error('[CardEligibility] Fehler beim Lesen von student_card_grants:', err.message);
     return null;
@@ -173,17 +174,26 @@ function savePersistentGrant({ userId, username, mediothekNumber, lastLdapSucces
 }
 
 /**
- * Widerruft einen Grant explizit (z.B. bei negativem LDAP-Befund oder Admin-Sperre).
+ * Widerruft einen Grant explizit (z.B. bei negativem LDAP-Befund, Entzug oder Sperre).
  */
 function revokePersistentGrant(identifier) {
   if (!identifier) return;
   try {
     const nowIso = new Date().toISOString();
-    db.prepare(`
-      UPDATE student_card_grants 
-      SET is_revoked = 1, offline_valid_until = ?, updated_at = ?
-      WHERE username = ? OR mediothek_number = ? OR user_id = ?
-    `).run(nowIso, nowIso, String(identifier).trim(), String(identifier).trim(), typeof identifier === 'number' ? identifier : -1);
+    if (typeof identifier === 'number') {
+      db.prepare(`
+        UPDATE student_card_grants 
+        SET is_revoked = 1, offline_valid_until = ?, updated_at = ?
+        WHERE user_id = ?
+      `).run(nowIso, nowIso, identifier);
+    } else {
+      const cleanId = String(identifier).trim();
+      db.prepare(`
+        UPDATE student_card_grants 
+        SET is_revoked = 1, offline_valid_until = ?, updated_at = ?
+        WHERE username = ? OR mediothek_number = ?
+      `).run(nowIso, nowIso, cleanId, cleanId);
+    }
   } catch (err) {
     console.error('[CardEligibility] Fehler beim Widerrufen von student_card_grants:', err);
   }
@@ -191,35 +201,56 @@ function revokePersistentGrant(identifier) {
 
 /**
  * Bewertet deterministisch die Gültigkeit eines Schülerausweises unter Einbeziehung von
- * LDAP-Status, Schuljahresende und persistenten Ausfallpuffern.
+ * LDAP-Status, MySQL-Statusklassifikation, Schuljahresende und persistenten Ausfallpuffern.
  * 
  * @param {Object} options
  * @param {Object} options.user - Benutzerobjekt (users)
  * @param {Object} options.profile - Schülerprofil (student_profiles oder MySQL)
  * @param {Object} options.ldapStatus - Ergebnis von ldap.isUserActiveInLdap: { status: string, active: boolean, error: string|null }
+ * @param {Object} options.mysqlStatus - Ergebnis/Klassifikation der MySQL-Abfrage: { status: 'found'|'not_found'|'connection_error'|'query_error'|'disabled', source: string }
  * @param {Date} options.now - Auswertungszeitpunkt (Standard: new Date())
  * @param {boolean} options.isAdminPreview - Flag, ob es sich um eine Admin-Vorschau handelt
+ * @param {boolean} options.allowSaveGrant - Ob ein Live-Grant in SQLite gespeichert werden darf (Standard: true, false bei QR-Verifikation)
  * @returns {Object} Einheitlicher Ergebnisvertrag
  */
 function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
-  let user, profile, ldapStatus, now, isAdminPreview;
-  if (userOrOptions && typeof userOrOptions === 'object' && ('user' in userOrOptions || 'ldapStatus' in userOrOptions || 'isAdminPreview' in userOrOptions || 'now' in userOrOptions || 'profile' in userOrOptions)) {
+  let user, profile, ldapStatus, mysqlStatus, now, isAdminPreview, allowSaveGrant;
+  if (userOrOptions && typeof userOrOptions === 'object' && ('user' in userOrOptions || 'ldapStatus' in userOrOptions || 'mysqlStatus' in userOrOptions || 'isAdminPreview' in userOrOptions || 'now' in userOrOptions || 'profile' in userOrOptions)) {
     user = userOrOptions.user;
     profile = userOrOptions.profile;
     ldapStatus = userOrOptions.ldapStatus !== undefined ? userOrOptions.ldapStatus : null;
+    mysqlStatus = userOrOptions.mysqlStatus !== undefined ? userOrOptions.mysqlStatus : null;
     now = userOrOptions.now || new Date();
     isAdminPreview = userOrOptions.isAdminPreview || false;
+    allowSaveGrant = userOrOptions.allowSaveGrant !== undefined ? userOrOptions.allowSaveGrant : true;
   } else {
     user = userOrOptions;
     profile = profileArg;
     now = nowArg || new Date();
     ldapStatus = null;
+    mysqlStatus = null;
     isAdminPreview = false;
+    allowSaveGrant = true;
   }
+
   const { expiresAt, expiryDate } = getSchoolYearExpirationDate(now);
   const isExpired = now > expiryDate;
-  const username = (user && user.username) || (profile && profile.username) || '';
+  
+  // Identitätsattribute strikt auflösen
+  const targetUsername = (user && user.username) ? String(user.username).trim() : ((profile && profile.username) ? String(profile.username).trim() : '');
+  const targetUserId = (user && typeof user.id === 'number') ? user.id : ((profile && typeof profile.user_id === 'number') ? profile.user_id : null);
+  const targetMediothek = (profile && profile.mediothek_number) ? String(profile.mediothek_number).trim() : '';
   const cardVersion = computeCardVersion(profile);
+
+  // MySQL-Status ableiten falls nicht explizit übergeben
+  let effectiveMysqlStatus = 'found';
+  if (mysqlStatus && typeof mysqlStatus === 'object') {
+    effectiveMysqlStatus = mysqlStatus.status || 'found';
+  } else if (profile && profile._queryStatus) {
+    effectiveMysqlStatus = profile._queryStatus;
+  } else if (!profile) {
+    effectiveMysqlStatus = 'not_found';
+  }
 
   // 1. Admin-Vorschau: Kein echter Schülerausweis
   if (isAdminPreview || (user && user.role === 'admin')) {
@@ -237,7 +268,7 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
 
   // 2. Konto-Existenz und Aktivität prüfen
   if (!user || user.is_active === 0) {
-    if (username) revokePersistentGrant(username);
+    if (targetUsername) revokePersistentGrant(targetUsername);
     return {
       valid: false,
       reasonCode: 'ACCOUNT_INACTIVE',
@@ -250,8 +281,41 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
     };
   }
 
-  // 3. Profil-Existenz prüfen
+  // 3. MySQL-Fehlerklassifikation: Fall b (not_found) & Fall d (query_error)
+  if (effectiveMysqlStatus === 'not_found') {
+    // Live MySQL-Prüfung ergab: Benutzer hat kein Schülerprofil -> Grant sofort invalidieren!
+    if (targetUsername) revokePersistentGrant(targetUsername);
+    return {
+      valid: false,
+      reasonCode: 'PROFILE_NOT_FOUND',
+      statusSummary: 'Kein Schülerprofil vorhanden',
+      rawStatus: '',
+      expiresAt: expiresAt,
+      offlineValidUntil: null,
+      is_buffered: false,
+      cardVersion: 'v0'
+    };
+  }
+
+  if (effectiveMysqlStatus === 'query_error') {
+    // SQL-/Schemafehler dürfen nicht pauschal als Ausfallpuffer behandelt werden
+    return {
+      valid: false,
+      reasonCode: 'DATABASE_ERROR',
+      statusSummary: 'Datenbankfehler bei Profilprüfung',
+      rawStatus: '',
+      expiresAt: expiresAt,
+      offlineValidUntil: null,
+      is_buffered: false,
+      cardVersion: cardVersion
+    };
+  }
+
+  // 4. Profil-Existenz prüfen
   if (!profile) {
+    if (targetUsername && effectiveMysqlStatus !== 'connection_error') {
+      revokePersistentGrant(targetUsername);
+    }
     return {
       valid: false,
       reasonCode: 'PROFILE_NOT_FOUND',
@@ -268,7 +332,7 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
   const { statusStr, codeStr } = normalizeStatus(rawStatus, profile.card_status_code);
   const hasImage = Boolean(profile.card_image && String(profile.card_image).trim().length > 20);
 
-  // 4. Ausweis gesperrt?
+  // 5. Ausweis gesperrt / abgelehnt?
   const isRevoked = REVOKED_STATUSES.has(statusStr) ||
                     REVOKED_STATUSES.has(codeStr) ||
                     codeStr === '1134' ||
@@ -277,7 +341,7 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
                     statusStr.includes('ungültig') ||
                     statusStr.includes('ungueltig');
   if (isRevoked) {
-    if (username) revokePersistentGrant(username);
+    if (targetUsername) revokePersistentGrant(targetUsername);
     return {
       valid: false,
       reasonCode: 'CARD_REVOKED',
@@ -290,7 +354,7 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
     };
   }
 
-  // 5. Ausweis abgelaufen (Schuljahresende)?
+  // 6. Ausweis abgelaufen (Schuljahresende)?
   if (isExpired) {
     return {
       valid: false,
@@ -304,8 +368,11 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
     };
   }
 
-  // 6. Passbild vorhanden?
+  // 7. Passbild vorhanden?
   if (!hasImage) {
+    if (targetUsername && effectiveMysqlStatus !== 'connection_error') {
+      revokePersistentGrant(targetUsername);
+    }
     return {
       valid: false,
       reasonCode: 'NO_PHOTO',
@@ -318,9 +385,12 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
     };
   }
 
-  // 7. Passbild verifiziert / genehmigt?
+  // 8. Passbild verifiziert / genehmigt?
   const isVerified = VERIFIED_STATUSES.has(statusStr) || VERIFIED_STATUSES.has(codeStr);
   if (!isVerified) {
+    if (targetUsername && effectiveMysqlStatus !== 'connection_error') {
+      revokePersistentGrant(targetUsername);
+    }
     return {
       valid: false,
       reasonCode: 'PHOTO_NOT_APPROVED',
@@ -333,16 +403,39 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
     };
   }
 
-  // 8. LDAP-Status & Puffer-Bewertung
-  let existingGrant = username ? getGrantByUsername(username) : null;
-  if (!existingGrant && profile.mediothek_number) {
-    existingGrant = getGrantByMediothekNumber(profile.mediothek_number);
-  }
-  if (!existingGrant && user.id) {
-    existingGrant = getGrantByUserId(user.id);
+  // 9. Strikte Identitätsbindung & Grant-Lookup
+  let existingGrant = targetUsername ? getGrantByUsername(targetUsername) : null;
+  let identityConflict = false;
+  
+  if (!existingGrant && targetMediothek) {
+    const grantByMed = getGrantByMediothekNumber(targetMediothek);
+    if (grantByMed) {
+      if (grantByMed.username && targetUsername && grantByMed.username !== targetUsername) {
+        identityConflict = true;
+      } else {
+        existingGrant = grantByMed;
+      }
+    }
   }
 
-  // Normalisiere ldapStatus Status-Taxonomie
+  if (!existingGrant && typeof targetUserId === 'number') {
+    const grantById = getGrantByUserId(targetUserId);
+    if (grantById) {
+      if (grantById.username && targetUsername && grantById.username !== targetUsername) {
+        identityConflict = true;
+      } else {
+        existingGrant = grantById;
+      }
+    }
+  }
+
+  // Wenn ein Grant gefunden wurde, aber die Mediotheksnummer zwischenzeitlich geändert wurde:
+  if (existingGrant && existingGrant.mediothek_number && targetMediothek && existingGrant.mediothek_number !== targetMediothek) {
+    // Altfreigabe passt nicht zur aktuellen Person / Lesenummer
+    existingGrant = null;
+  }
+
+  // 10. Normalisiere ldapStatus Status-Taxonomie
   let effectiveLdapStatus = 'not_checked';
   if (ldapStatus && typeof ldapStatus === 'object') {
     if (ldapStatus.status) {
@@ -356,18 +449,87 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
     }
   }
 
+  // 11. MySQL-Ausfall (Fall c): Erlaubt AUSSCHLIESSLICH bestehenden Puffer, erstellt NIE neuen Grant und verlängert NIE Fristen
+  if (effectiveMysqlStatus === 'connection_error') {
+    if (identityConflict) {
+      return {
+        valid: false,
+        reasonCode: 'IDENTITY_MISMATCH',
+        statusSummary: 'Widersprüchliche Identitätszuordnung (Grant gehört anderem Benutzer)',
+        rawStatus: rawStatus,
+        expiresAt: expiresAt,
+        offlineValidUntil: null,
+        is_buffered: false,
+        cardVersion: cardVersion
+      };
+    }
+    if (!existingGrant || existingGrant.is_revoked === 1) {
+      return {
+        valid: false,
+        reasonCode: 'MYSQL_UNAVAILABLE_NO_BUFFER',
+        statusSummary: 'Schul-Datenbank nicht erreichbar (keine vorherige Freigabe vorhanden)',
+        rawStatus: rawStatus,
+        expiresAt: expiresAt,
+        offlineValidUntil: null,
+        is_buffered: false,
+        cardVersion: cardVersion
+      };
+    }
+
+    const grantOfflineExpiry = new Date(existingGrant.offline_valid_until);
+    const grantSchoolYearExpiry = new Date(existingGrant.school_year_expires_at + 'T23:59:59.999Z');
+
+    if (now > grantOfflineExpiry || now > grantSchoolYearExpiry) {
+      return {
+        valid: false,
+        reasonCode: 'OFFLINE_EXPIRED',
+        statusSummary: 'Ausfallpuffer abgelaufen (erneute Online-Prüfung erforderlich)',
+        rawStatus: rawStatus,
+        expiresAt: existingGrant.school_year_expires_at,
+        offlineValidUntil: existingGrant.offline_valid_until,
+        is_buffered: true,
+        cardVersion: existingGrant.card_version || cardVersion
+      };
+    }
+
+    if (existingGrant.card_version && cardVersion && cardVersion !== 'v0' && existingGrant.card_version !== cardVersion) {
+      return {
+        valid: false,
+        reasonCode: 'VERSION_MISMATCH',
+        statusSummary: 'Ausweis-Version nicht synchron (erneute Online-Prüfung erforderlich)',
+        rawStatus: rawStatus,
+        expiresAt: existingGrant.school_year_expires_at,
+        offlineValidUntil: existingGrant.offline_valid_until,
+        is_buffered: true,
+        cardVersion: existingGrant.card_version
+      };
+    }
+
+    return {
+      valid: true,
+      reasonCode: 'VALID_BUFFERED',
+      statusSummary: 'Gültig (Ausfallpuffer aktiv)',
+      rawStatus: rawStatus,
+      expiresAt: existingGrant.school_year_expires_at,
+      offlineValidUntil: existingGrant.offline_valid_until,
+      is_buffered: true,
+      cardVersion: existingGrant.card_version || cardVersion
+    };
+  }
+
+  // 12. Live-Prüfungen (MySQL erreichbar und Daten verifiziert)
   if (effectiveLdapStatus === 'active') {
-    // Live LDAP bestätigt: Neuer Grant / Verlängerung
+    // Beide Live-Prüfungen (MySQL + LDAP) erfolgreich!
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     const thirtyDaysFromNow = new Date(now.getTime() + thirtyDaysMs);
     const offlineExpiryDate = thirtyDaysFromNow < expiryDate ? thirtyDaysFromNow : expiryDate;
     const offlineValidUntil = offlineExpiryDate.toISOString();
 
-    if (username) {
+    if (allowSaveGrant && targetUsername) {
       savePersistentGrant({
-        userId: user.id || null,
-        username: username,
-        mediothekNumber: profile.mediothek_number || null,
+        userId: targetUserId || null,
+        username: targetUsername,
+        mediothekNumber: targetMediothek || null,
         lastLdapSuccessAt: now.toISOString(),
         offlineValidUntil: offlineValidUntil,
         schoolYearExpiresAt: expiresAt,
@@ -390,7 +552,7 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
 
   if (effectiveLdapStatus === 'inactive') {
     // LDAP meldet: Benutzer existiert nicht oder ist deaktiviert
-    if (username) revokePersistentGrant(username);
+    if (targetUsername) revokePersistentGrant(targetUsername);
     return {
       valid: false,
       reasonCode: 'ACCOUNT_INACTIVE',
@@ -404,7 +566,19 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
   }
 
   if (effectiveLdapStatus === 'unavailable') {
-    // LDAP-Störung: Nur bestehender nicht widerrufener Grant bis zur Frist nutzbar
+    // LDAP-Störung: Nur bestehender nicht-widerrufener Grant bis zur Frist nutzbar
+    if (identityConflict) {
+      return {
+        valid: false,
+        reasonCode: 'IDENTITY_MISMATCH',
+        statusSummary: 'Widersprüchliche Identitätszuordnung (Grant gehört anderem Benutzer)',
+        rawStatus: rawStatus,
+        expiresAt: expiresAt,
+        offlineValidUntil: null,
+        is_buffered: false,
+        cardVersion: cardVersion
+      };
+    }
     if (!existingGrant || existingGrant.is_revoked === 1) {
       return {
         valid: false,
@@ -434,6 +608,19 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
       };
     }
 
+    if (existingGrant.card_version && cardVersion && cardVersion !== 'v0' && existingGrant.card_version !== cardVersion) {
+      return {
+        valid: false,
+        reasonCode: 'VERSION_MISMATCH',
+        statusSummary: 'Ausweis-Version nicht synchron (erneute Online-Prüfung erforderlich)',
+        rawStatus: rawStatus,
+        expiresAt: existingGrant.school_year_expires_at,
+        offlineValidUntil: existingGrant.offline_valid_until,
+        is_buffered: true,
+        cardVersion: existingGrant.card_version
+      };
+    }
+
     return {
       valid: true,
       reasonCode: 'VALID_BUFFERED',
@@ -442,7 +629,7 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
       expiresAt: existingGrant.school_year_expires_at,
       offlineValidUntil: existingGrant.offline_valid_until,
       is_buffered: true,
-      cardVersion: cardVersion
+      cardVersion: existingGrant.card_version || cardVersion
     };
   }
 
@@ -503,6 +690,19 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
       };
     }
 
+    if (existingGrant.card_version && cardVersion && cardVersion !== 'v0' && existingGrant.card_version !== cardVersion) {
+      return {
+        valid: false,
+        reasonCode: 'VERSION_MISMATCH',
+        statusSummary: 'Ausweis-Version nicht synchron (erneute Online-Prüfung erforderlich)',
+        rawStatus: rawStatus,
+        expiresAt: existingGrant.school_year_expires_at,
+        offlineValidUntil: existingGrant.offline_valid_until,
+        is_buffered: true,
+        cardVersion: existingGrant.card_version
+      };
+    }
+
     return {
       valid: true,
       reasonCode: 'VALID',
@@ -541,4 +741,5 @@ module.exports = {
   VERIFIED_STATUSES,
   REVOKED_STATUSES
 };
+
 

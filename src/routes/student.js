@@ -88,8 +88,11 @@ router.get('/card', async (req, res) => {
   }
 
   try {
-    // 3. Schülerprofil laden (mit Ausweispfad-Prüfung)
-    let profile = await studentDb.getStudentProfile(user, { isCardPath: true });
+    // 3. Schülerprofil laden (mit Ausweispfad-Prüfung & Status-Klassifikation)
+    const metaResult = await studentDb.getStudentProfile(user, { isCardPath: true, returnMeta: true });
+    let profile = metaResult.profile;
+    const mysqlStatus = { status: metaResult.queryStatus, source: metaResult.source, error: metaResult.error };
+
     let isAdminPreview = false;
     if (user.role === 'admin') {
       isAdminPreview = true;
@@ -108,13 +111,13 @@ router.get('/card', async (req, res) => {
           card_status_code: '1132'
         };
       }
-    } else if (!profile) {
+    } else if (!profile && mysqlStatus.status !== 'connection_error') {
       if (typeof logEvent === 'function') {
         logEvent('warn', 'student_card_not_found', `Schülerausweis-Abruf fehlgeschlagen: Kein Schülerprofil für User ${user.username}`, { userId: user.id }, clientIp);
       }
       return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
-    } else {
-      // Profil in lokaler SQLite synchronisieren für Offline-Puffer
+    } else if (profile && metaResult.source === 'mysql_live') {
+      // Profil in lokaler SQLite NUR bei echten Live-Daten synchronisieren
       db.prepare(`
         INSERT INTO student_profiles (
           user_id, first_name, last_name, birth_date, birth_place, 
@@ -150,9 +153,11 @@ router.get('/card', async (req, res) => {
       user: dbUser,
       profile: profile,
       ldapStatus: ldapStatus,
+      mysqlStatus: mysqlStatus,
       now: now,
       isAdminPreview: isAdminPreview
     });
+
 
     let statusSummary = eligibility.statusSummary;
     let logLevel = eligibility.valid ? 'info' : 'warn';
@@ -323,12 +328,16 @@ router.get('/status-check', async (req, res) => {
       });
     }
 
-    // 4. Schülerprofil laden
+    // 4. Schülerprofil laden (mit Ausweispfad-Prüfung & Status-Klassifikation)
     let profile = null;
+    let mysqlStatus = null;
     try {
-      profile = await studentDb.getStudentProfile(dbUser, { isCardPath: true });
+      const metaResult = await studentDb.getStudentProfile(dbUser, { isCardPath: true, returnMeta: true });
+      profile = metaResult.profile;
+      mysqlStatus = { status: metaResult.queryStatus, source: metaResult.source, error: metaResult.error };
     } catch (e) {
       console.error('[Express /status-check] Fehler beim Abrufen des Schülerprofils:', e);
+      mysqlStatus = { status: 'query_error', source: 'mysql_error', error: e.message };
     }
 
     // 5. Zentrale Gültigkeits- & Pufferbewertung
@@ -336,6 +345,7 @@ router.get('/status-check', async (req, res) => {
       user: dbUser,
       profile: profile,
       ldapStatus: ldapStatus,
+      mysqlStatus: mysqlStatus,
       now: now
     });
 
@@ -371,6 +381,7 @@ router.get('/status-check', async (req, res) => {
  * - Keine Auswertung von Antrags-IDs oder internen Datenbank-IDs.
  * - Lädt minimalste Daten ohne Passbild-Blob und ohne vertrauliche Stammdaten.
  * - Führt eine LDAP-Prüfung des Inhabers durch.
+ * - Überschreibt NIEMALS den vollständigen card_version-Hash im persistenten Grant!
  * - Liefert nach außen bei JEDEM Fehler eine neutrale, einheitliche Antwort ohne Rückschlüsse auf die Existenz von Nummern.
  */
 router.get('/verify-check', async (req, res) => {
@@ -421,7 +432,7 @@ router.get('/verify-check', async (req, res) => {
       ldapStatus = { active: false, error: 'Kein LDAP-Benutzername zugeordnet.' };
     }
 
-    // 3. Zentrale Gültigkeitsprüfung
+    // 3. Zentrale Gültigkeitsprüfung (allowSaveGrant: false verhindert Überschreiben von Version/Grants)
     const verifyUser = { id: match.userId || null, username: match.username, is_active: 1 };
     const minimalProfile = {
       username: match.username,
@@ -437,7 +448,9 @@ router.get('/verify-check', async (req, res) => {
       user: verifyUser,
       profile: minimalProfile,
       ldapStatus: ldapStatus,
-      now: new Date()
+      mysqlStatus: { status: match.queryStatus || 'found', source: match.source || 'mysql_live' },
+      now: new Date(),
+      allowSaveGrant: false
     });
 
     if (!eligibility.valid) {

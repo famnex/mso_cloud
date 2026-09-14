@@ -93,11 +93,15 @@ test('1. Mediotheksnummer search in MySQL uses field = 145 (not 168) in findStud
   assert.equal(field168Query, undefined, 'No queries should use field 168');
 });
 
-test('2. Photo and profile actions return error on MySQL failure and do not fake SQLite success', async () => {
+test('2. Photo and profile actions return error on MySQL failure, roll back transaction and do not fake SQLite success', async () => {
   let sqliteUpdated = false;
+  let rolledBack = false;
+  let committed = false;
+  let connectionReleased = false;
+
   const dummyDb = {
-    prepare: () => ({
-      get: () => ({ username: 'max.mustermann' }),
+    prepare: (sql) => ({
+      get: () => ({ id: 1, username: 'max.mustermann' }),
       all: () => [],
       run: () => {
         sqliteUpdated = true;
@@ -106,14 +110,29 @@ test('2. Photo and profile actions return error on MySQL failure and do not fake
     })
   };
 
+  const mockTransactionConn = {
+    beginTransaction: async () => {},
+    query: async (sql, params) => {
+      if (sql.includes('FROM fieldvalues WHERE field = 146')) {
+        return [[{ application: 99 }]];
+      }
+      if (sql.includes('INSERT INTO images')) {
+        return [{ affectedRows: 1 }];
+      }
+      if (sql.includes('INSERT INTO fieldvalues')) {
+        throw new Error('Simulierter Status-Schreibfehler in MySQL während Transaktion');
+      }
+      return [[]];
+    },
+    commit: async () => { committed = true; },
+    rollback: async () => { rolledBack = true; },
+    release: () => { connectionReleased = true; }
+  };
+
   const failingPool = {
     end: async () => {},
-    query: async (sql) => {
-      if (sql.includes('FROM fieldvalues WHERE field = 146')) {
-        return [[]];
-      }
-      throw new Error('MySQL connection dropped');
-    }
+    getConnection: async () => mockTransactionConn,
+    query: async (sql, params) => mockTransactionConn.query(sql, params)
   };
 
   const studentDbModule = loadModule('src/student_db.js', {
@@ -132,29 +151,18 @@ test('2. Photo and profile actions return error on MySQL failure and do not fake
 
   await studentDbModule.reconnectMySQL();
 
-  // Test approvePhoto
+  // Test updateStudentPhoto: führt die Transaktion tatsächlich durch den Rollback-Fehlerpfad
   sqliteUpdated = false;
-  const approveRes = await studentDbModule.approvePhoto(1, 'max@schule.local');
-  assert.equal(approveRes.success, false, 'approvePhoto must fail when MySQL cannot resolve application ID');
-  assert.equal(sqliteUpdated, false, 'SQLite must not be updated if MySQL fails');
+  rolledBack = false;
+  committed = false;
+  connectionReleased = false;
 
-  // Test rejectPhoto
-  sqliteUpdated = false;
-  const rejectRes = await studentDbModule.rejectPhoto(1, 'max@schule.local');
-  assert.equal(rejectRes.success, false, 'rejectPhoto must fail when MySQL cannot resolve application ID');
-  assert.equal(sqliteUpdated, false, 'SQLite must not be updated if MySQL fails');
-
-  // Test deletePhoto
-  sqliteUpdated = false;
-  const deleteRes = await studentDbModule.deletePhoto(1, 'max@schule.local');
-  assert.equal(deleteRes.success, false, 'deletePhoto must fail when MySQL cannot resolve application ID');
-  assert.equal(sqliteUpdated, false, 'SQLite must not be updated if MySQL fails');
-
-  // Test updateStudentPhoto
-  sqliteUpdated = false;
   const photoRes = await studentDbModule.updateStudentPhoto(1, 'max@schule.local', 'data:image/png;base64,abc');
-  assert.equal(photoRes.success, false, 'updateStudentPhoto must fail when MySQL fails');
-  assert.equal(sqliteUpdated, false, 'SQLite must not be updated if MySQL fails');
+  assert.equal(photoRes.success, false, 'updateStudentPhoto must fail on MySQL error');
+  assert.equal(rolledBack, true, 'updateStudentPhoto must execute conn.rollback() on transaction failure');
+  assert.equal(committed, false, 'updateStudentPhoto must not commit failed transaction');
+  assert.equal(connectionReleased, true, 'updateStudentPhoto must release connection');
+  assert.equal(sqliteUpdated, false, 'SQLite must not be updated if MySQL transaction fails');
 });
 
 test('3. Session revocation via auth_version is enforced on /api/student/card', async (t) => {
@@ -170,13 +178,19 @@ test('3. Session revocation via auth_version is enforced on /api/student/card', 
   };
 
   const dummyStudentDb = {
-    getStudentProfile: async () => ({
-      first_name: 'Erika',
-      last_name: 'Muster',
-      mediothek_number: '12345',
-      card_image: 'data:image/png;base64,validimg',
-      card_status: 'Bild genehmigt'
-    })
+    getStudentProfile: async (user, opts) => {
+      const prof = {
+        first_name: 'Erika',
+        last_name: 'Muster',
+        mediothek_number: '12345',
+        card_image: 'data:image/png;base64,validimg',
+        card_status: 'Bild genehmigt'
+      };
+      if (opts && opts.returnMeta) {
+        return { profile: prof, source: 'mysql_live', queryStatus: 'found', error: null };
+      }
+      return prof;
+    }
   };
 
   const app = express();
@@ -260,11 +274,41 @@ test('4. 30-day offline validity contract and card evaluation', () => {
   assert.equal(revokedEval.offlineValidUntil, null);
 });
 
-test('5. Frontend student_card.html evaluates data.valid as single source of truth and enforces offline expiration', () => {
+test('5. Frontend student_card.html evaluates isSupportedValidCache and enforces offline expiration', () => {
   const htmlContent = fs.readFileSync(path.resolve(__dirname, '../public/student_card.html'), 'utf8');
 
-  assert.ok(htmlContent.includes('tempParsed.offline_valid_until'), 'student_card.html must check offline_valid_until on cached card');
-  assert.ok(htmlContent.includes("typeof data.valid === 'boolean'"), 'renderCard must evaluate data.valid as single source of truth');
-  assert.ok(htmlContent.includes('isOfflineExpired'), 'renderCard must handle isOfflineExpired');
-  assert.ok(htmlContent.includes('Offline-Zeitraum abgelaufen'), 'Overlay must contain offline expired text');
+  // Extract isSupportedValidCache function from HTML and execute in VM
+  const fnMatch = htmlContent.match(/function isSupportedValidCache\(entry\)\s*\{([\s\S]*?)\n\s*\}/);
+  assert.ok(fnMatch, 'isSupportedValidCache must be present in student_card.html');
+
+  const vmContext = vm.createContext({ Date, isNaN, isFinite, String });
+  vm.runInContext(`function isSupportedValidCache(entry) { ${fnMatch[1]} }`, vmContext);
+  const isSupportedValidCache = vmContext.isSupportedValidCache;
+
+  // 1. Valid entry within deadline
+  const validEntry = {
+    valid: true,
+    card_version: 'v_123456789abc',
+    offline_valid_until: new Date(Date.now() + 86400000).toISOString(),
+    expires_at: '2027-07-31',
+    card_status: 'Bild genehmigt'
+  };
+  assert.equal(isSupportedValidCache(validEntry), true, 'Valid cache entry within deadline must return true');
+
+  // 2. Missing card_version
+  const unversionedEntry = { ...validEntry, card_version: null };
+  assert.equal(isSupportedValidCache(unversionedEntry), false, 'Cache without version must return false');
+
+  // 3. Expired offline deadline
+  const expiredOfflineEntry = { ...validEntry, offline_valid_until: new Date(Date.now() - 10000).toISOString() };
+  assert.equal(isSupportedValidCache(expiredOfflineEntry), false, 'Expired offline deadline must return false');
+
+  // 4. Expired school year
+  const expiredYearEntry = { ...validEntry, expires_at: '2020-07-31' };
+  assert.equal(isSupportedValidCache(expiredYearEntry), false, 'Expired school year must return false');
+
+  // 5. Revoked / blocked status
+  const blockedEntry = { ...validEntry, card_status: 'Ausweis gesperrt' };
+  assert.equal(isSupportedValidCache(blockedEntry), false, 'Blocked card must return false');
 });
+

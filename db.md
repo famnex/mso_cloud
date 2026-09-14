@@ -448,3 +448,11 @@ Strukturiert die Tabelle `student_card_grants` um:
 *   Macht `user_id` optional (NULL erlaubt), setzt `id` als AUTOINCREMENT Primärschlüssel.
 *   Erstellt Indizes auf `username` (UNIQUE), `mediothek_number` und `user_id`.
 *   Entfernt Altlasten von Fake-IDs (z. B. `id: 1001`) und sichert referenzielle Integrität bei QR-Code-Verifizierungen.
+
+---
+
+### Migration: `027_invalidate_legacy_grants.sql`
+Invalidiert unvollständige und unversionierte Altfreigaben in `student_card_grants`:
+*   `UPDATE student_card_grants SET is_revoked = 1 WHERE is_revoked = 0 AND (card_version IS NULL OR TRIM(card_version) = '' OR last_ldap_success_at IS NULL OR offline_valid_until IS NULL);`
+*   **Zweck**: Stellt sicher, dass bei System-Upgrades veraltete Freigabedatensätze ohne kryptografischen Versionshash (`card_version`) oder ohne vollständige Zeitstempel (`last_ldap_success_at`, `offline_valid_until`) sofort als widerrufen markiert werden. Dies verhindert, dass Altdaten bei Server- oder LDAP-Ausfällen als unversionierte Offline-Puffer missbraucht werden.
+

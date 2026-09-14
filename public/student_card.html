@@ -2543,6 +2543,24 @@
       }
     }
 
+    // Supported Cache Contract Checker (FEHLER 5: Strenger Offline-Cache-Vertrag)
+    function isSupportedValidCache(entry) {
+      if (!entry || typeof entry !== 'object') return false;
+      if (entry.valid !== true) return false;
+      if (!entry.card_version || typeof entry.card_version !== 'string' || entry.card_version === 'v0') return false;
+      if (!entry.offline_valid_until || !entry.expires_at) return false;
+      const offlineMs = Date.parse(entry.offline_valid_until);
+      const expiryMs = Date.parse(entry.expires_at.includes('T') ? entry.expires_at : entry.expires_at + 'T23:59:59.999Z');
+      if (isNaN(offlineMs) || isNaN(expiryMs) || !isFinite(offlineMs) || !isFinite(expiryMs)) return false;
+      const now = Date.now();
+      if (now > offlineMs || now > expiryMs) return false;
+      const statusStr = String(entry.card_status || '').toLowerCase();
+      const codeStr = String(entry.card_status_code || '').toLowerCase();
+      if (statusStr.includes('gesperrt') || statusStr.includes('deaktiviert') || statusStr.includes('ungültig') || statusStr.includes('abgelehnt') || codeStr === '1134') return false;
+      if (entry.reason_code === 'CARD_REVOKED' || entry.reason_code === 'ACCOUNT_INACTIVE' || entry.reason_code === 'OFFLINE_EXPIRED' || entry.reason_code === 'VERSION_MISMATCH') return false;
+      return true;
+    }
+
     // Fetch Card Data
 
     async function loadCardData(isBackgroundRetry = false) {
@@ -2551,33 +2569,28 @@
       setReloadingState(true);
 
       const cached = localStorage.getItem('mso_cached_card');
-      const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
-      const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : 0;
       const isOfflineBlocked = localStorage.getItem('mso_card_offline_blocked') === 'true';
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-      let isCacheExpired = (Date.now() - cachedTime) > thirtyDaysMs;
 
       let tempParsed = null;
+      let isCacheExpired = false;
       if (cached) {
         try {
           tempParsed = JSON.parse(cached);
-          if (tempParsed && tempParsed.offline_valid_until) {
-            if (new Date() > new Date(tempParsed.offline_valid_until)) {
-              isCacheExpired = true;
-            }
-          }
-        } catch (e) {}
+        } catch (e) {
+          tempParsed = null;
+        }
+      }
+
+      if (!tempParsed || !isSupportedValidCache(tempParsed)) {
+        isCacheExpired = true;
       }
 
       let cacheRendered = false;
 
-      // 1. Instant Cache Load: Falls ein gültiger Cache existiert, diesen sofort als Cache-Ausweis anzeigen (0ms Wartezeit)
-      if (tempParsed && !isCacheExpired) {
+      // 1. Instant Cache Load: Falls ein gültiger, unterstützter Cache existiert, diesen sofort anzeigen (0ms Wartezeit)
+      if (tempParsed && !isCacheExpired && !isOfflineBlocked) {
         try {
           cardData = tempParsed;
-          if (isOfflineBlocked) {
-            cardData.card_status = 'Ausweis gesperrt';
-          }
           renderCard(cardData, true);
           updateControlsState(true);
           cacheRendered = true;
@@ -2607,6 +2620,8 @@
             
             const blockedData = {
               card_status: 'Ausweis gesperrt',
+              valid: false,
+              reason_code: 'ACCOUNT_INACTIVE',
               first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
             };
             renderCard(blockedData, false);
@@ -2627,7 +2642,7 @@
               if (statusRes.ok) {
                 const statusData = await statusRes.json();
                 
-                // Prüfen, ob die Profil-/Foto-Version noch mit dem Cache übereinstimmt (FEHLER 7)
+                // Prüfen, ob die Profil-/Foto-Version noch mit dem Cache übereinstimmt (Versionsmismatch)
                 if (tempCached && statusData.card_version && tempCached.card_version && statusData.card_version !== tempCached.card_version) {
                   console.warn('[PWA Card] Ausweis-Version hat sich geändert. Authentifizierte Aktualisierung erforderlich.');
                   localStorage.setItem('mso_card_offline_blocked', 'true');
@@ -2727,7 +2742,7 @@
           startAutoRetry();
         } else {
           localStorage.setItem('mso_cached_card', JSON.stringify(data));
-          if (!data.is_buffered) {
+          if (!data.is_buffered && data.valid === true) {
             localStorage.setItem('mso_cached_card_time', Date.now().toString());
           }
           if (data.username) localStorage.setItem('mso_cached_card_user', data.username);
@@ -2748,15 +2763,17 @@
         console.warn('[PWA Card] Online-Abruf fehlgeschlagen oder verlangsamt:', err);
         isFreshOnlineLoaded = false;
 
-        if (cached && !isCacheExpired) {
+        if (cached && !isCacheExpired && isSupportedValidCache(tempParsed)) {
           try { cardData = JSON.parse(cached); } catch(e) {}
           if (isOfflineBlocked && cardData) cardData.card_status = 'Ausweis gesperrt';
           if (cardData) renderCard(cardData, true);
           updateControlsState(true);
         } else {
-          // Kein Cache vorhanden ODER Offline-Zeitraum abgelaufen
+          // Kein unterstützter Cache vorhanden ODER Offline-Zeitraum abgelaufen
           const blockedData = {
             card_status: 'Offline-Zeitraum abgelaufen',
+            valid: false,
+            reason_code: 'OFFLINE_EXPIRED',
             first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
           };
           renderCard(blockedData, true);
@@ -2929,18 +2946,14 @@
 
       // 2. Offline- und Gültigkeitsprüfung (Single Source of Truth vom Backend)
       const now = new Date();
-      const cachedTimeStr = localStorage.getItem('mso_cached_card_time');
-      const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : 0;
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-      const offlineTimeExceeded = cachedTime > 0 && (Date.now() - cachedTime > thirtyDaysMs);
-      const offlineDateExceeded = Boolean(data.offline_valid_until && (now > new Date(data.offline_valid_until)));
-      const isOfflineExpired = isOffline && (offlineTimeExceeded || offlineDateExceeded || data.card_status === 'Offline-Zeitraum abgelaufen' || data.reason_code === 'OFFLINE_EXPIRED');
-
-      const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig' || data.reason_code === 'CARD_REVOKED' || data.reason_code === 'ACCOUNT_INACTIVE';
+      const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig' || data.card_status === 'Konto deaktiviert' || data.reason_code === 'CARD_REVOKED' || data.reason_code === 'ACCOUNT_INACTIVE';
       const hasNoImage = !data.card_image || data.reason_code === 'NO_PHOTO';
       const isRejected = data.card_status === 'Bild abgelehnt' || data.card_status_code === '1134' || data.reason_code === 'PHOTO_REJECTED';
-      const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59') : '2099-12-31T23:59:59');
+      const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59.999Z') : '2099-12-31T23:59:59.999Z');
       const isExpired = now > expiry || data.reason_code === 'EXPIRED';
+
+      const isOfflineContractValid = isSupportedValidCache(data);
+      const isOfflineExpired = isOffline && (!isOfflineContractValid || data.card_status === 'Offline-Zeitraum abgelaufen' || data.reason_code === 'OFFLINE_EXPIRED');
 
       let isVerified = false;
       let isNotVerified = false;
@@ -2949,8 +2962,8 @@
       if (isOfflineExpired) {
         shouldBlockContent = true;
       } else if (typeof data.valid === 'boolean') {
-        shouldBlockContent = !data.valid;
-        isVerified = data.valid;
+        shouldBlockContent = !data.valid || isRevoked || isExpired || isRejected;
+        isVerified = data.valid && !shouldBlockContent;
         isNotVerified = !data.valid && !isRevoked && !isExpired && !hasNoImage && !isRejected;
       } else {
         isVerified = (data.card_status === 'Bild genehmigt' || 
@@ -2961,7 +2974,7 @@
                       data.card_status === '1132' ||
                       data.card_status === '1133' ||
                       data.card_status_code === '1132' ||
-                      data.card_status_code === '1133') && !hasNoImage;
+                      data.card_status_code === '1133') && !hasNoImage && !isRevoked && !isExpired;
         isNotVerified = !isVerified && !isRejected;
         shouldBlockContent = isRevoked || isExpired || hasNoImage || isNotVerified;
       }
@@ -3045,7 +3058,7 @@
         // ── Technik-Scout-Badge ─────────────────────────────────────────
         const technikScoutBadge = document.getElementById('technik-scout-badge');
         if (technikScoutBadge) {
-          const isTechnikScout = Boolean(data.is_technik_scout);
+          const isTechnikScout = Boolean(data.valid && !shouldBlockContent && !isOfflineExpired && data.is_technik_scout);
           technikScoutBadge.style.display = isTechnikScout ? 'inline-flex' : 'none';
         }
 

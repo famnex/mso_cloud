@@ -261,13 +261,43 @@ function getLocalAllStudents() {
 }
 
 /**
- * Holt das Schülerprofil wahlweise aus MySQL oder SQLite.
+ * Klassifiziert MySQL-Fehler in Verbindungsfehler vs. Query-/Schema-/Syntaxfehler.
+ */
+function classifyMySQLError(err) {
+  if (!err) return { status: 'found', source: 'mysql_live', error: null };
+  const code = String(err.code || '');
+  const msg = String(err.message || '').toLowerCase();
+  const connCodes = new Set([
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    'ENOTFOUND',
+    'EHOSTUNREACH',
+    'ECONNRESET',
+    'PROTOCOL_CONNECTION_LOST',
+    'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR',
+    'ER_ACCESS_DENIED_ERROR',
+    'ENETUNREACH',
+    'EAI_AGAIN',
+    'ER_CON_COUNT_ERROR',
+    'HANDSHAKE_ERROR',
+    'PROTOCOL_PACKETS_OUT_OF_ORDER'
+  ]);
+  
+  if (connCodes.has(code) || msg.includes('connect') || msg.includes('timeout') || msg.includes('pool') || msg.includes('dropped') || msg.includes('connection lost') || msg.includes('closed')) {
+    return { status: 'connection_error', source: 'mysql_unavailable', error: err.message };
+  }
+  return { status: 'query_error', source: 'mysql_error', error: err.message };
+}
+
+/**
+ * Holt das Schülerprofil wahlweise aus MySQL oder SQLite mit strukturierter Quellen- und Statusklassifikation.
  * 
  * @param {Object|number} user 
  * @param {Object} options
  * @param {boolean} options.isCardPath - Wenn true, wird bei erreichbarer MySQL-DB mit 0 Treffern kein SQLite-Fallback verwendet.
+ * @param {boolean} options.returnMeta - Wenn true, wird ein Objekt { profile, source, queryStatus, error } geliefert.
  */
-async function getStudentProfile(user, { isCardPath = false } = {}) {
+async function getStudentProfile(user, { isCardPath = false, returnMeta = false } = {}) {
   let userObj = (typeof user === 'object' && user !== null) ? { ...user } : { id: user };
   
   if (!userObj.username && userObj.id) {
@@ -326,20 +356,23 @@ async function getStudentProfile(user, { isCardPath = false } = {}) {
         }
       }
       
-      // Wenn MySQL erreichbar ist, aber kein Antrag existiert:
+      // Fall b: MySQL erreichbar, aber kein Antrag existiert (not_found)
       if (!applicationId) {
         if (isCardPath) {
-          // FEHLER 3: Bei erreichbarem MySQL und keinem Treffer im Ausweispfad KEIN SQLite-Fallback
-          return null;
+          const resMeta = { profile: null, source: 'mysql_live', queryStatus: 'not_found', error: null };
+          return returnMeta ? resMeta : null;
         }
-        return getLocalProfile(userObj.id);
+        const local = getLocalProfile(userObj.id);
+        const resMeta = { profile: local, source: local ? 'sqlite_buffered' : 'none', queryStatus: 'not_found', error: null };
+        return returnMeta ? resMeta : local;
       }
 
       // Prüfen, ob der Antrag den Status >= 10 hat (im Ausweispfad zwingend)
       const [appRows] = await pool.query('SELECT status FROM applications WHERE ID = ?', [applicationId]);
       if (appRows.length === 0 || (isCardPath && appRows[0].status < 10)) {
         if (isCardPath) {
-          return null;
+          const resMeta = { profile: null, source: 'mysql_live', queryStatus: 'not_found', error: null };
+          return returnMeta ? resMeta : null;
         }
       }
 
@@ -373,16 +406,53 @@ async function getStudentProfile(user, { isCardPath = false } = {}) {
           mysqlProf.start_password = localProf.start_password;
         }
       }
-      return mysqlProf;
+
+      mysqlProf._source = 'mysql_live';
+      mysqlProf._queryStatus = 'found';
+
+      const resMeta = { profile: mysqlProf, source: 'mysql_live', queryStatus: 'found', error: null };
+      return returnMeta ? resMeta : mysqlProf;
     } catch (err) {
-      console.error('[StudentDB] MySQL Verbindungsfehler in getStudentProfile:', err.message);
-      // Nur bei echtem MySQL-Verbindungsfehler im Ausweispfad lokalen Cache für den Pufferpfad liefern
-      return getLocalProfile(userObj.id) || null;
+      const errInfo = classifyMySQLError(err);
+      console.error(`[StudentDB] MySQL Fehler (${errInfo.status}) in getStudentProfile:`, err.message);
+
+      if (errInfo.status === 'connection_error') {
+        // Fall c: Echter Verbindungsfehler -> Ausfallpuffer aus SQLite zulässig
+        const localProf = getLocalProfile(userObj.id) || null;
+        if (localProf) {
+          localProf._source = 'sqlite_buffered';
+          localProf._queryStatus = 'connection_error';
+        }
+        const resMeta = { profile: localProf, source: localProf ? 'sqlite_buffered' : 'none', queryStatus: 'connection_error', error: err.message };
+        return returnMeta ? resMeta : (isCardPath ? localProf : (localProf || null));
+      } else {
+        // Fall d: SQL-, Schema- oder Queryfehler -> KEIN Ausfallpuffer!
+        const resMeta = { profile: null, source: 'mysql_error', queryStatus: 'query_error', error: err.message };
+        return returnMeta ? resMeta : null;
+      }
     }
   } else {
-    return getLocalProfile(userObj.id) || null;
+    // MySQL nicht aktiv / pool ist null
+    const isExplicitlyEnabled = config.enabled && !pool;
+    const localProf = getLocalProfile(userObj.id) || null;
+    if (localProf) {
+      localProf._source = 'sqlite_buffered';
+      localProf._queryStatus = isExplicitlyEnabled ? 'connection_error' : 'disabled';
+    }
+    const resMeta = {
+      profile: localProf,
+      source: localProf ? 'sqlite_buffered' : 'none',
+      queryStatus: isExplicitlyEnabled ? 'connection_error' : 'disabled',
+      error: isExplicitlyEnabled ? 'MySQL pool is null' : null
+    };
+    return returnMeta ? resMeta : localProf;
   }
 }
+
+async function getStudentProfileWithStatus(user, options = {}) {
+  return getStudentProfile(user, { ...options, returnMeta: true });
+}
+
 
 function convertBlobToDataUrl(rawFile) {
   if (!rawFile) return null;
@@ -533,6 +603,14 @@ async function updateStudentPhoto(userId, email, base64Image) {
     `).run(base64Image, userId);
     debugLog.push("SQLite: UPDATE student_profiles erfolgreich.");
     sqliteSuccess = true;
+
+    try {
+      const localUser = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+      if (localUser && localUser.username) {
+        const { revokePersistentGrant } = require('./services/cardEligibility');
+        revokePersistentGrant(localUser.username);
+      }
+    } catch (e) {}
   } catch (err) {
     debugLog.push(`FEHLER bei SQLite-Operation: ${err.message}`);
     console.error('SQLite Error in updateStudentPhoto:', err);
@@ -1298,11 +1376,18 @@ async function findStudentForVerification(bib, name) {
         last_name: matchedCandidate.last_name,
         card_status: rawStatus,
         card_status_code: statusCode,
-        has_photo: hasPhoto
+        has_photo: hasPhoto,
+        source: 'mysql_live',
+        queryStatus: 'found'
       };
     } catch (err) {
-      console.error('[StudentDB] MySQL Fehler in findStudentForVerification:', err.message);
-      // Bei Verbindungsfehler Fallback auf lokalen Cache
+      const errInfo = classifyMySQLError(err);
+      console.error(`[StudentDB] MySQL Fehler (${errInfo.status}) in findStudentForVerification:`, err.message);
+      if (errInfo.status !== 'connection_error') {
+        // Fall d: SQL-/Query-Fehler -> KEIN SQLite-Fallback!
+        return null;
+      }
+      // Fall c: Echter Verbindungsfehler -> Fortfahren mit SQLite-Fallback
     }
   }
 
@@ -1351,13 +1436,14 @@ async function findStudentForVerification(bib, name) {
       last_name: p.last_name,
       card_status: rawStatus,
       card_status_code: statusCode,
-      has_photo: p.has_photo === 1
+      has_photo: p.has_photo === 1,
+      source: 'sqlite_buffered',
+      queryStatus: 'connection_error'
     };
   }
 
   return null;
 }
-
 
 async function findStudentByVerificationReference(bib, id, name) {
   const match = await findStudentForVerification(bib, name);
@@ -1379,6 +1465,8 @@ async function findStudentByVerificationReference(bib, id, name) {
 
 module.exports = {
   getStudentProfile,
+  getStudentProfileWithStatus,
+  classifyMySQLError,
   findStudentForVerification,
   findStudentByVerificationReference,
   normalizeName,

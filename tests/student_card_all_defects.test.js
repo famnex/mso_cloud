@@ -13,7 +13,7 @@ const studentDb = require('../src/student_db');
 console.log('=== START REGRESSION TEST SUITE: ALL 20+ STUDENT CARD SCENARIOS ===\n');
 
 let passedTests = 0;
-const totalTests = 24;
+const totalTests = 35;
 
 async function runTest(num, name, fn) {
   try {
@@ -514,6 +514,268 @@ async function runAllTests() {
     assert.strictEqual(resValid.has_photo, true);
   });
 
+  // 25. MySQL gestört + LDAP aktiv + bestehender Grant: Frist unverändert
+  await runTest(25, 'MySQL gestört + LDAP aktiv + bestehender Grant: Frist unverändert', () => {
+    const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = 8004').get();
+    const grantBefore = getPersistentGrant('student.buffered');
+    assert.ok(grantBefore);
+    const expectedExpiry = grantBefore.offline_valid_until;
+
+    // MySQL ist im Verbindungsfehlerzustand (connection_error), LDAP meldet aktiv
+    const res = evaluateCardEligibility({
+      user: testUserBuffered,
+      profile: profile,
+      ldapStatus: { status: 'active', active: true, error: null },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable', error: 'Connection refused' },
+      now: new Date('2026-03-15T12:00:00Z')
+    });
+
+    assert.strictEqual(res.valid, true, 'Ausfallpuffer muss greifen');
+    assert.strictEqual(res.is_buffered, true, 'Muss als gepuffert gekennzeichnet sein');
+    assert.strictEqual(res.offlineValidUntil, expectedExpiry, 'Frist darf bei MySQL-Ausfall trotz aktivem LDAP NICHT verlängert werden!');
+
+    const grantAfter = getPersistentGrant('student.buffered');
+    assert.strictEqual(grantAfter.offline_valid_until, expectedExpiry, 'Grant in DB darf nicht verändert worden sein');
+  });
+
+  // 26. MySQL gestört + LDAP aktiv OHNE bestehenden Grant: ungültig
+  await runTest(26, 'MySQL gestört + LDAP aktiv OHNE bestehenden Grant: ungültig', () => {
+    const unbufferedUser = { id: 8990, username: 'student.nobuffer', is_active: 1 };
+    const profile = { user_id: 8990, first_name: 'No', last_name: 'Buffer', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+
+    const res = evaluateCardEligibility({
+      user: unbufferedUser,
+      profile: profile,
+      ldapStatus: { status: 'active', active: true, error: null },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable', error: 'Connection refused' },
+      now: new Date()
+    });
+
+    assert.strictEqual(res.valid, false, 'Ohne bestehenden Grant muss bei MySQL-Ausfall abgelehnt werden');
+    assert.strictEqual(res.reasonCode, 'MYSQL_UNAVAILABLE_NO_BUFFER');
+  });
+
+  // 27. SQL-/Schemafehler (Fall d): keine neue Freigabe und kein Ausfallpuffer
+  await runTest(27, 'SQL-/Schemafehler (Fall d): keine neue Freigabe und kein Ausfallpuffer', () => {
+    const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = 8001').get();
+    const res = evaluateCardEligibility({
+      user: testUserActive,
+      profile: profile,
+      ldapStatus: { status: 'active', active: true, error: null },
+      mysqlStatus: { status: 'query_error', source: 'mysql_error', error: 'Table not found' },
+      now: new Date()
+    });
+
+    assert.strictEqual(res.valid, false, 'SQL-/Schemafehler darf keine Freigabe erteilen');
+    assert.strictEqual(res.reasonCode, 'DATABASE_ERROR');
+  });
+
+  // 28. Strikte Identitätsbindung: Kollidierende Zuordnungen teilen keinen Grant
+  await runTest(28, 'Strikte Identitätsbindung: Kollidierende Zuordnungen teilen keinen Grant', () => {
+    // Grant für User A existiert
+    savePersistentGrant({
+      userId: 8001,
+      username: 'student.active',
+      mediothekNumber: 'BIB-8001',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0
+    });
+
+    // User B versucht mit selber Mediotheksnummer, aber anderem Username zu evaluieren
+    const userB = { id: 8099, username: 'student.impostor', is_active: 1 };
+    const profileB = { user_id: 8099, first_name: 'Impostor', last_name: 'User', mediothek_number: 'BIB-8001', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+
+    const res = evaluateCardEligibility({
+      user: userB,
+      profile: profileB,
+      ldapStatus: { status: 'unavailable', active: false, error: 'Outage' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable', error: 'Outage' },
+      now: new Date()
+    });
+
+    assert.strictEqual(res.valid, false, 'Fremder Grant darf bei Identitätskollision niemals genutzt werden');
+    assert.strictEqual(res.reasonCode, 'IDENTITY_MISMATCH');
+  });
+
+  // 29. Numerischer Benutzername wird nicht als lokale user_id interpretiert
+  await runTest(29, 'Numerischer Benutzername wird nicht als lokale user_id interpretiert', () => {
+    // User 8001 hat Grant
+    const grant = getPersistentGrant('8001'); // String '8001'
+    assert.strictEqual(grant, null, 'String 8001 darf nicht fälschlich als user_id 8001 aufgelöst werden');
+
+    const grantNumeric = getPersistentGrant(8001); // Echte Zahl 8001
+    assert.ok(grantNumeric, 'Echte Zahl 8001 muss als user_id aufgelöst werden');
+  });
+
+  // 30. QR-Aufruf überschreibt nicht die Version des vollständigen Ausweises (allowSaveGrant: false)
+  await runTest(30, 'QR-Aufruf überschreibt nicht die Version des vollständigen Ausweises', () => {
+    const fullProfile = db.prepare('SELECT * FROM student_profiles WHERE user_id = 8001').get();
+    const fullVersion = computeCardVersion(fullProfile);
+
+    // 1. Regulärer Ausweis-Abruf legt Grant mit vollständiger Version an
+    evaluateCardEligibility({
+      user: testUserActive,
+      profile: fullProfile,
+      ldapStatus: { status: 'active', active: true, error: null }
+    });
+
+    const grantBefore = getPersistentGrant('student.active');
+    assert.strictEqual(grantBefore.card_version, fullVersion, 'Grant muss volle Profilversion enthalten');
+
+    // 2. Öffentliche QR-Verifikation mit Platzhalter-Profil
+    const minimalProfile = {
+      username: 'student.active',
+      first_name: 'Anna',
+      last_name: 'Active',
+      mediothek_number: 'BIB-8001',
+      card_status: 'Bild genehmigt',
+      card_image: 'data:image/jpeg;base64,PHOTO_EXISTS'
+    };
+    const qrVersion = computeCardVersion(minimalProfile);
+    assert.notStrictEqual(fullVersion, qrVersion, 'QR-Platzhalterversion und Vollversion müssen sich unterscheiden');
+
+    const qrEval = evaluateCardEligibility({
+      user: { id: null, username: 'student.active', is_active: 1 },
+      profile: minimalProfile,
+      ldapStatus: { status: 'active', active: true, error: null },
+      allowSaveGrant: false
+    });
+    assert.strictEqual(qrEval.valid, true);
+
+    const grantAfter = getPersistentGrant('student.active');
+    assert.strictEqual(grantAfter.card_version, fullVersion, 'QR-Prüfung darf den Versions-Hash im Grant niemals überschreiben');
+  });
+
+  // 31. Profil live nicht mehr vorhanden, danach MySQL-Ausfall: bleibt ungültig
+  await runTest(31, 'Profil live nicht mehr vorhanden, danach MySQL-Ausfall: bleibt ungültig', () => {
+    const testUserDeleted = { id: 8077, username: 'student.deletedprofile', is_active: 1 };
+    
+    // Zunächst gültig
+    savePersistentGrant({
+      userId: 8077,
+      username: 'student.deletedprofile',
+      mediothekNumber: 'BIB-8077',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0
+    });
+
+    // 1. Live MySQL meldet: Profil existiert nicht mehr (not_found)
+    const resLive = evaluateCardEligibility({
+      user: testUserDeleted,
+      profile: null,
+      ldapStatus: { status: 'active', active: true, error: null },
+      mysqlStatus: { status: 'not_found', source: 'mysql_live' }
+    });
+    assert.strictEqual(resLive.valid, false);
+    assert.strictEqual(resLive.reasonCode, 'PROFILE_NOT_FOUND');
+
+    const grantAfterRevoke = getPersistentGrant('student.deletedprofile');
+    assert.strictEqual(grantAfterRevoke.is_revoked, 1, 'Grant muss durch Wegfall invalidiert worden sein');
+
+    // 2. Anschließender MySQL-Ausfall
+    const resOutage = evaluateCardEligibility({
+      user: testUserDeleted,
+      profile: { user_id: 8077, first_name: 'Old', last_name: 'Data', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 },
+      ldapStatus: { status: 'active', active: true, error: null },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' }
+    });
+    assert.strictEqual(resOutage.valid, false, 'Zuvor invalidierter Grant darf bei Ausfall nicht wieder aufleben');
+  });
+
+  // 32. Foto entfernt, danach Ausfall: bleibt ungültig
+  await runTest(32, 'Foto entfernt, danach Ausfall: bleibt ungültig', () => {
+    const testUserNoImg = { id: 8078, username: 'student.removedphoto', is_active: 1 };
+    
+    // Zunächst gültiger Grant
+    savePersistentGrant({
+      userId: 8078,
+      username: 'student.removedphoto',
+      mediothekNumber: 'BIB-8078',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0
+    });
+
+    // 1. Live Prüfung: Profil ohne Foto
+    const noImgProf = { user_id: 8078, first_name: 'No', last_name: 'Img', card_status: 'Bild genehmigt', card_image: null };
+    const resNoImg = evaluateCardEligibility({
+      user: testUserNoImg,
+      profile: noImgProf,
+      ldapStatus: { status: 'active', active: true, error: null }
+    });
+    assert.strictEqual(resNoImg.valid, false);
+    assert.strictEqual(resNoImg.reasonCode, 'NO_PHOTO');
+
+    const grantAfter = getPersistentGrant('student.removedphoto');
+    assert.strictEqual(grantAfter.is_revoked, 1, 'Grant muss bei entferntem Foto invalidiert worden sein');
+
+    // 2. Nachfolgender Ausfall
+    const resOutage = evaluateCardEligibility({
+      user: testUserNoImg,
+      profile: noImgProf,
+      ldapStatus: { status: 'unavailable', active: false, error: 'Outage' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' }
+    });
+    assert.strictEqual(resOutage.valid, false);
+  });
+
+  // 33. Neues ungeprüftes Foto nutzt keinen alten Grant
+  await runTest(33, 'Neues ungeprüftes Foto nutzt keinen alten Grant', () => {
+    const testUserUnapp = { id: 8079, username: 'student.unapprovedphoto', is_active: 1 };
+    savePersistentGrant({
+      userId: 8079,
+      username: 'student.unapprovedphoto',
+      mediothekNumber: 'BIB-8079',
+      lastLdapSuccessAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + 86400000).toISOString(),
+      schoolYearExpiresAt: '2027-07-31',
+      isRevoked: 0
+    });
+
+    const unappProf = { user_id: 8079, first_name: 'Unapp', last_name: 'Photo', card_status: 'Bild eingereicht', card_status_code: '1131', card_image: samplePhotoBase64 };
+    const resUnapp = evaluateCardEligibility({
+      user: testUserUnapp,
+      profile: unappProf,
+      ldapStatus: { status: 'active', active: true, error: null }
+    });
+    assert.strictEqual(resUnapp.valid, false);
+    assert.strictEqual(resUnapp.reasonCode, 'PHOTO_NOT_APPROVED');
+
+    const grantAfter = getPersistentGrant('student.unapprovedphoto');
+    assert.strictEqual(grantAfter.is_revoked, 1);
+  });
+
+  // 34. Migration 027: Invalidiert unvollständige Altfreigaben
+  await runTest(34, 'Migration 027: Invalidiert unvollständige Altfreigaben', () => {
+    // Alten unvollständigen Grant anlegen (ohne card_version und ohne last_ldap_success_at)
+    db.prepare(`
+      INSERT INTO student_card_grants (user_id, username, mediothek_number, last_ldap_success_at, offline_valid_until, school_year_expires_at, is_revoked, card_version)
+      VALUES (8095, 'student.legacy_incomplete', 'BIB-8095', NULL, '2026-10-01', '2027-07-31', 0, NULL)
+      ON CONFLICT(username) DO UPDATE SET is_revoked = 0, card_version = NULL, last_ldap_success_at = NULL
+    `).run();
+
+    // Migration 027 ausführen
+    const mig027Sql = require('fs').readFileSync(require('path').resolve(__dirname, '../migrations/027_invalidate_legacy_grants.sql'), 'utf8');
+    db.exec(mig027Sql);
+
+    const legacyGrant = getPersistentGrant('student.legacy_incomplete');
+    assert.ok(legacyGrant);
+    assert.strictEqual(legacyGrant.is_revoked, 1, 'Unvollständige Altfreigabe muss durch Migration 027 invalidiert worden sein');
+  });
+
+  // 35. Testisolation: Test verändert niemals eine externe Datenbank
+  await runTest(35, 'Testisolation: Test verwendet isolierte Temp-DB und schützt externe Datenbanken', () => {
+    const { tempDbPath } = require('./test_helper');
+    assert.ok(tempDbPath, 'tempDbPath muss definiert sein');
+    assert.ok(tempDbPath.includes('mso-test-'), 'tempDbPath muss in einem temporären Verzeichnis liegen');
+    assert.notStrictEqual(tempDbPath, 'data/mso_cloud.db', 'tempDbPath darf niemals der Produktionspfad sein');
+  });
+
   console.log(`\n=== RESULT: ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY! ===`);
 }
 
@@ -521,3 +783,4 @@ runAllTests().catch((err) => {
   console.error('\nTest runner failed:', err);
   process.exit(1);
 });
+
