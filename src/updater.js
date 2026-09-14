@@ -111,9 +111,15 @@ async function performUpdate() {
       logProgress(results.backup);
     }
 
-    // 1. GitHub Pull
-    logProgress('--- Schritt 1: Git Pull ---');
-    results.gitPull = await runCommand('git pull', projectRoot);
+    // 1. GitHub Fetch & Hard Reset to origin/main
+    logProgress('--- Schritt 1: Git Fetch & Reset auf origin/main ---');
+    try {
+      await runCommand('git fetch origin main', projectRoot);
+      results.gitPull = await runCommand('git reset --hard origin/main', projectRoot);
+    } catch (fetchErr) {
+      logProgress(`Warnung bei Fetch/Reset (${fetchErr.message}), führe Fallback 'git pull' aus...`);
+      results.gitPull = await runCommand('git pull', projectRoot);
+    }
 
     // 2. NPM Dependencies
     logProgress('--- Schritt 2: NPM Dependencies installieren ---');

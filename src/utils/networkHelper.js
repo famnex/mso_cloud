@@ -66,13 +66,61 @@ function isPrivateOrLoopbackIp(ip) {
   return true;
 }
 
+/**
+ * Prüft, ob eine IP-Adresse zu gesperrten Cloud-Metadaten-Endpunkten (169.254.169.254) oder Broadcast/Multicast gehört.
+ */
+function isForbiddenMetadataOrBroadcastIp(ip) {
+  if (!ip) return true;
+  ip = ip.toLowerCase();
+  const mapped = ip.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mapped) {
+    const hi = parseInt(mapped[1], 16), lo = parseInt(mapped[2], 16);
+    ip = [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+  }
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.substring(7);
+  }
+
+  const ipType = net.isIP(ip);
+  if (ipType === 0) return true;
+
+  if (ipType === 4) {
+    const parts = ip.split('.').map(p => parseInt(p, 10));
+    if (parts.length !== 4 || parts.some(isNaN)) return true;
+
+    // 0.0.0.0/8 (Broadcast/This network)
+    if (parts[0] === 0) return true;
+    // 169.254.0.0/16 (Link-Local / Cloud Metadata 169.254.169.254)
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    // 224.0.0.0/4 (Multicast) & 240.0.0.0/4 (Reserved)
+    if (parts[0] >= 224) return true;
+
+    return false;
+  }
+
+  if (ipType === 6) {
+    const lower = ip.toLowerCase();
+    if (lower === '::') return true;
+    // fe80::/10 (Link-Local)
+    if (lower.startsWith('fe80:') || lower.startsWith('fe8') || lower.startsWith('fe9') || lower.startsWith('fea') || lower.startsWith('feb')) return true;
+    // ff00::/8 (Multicast)
+    if (lower.startsWith('ff')) return true;
+
+    return false;
+  }
+
+  return true;
+}
+
 // In-Memory-Cache für Kachelstatus (60 Sekunden TTL)
 const statusCache = new Map();
 const CACHE_TTL_MS = 60 * 1000;
 
 /**
  * Führt eine sichere HTTP/HTTPS Statusabfrage für eine Kachel-URL aus.
- * Schützt vor SSRF, DNS-Rebinding, Endlosschleifen und Timeouts.
+ * Schützt vor DNS-Rebinding, Endlosschleifen, Timeouts und Cloud-Metadaten-Exfiltration.
+ * Erlaubt standardmäßig interne Schulnetz-Dienste (10.x, 192.168.x, 172.16-31.x, 127.0.0.1),
+ * da Kacheln ausschließlich vom Administrator im System hinterlegt werden.
  */
 async function checkUrlAvailability(targetUrl) {
   const unknown = reason => ({ online: null, state: 'unknown', reason });
@@ -83,10 +131,13 @@ async function checkUrlAvailability(targetUrl) {
     return unknown('Nur HTTP/HTTPS ohne Zugangsdaten in der URL erlaubt');
   }
 
-  // Exact origins, controlled by the server administrator, never by request input.
+  // Erlaube interne Schulnetze standardmäßig, außer wenn STATUS_CHECK_ALLOW_PRIVATE explizit '0' oder 'false' ist
+  const allowAllPrivate = process.env.STATUS_CHECK_ALLOW_PRIVATE !== '0' && 
+                          process.env.STATUS_CHECK_ALLOW_PRIVATE !== 'false';
   const allowedOrigins = (process.env.STATUS_CHECK_PRIVATE_ORIGINS || '').split(',')
     .map(value => value.trim()).filter(Boolean);
-  const allowPrivate = allowedOrigins.includes(parsedUrl.origin);
+  const allowPrivate = allowAllPrivate || allowedOrigins.includes(parsedUrl.origin) || allowedOrigins.includes('*');
+
   const cacheKey = `${allowPrivate}:${parsedUrl.href}`;
   const cached = statusCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) return cached.result;
@@ -104,6 +155,13 @@ async function checkUrlAvailability(targetUrl) {
   } catch { return unknown('DNS-Auflösung fehlgeschlagen'); }
   finally { clearTimeout(dnsTimer); }
   if (!records.length) return unknown('DNS-Auflösung fehlgeschlagen');
+
+  // Cloud-Metadaten (z.B. 169.254.169.254) und Broadcast/Multicast sind immer blockiert
+  if (records.some(record => isForbiddenMetadataOrBroadcastIp(record.address))) {
+    return { ...unknown('Gesperrter Cloud-Metadaten- oder Broadcast-Endpunkt'), blocked: true };
+  }
+
+  // Falls Strict-Mode aktiv ist (STATUS_CHECK_ALLOW_PRIVATE=false) und private IP nicht in Whitelist
   if (!allowPrivate && records.some(record => isPrivateOrLoopbackIp(record.address))) {
     return { ...unknown('Interner Dienst: Statusprüfung nicht freigegeben'), blocked: true };
   }
@@ -149,4 +207,4 @@ async function checkUrlAvailability(targetUrl) {
   });
 }
 
-module.exports = { isPrivateOrLoopbackIp, checkUrlAvailability };
+module.exports = { isPrivateOrLoopbackIp, isForbiddenMetadataOrBroadcastIp, checkUrlAvailability };

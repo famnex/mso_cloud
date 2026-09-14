@@ -108,22 +108,35 @@ test('status route normalizes LDAP groups, rejects arbitrary URLs and handles re
   assert.equal(checks, 1);
 });
 
-test('private checks require exact origin, cache respects policy, redirects are not followed', async t => {
+test('private checks require exact origin when strict, cache respects policy, redirects are not followed', async t => {
   const app = express();
   let reached = 0;
   app.head('/', (req, res) => { reached++; res.redirect('http://169.254.169.254/'); });
   const base = await listen(t, app);
   const previous = process.env.STATUS_CHECK_PRIVATE_ORIGINS;
-  t.after(() => { if (previous === undefined) delete process.env.STATUS_CHECK_PRIVATE_ORIGINS; else process.env.STATUS_CHECK_PRIVATE_ORIGINS = previous; });
+  const prevAllow = process.env.STATUS_CHECK_ALLOW_PRIVATE;
+  t.after(() => { 
+    if (previous === undefined) delete process.env.STATUS_CHECK_PRIVATE_ORIGINS; else process.env.STATUS_CHECK_PRIVATE_ORIGINS = previous;
+    if (prevAllow === undefined) delete process.env.STATUS_CHECK_ALLOW_PRIVATE; else process.env.STATUS_CHECK_ALLOW_PRIVATE = prevAllow;
+  });
+  
+  // Strict-Modus: STATUS_CHECK_ALLOW_PRIVATE=false verlangt STATUS_CHECK_PRIVATE_ORIGINS
+  process.env.STATUS_CHECK_ALLOW_PRIVATE = 'false';
   delete process.env.STATUS_CHECK_PRIVATE_ORIGINS;
   assert.equal((await network.checkUrlAvailability(base)).blocked, true);
   assert.equal(reached, 0);
+  
   process.env.STATUS_CHECK_PRIVATE_ORIGINS = base;
   assert.equal((await network.checkUrlAvailability(base)).online, true);
   assert.equal(reached, 1);
+
   delete process.env.STATUS_CHECK_PRIVATE_ORIGINS;
   assert.equal((await network.checkUrlAvailability(base)).blocked, true);
   assert.equal(network.isPrivateOrLoopbackIp('::ffff:7f00:1'), true);
+
+  // Standardmodus: STATUS_CHECK_ALLOW_PRIVATE=true erlaubt interne Schulnetz-Dienste
+  process.env.STATUS_CHECK_ALLOW_PRIVATE = 'true';
+  assert.equal((await network.checkUrlAvailability(base)).online, true);
 });
 
 test('frontend sends tile id and leaves links usable for denied, failed and offline checks', async () => {

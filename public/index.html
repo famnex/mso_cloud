@@ -97,7 +97,7 @@
     <!-- TILES SEARCH & FILTER -->
     <div class="tiles-search-bar" id="tiles-search-container" style="max-width: 440px; margin: 0 auto 26px auto; position: relative;">
       <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none;"></i>
-      <input type="text" id="tiles-search-input" placeholder="Dienste durchsuchen..." oninput="filterTilesLive(this.value)" style="width: 100%; padding: 12px 42px 12px 44px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg); color: var(--text-primary); font-size: 0.95rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='var(--panel-border)'">
+      <input type="search" id="tiles-search-input" name="mso_tiles_search_field" placeholder="Dienste durchsuchen..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" data-1p-ignore="true" oninput="filterTilesLive(this.value)" style="width: 100%; padding: 12px 42px 12px 44px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg); color: var(--text-primary); font-size: 0.95rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='var(--panel-border)'">
       <button id="tiles-search-clear" onclick="clearTileSearch()" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer; display: none; padding: 4px;" title="Suche leeren">
         <i class="fa-solid fa-xmark"></i>
       </button>
@@ -625,7 +625,11 @@
             </button>
             <div id="update-loader" style="display:none; margin-top:20px; align-items:center; gap:15px; color:var(--accent-color);">
               <i class="fa-solid fa-spinner fa-spin fa-lg"></i>
-              <span>Update läuft im Hintergrund. Die Anwendung startet in Kürze neu...</span>
+              <span id="update-loader-text">Update läuft im Hintergrund. Die Anwendung startet in Kürze neu...</span>
+            </div>
+            <div id="update-log-container" style="display:none; margin-top:15px; background:rgba(0,0,0,0.4); border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.1);">
+              <div style="font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Live-Update-Protokoll:</div>
+              <pre id="update-log-output" style="margin:0; font-size:0.8rem; font-family:monospace; color:#cbd5e1; max-height:180px; overflow-y:auto; white-space:pre-wrap; line-height:1.4;"></pre>
             </div>
           </div>
         </div>
@@ -1458,11 +1462,11 @@
 
         <div class="form-group">
           <label for="login-username">Benutzername</label>
-          <input type="text" id="login-username" class="form-control" placeholder="Benutzername" required autocomplete="off">
+          <input type="text" id="login-username" name="username" class="form-control" placeholder="Benutzername" required autocomplete="username">
         </div>
         <div class="form-group">
           <label for="login-password">Passwort</label>
-          <input type="password" id="login-password" class="form-control" placeholder="Passwort" required autocomplete="off">
+          <input type="password" id="login-password" name="password" class="form-control" placeholder="Passwort" required autocomplete="current-password">
         </div>
         
         <div style="text-align: right; margin-bottom: 20px;">

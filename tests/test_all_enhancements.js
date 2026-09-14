@@ -46,21 +46,30 @@ async function runTests() {
   assert.strictEqual(Object.keys(publicDTO).includes('sso_key'), false);
   console.log('  ✓ toPublicTileDTO filtert sso_key strikt heraus');
 
-  // 3. SSRF Blocker Test (F08)
-  console.log('\n[Test 3] SSRF-Schutz & Private IP-Filter (F08)...');
-  const { isPrivateOrLoopbackIp, checkUrlAvailability } = require('../src/utils/networkHelper');
+  // 3. SSRF & Metadaten-Schutz / Private IP-Filter (F08)
+  console.log('\n[Test 3] Metadaten-Schutz & Schulnetz-Statusprüfung (F08)...');
+  const { isPrivateOrLoopbackIp, isForbiddenMetadataOrBroadcastIp, checkUrlAvailability } = require('../src/utils/networkHelper');
   assert.strictEqual(isPrivateOrLoopbackIp('127.0.0.1'), true, '127.0.0.1 ist Loopback');
   assert.strictEqual(isPrivateOrLoopbackIp('10.0.5.1'), true, '10.0.0.0/8 ist privat');
   assert.strictEqual(isPrivateOrLoopbackIp('172.16.0.1'), true, '172.16.0.0/12 ist privat');
   assert.strictEqual(isPrivateOrLoopbackIp('192.168.1.1'), true, '192.168.0.0/16 ist privat');
-  assert.strictEqual(isPrivateOrLoopbackIp('169.254.169.254'), true, '169.254.0.0/16 ist link-local');
+  assert.strictEqual(isForbiddenMetadataOrBroadcastIp('169.254.169.254'), true, '169.254.0.0/16 ist Cloud-Metadaten-IP');
+  assert.strictEqual(isForbiddenMetadataOrBroadcastIp('0.0.0.0'), true, '0.0.0.0 ist Broadcast');
   assert.strictEqual(isPrivateOrLoopbackIp('8.8.8.8'), false, '8.8.8.8 ist öffentlich');
   assert.strictEqual(isPrivateOrLoopbackIp('1.1.1.1'), false, '1.1.1.1 ist öffentlich');
 
-  const localhostCheck = await checkUrlAvailability('http://127.0.0.1:8080/admin');
-  assert.strictEqual(localhostCheck.online, null, 'Blockierte Prüfung liefert unbekannten Status');
-  assert.strictEqual(localhostCheck.blocked, true, 'Lokale IP muss als blockiert markiert werden');
-  console.log('  ✓ SSRF-Filter blockiert private IPs und Loopback-Adressen zuverlässig');
+  // Cloud-Metadaten-IP muss immer blockiert werden
+  const metadataCheck = await checkUrlAvailability('http://169.254.169.254/latest/meta-data');
+  assert.strictEqual(metadataCheck.blocked, true, 'Cloud-Metadaten müssen zwingend blockiert werden');
+
+  // Strict-Modus: STATUS_CHECK_ALLOW_PRIVATE=false
+  process.env.STATUS_CHECK_ALLOW_PRIVATE = 'false';
+  delete process.env.STATUS_CHECK_PRIVATE_ORIGINS;
+  const localhostStrict = await checkUrlAvailability('http://127.0.0.1:8080/admin');
+  assert.strictEqual(localhostStrict.blocked, true, 'Im Strict-Modus muss private IP blockiert werden');
+  
+  delete process.env.STATUS_CHECK_ALLOW_PRIVATE;
+  console.log('  ✓ Metadaten-Schutz und Schulnetz-Statusprüfung arbeiten zuverlässig');
 
   // 4. Schülerausweis Regelwerk & Stichtage (F05, F06)
   console.log('\n[Test 4] Schülerausweis Regelwerk & Stichtagsprüfung (F05, F06)...');

@@ -64,6 +64,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Tooltip initialisieren
   initTooltips();
 
+  // Suchfeld beim Starten leeren und Entsperren
+  const searchInput = document.getElementById('tiles-search-input');
+  if (searchInput) {
+    searchInput.value = '';
+    filterTilesLive('');
+  }
+
   // 8. Hash-basiertes Routing beim Laden auflösen
   handleHashRoute();
 });
@@ -377,8 +384,9 @@ async function handleLogin(e) {
     if (res.ok) {
       console.log('[MSO Login] Anmeldevorgang erfolgreich!');
       closeModal('login-modal');
-      // Login-Formular leeren
+      // Login-Formular und Suchfeld leeren
       document.getElementById('login-form').reset();
+      clearTileSearch();
       
       if (data.oauth_redirect) {
         window.location.href = 'api/oauth/authorize';
@@ -480,6 +488,7 @@ async function handleLogout() {
       localStorage.removeItem('mso_card_offline_blocked');
 
       clearStudentViewDOM();
+      clearTileSearch();
       renderAnonymousHeader();
       closeAdminView();
       closeStudentView();
@@ -3880,14 +3889,22 @@ async function loadSystemInfo() {
   }
 }
 
+let _updatePollInterval = null;
+
 async function triggerSystemUpdate() {
   if (!confirm('WARNUNG: Das System lädt das neueste Update direkt von GitHub, installiert Pakete, migriert die Datenbank und startet sich neu. Sind Sie sicher?')) return;
 
   const btn = document.getElementById('update-system-btn');
   const loader = document.getElementById('update-loader');
+  const loaderText = document.getElementById('update-loader-text');
+  const logContainer = document.getElementById('update-log-container');
+  const logOutput = document.getElementById('update-log-output');
 
-  btn.disabled = true;
-  loader.style.display = 'flex';
+  if (btn) btn.disabled = true;
+  if (loader) loader.style.display = 'flex';
+  if (loaderText) loaderText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Update wird gestartet...';
+  if (logContainer) logContainer.style.display = 'block';
+  if (logOutput) logOutput.innerText = 'Verbindung zum Update-Dienst wird aufgebaut...\n';
 
   try {
     const res = await fetch('api/admin/system/update', { method: 'POST' });
@@ -3896,17 +3913,46 @@ async function triggerSystemUpdate() {
     if (res.ok) {
       showAdminAlert(data.message, 'success');
       
-      // Nach 10 Sekunden die Seite neu laden, um die neue Instanz zu prüfen
-      setTimeout(() => {
-        window.location.reload();
-      }, 15000);
+      // Polling des Live-Status im 1-Sekunden-Takt
+      if (_updatePollInterval) clearInterval(_updatePollInterval);
+      _updatePollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch('api/admin/system/update/status');
+          if (statusRes.ok) {
+            const job = await statusRes.json();
+            if (logOutput && job.progress && job.progress.length > 0) {
+              logOutput.innerText = job.progress.join('\n');
+              logOutput.scrollTop = logOutput.scrollHeight;
+            }
+
+            if (job.status === 'succeeded') {
+              clearInterval(_updatePollInterval);
+              _updatePollInterval = null;
+              if (loaderText) loaderText.innerHTML = '<span style="color:var(--success-color); font-weight:600;"><i class="fa-solid fa-circle-check"></i> Update erfolgreich abgeschlossen! Seite wird aktualisiert...</span>';
+              showAdminAlert('Update erfolgreich! Die Seite wird in Kürze neu geladen.', 'success');
+              setTimeout(() => {
+                window.location.reload();
+              }, 4000);
+            } else if (job.status === 'failed') {
+              clearInterval(_updatePollInterval);
+              _updatePollInterval = null;
+              if (btn) btn.disabled = false;
+              if (loaderText) loaderText.innerHTML = `<span style="color:var(--error-color); font-weight:600;"><i class="fa-solid fa-circle-xmark"></i> Update fehlgeschlagen: ${escapeHtml(job.error || 'Unbekannter Fehler')}</span>`;
+              showAdminAlert(`Update fehlgeschlagen: ${job.error}`, 'danger');
+            }
+          }
+        } catch (pollErr) {
+          // Während des PM2 Restarts kann die Verbindung kurzzeitig unterbrechen
+          if (loaderText) loaderText.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin"></i> Server startet neu... Bitte einen Augenblick Geduld.';
+        }
+      }, 1000);
     } else {
-      throw new Error(data.error);
+      throw new Error(data.error || data.message);
     }
   } catch (err) {
     showAdminAlert(err.message, 'danger');
-    btn.disabled = false;
-    loader.style.display = 'none';
+    if (btn) btn.disabled = false;
+    if (loader) loader.style.display = 'none';
   }
 }
 

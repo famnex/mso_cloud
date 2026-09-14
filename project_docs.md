@@ -28,10 +28,12 @@
 *   Der öffentliche Endpoint `GET /api/tiles` verwendet die Whitelist-Funktion `toPublicTileDTO()` in `src/routes/tiles.js`.
 *   Felder wie `sso_key` werden niemals an nicht-autorisierte Clients ausgeliefert. Die SSO-Token-Generierung erfolgt ausschließlich serverseitig über das Gateway `GET /api/tiles/sso/:id`.
 
-### 2.3 SSRF-Schutz & Statusprüfungen (`src/utils/networkHelper.js`)
-*   Die Kachel-Erreichbarkeitsprüfung (`GET /api/tiles/check-status?id=...`) führt vor jedem HTTP-Request eine DNS-Auflösung durch.
-*   IP-Adressen werden gegen RFC1918 / Private, Loopback (`127.0.0.0/8`), Link-Local (`169.254.0.0/16`) und Multicast-Ranges geprüft.
-*   Interne Adressen werden strikt blockiert.
+### 2.3 Statusprüfungen & Schutz vor Metadaten-Exfiltration (`src/utils/networkHelper.js`)
+*   Die Kachel-Erreichbarkeitsprüfung (`GET /api/tiles/check-status?id=...`) führt vor jedem HTTP-Request eine DNS-Auflösung und URL-Validierung durch.
+*   Es dürfen ausschließlich Kacheln geprüft werden, die in der Datenbank hinterlegt und für den Benutzer sichtbar sind.
+*   **Schulnetz-Unterstützung:** Interne Schulnetz-Dienste (`10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12` und `127.0.0.1` / Localhost) sind standardmäßig für Statusprüfungen freigegeben, damit interne Schulanwendungen (Moodle, WebUntis, Mediothek, Nextcloud) zuverlässig als online/offline angezeigt werden.
+*   **Cloud-Metadaten-Schutz:** Gefährliche Link-Local- und Cloud-Metadaten-Endpunkte (`169.254.0.0/16` wie `169.254.169.254`), Multicast (`224.0.0.0/4`) und Broadcast (`0.0.0.0/8`) sind dauerhaft gesperrt.
+*   **Optionaler Strict-Modus:** Über `STATUS_CHECK_ALLOW_PRIVATE=false` in `.env` kann die Prüfung privater Netze auf eine explizite Positivliste (`STATUS_CHECK_PRIVATE_ORIGINS`) beschränkt werden.
 *   Ergebnisse werden 60 Sekunden lang im Arbeitsspeicher gecacht.
 
 ### 2.4 Brute-Force & Rate-Limiting
