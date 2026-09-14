@@ -2551,9 +2551,9 @@
       if (!entry.offline_valid_until || !entry.expires_at) return false;
       const offlineMs = Date.parse(entry.offline_valid_until);
       const expiryMs = Date.parse(entry.expires_at.includes('T') ? entry.expires_at : entry.expires_at + 'T23:59:59.999Z');
-      if (isNaN(offlineMs) || isNaN(expiryMs) || !isFinite(offlineMs) || !isFinite(expiryMs)) return false;
+      if (isNaN(offlineMs) || isNaN(expiryMs) || !Number.isFinite(offlineMs) || !Number.isFinite(expiryMs)) return false;
       const now = Date.now();
-      if (now > offlineMs || now > expiryMs) return false;
+      if (now >= offlineMs || now >= expiryMs) return false;
       const statusStr = String(entry.card_status || '').toLowerCase();
       const codeStr = String(entry.card_status_code || '').toLowerCase();
       if (statusStr.includes('gesperrt') || statusStr.includes('deaktiviert') || statusStr.includes('ungültig') || statusStr.includes('abgelehnt') || codeStr === '1134') return false;
@@ -2989,7 +2989,7 @@
       const hasNoImage = !data.card_image || data.reason_code === 'NO_PHOTO';
       const isRejected = data.card_status === 'Bild abgelehnt' || data.card_status_code === '1134' || data.reason_code === 'PHOTO_REJECTED';
       const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59.999Z') : '2099-12-31T23:59:59.999Z');
-      const isExpired = now > expiry || data.reason_code === 'EXPIRED';
+      const isExpired = (!Number.isFinite(expiry.getTime()) || now >= expiry) || data.reason_code === 'EXPIRED';
 
       const isOfflineContractValid = isSupportedValidCache(data);
       const isOfflineExpired = isOffline && (!isOfflineContractValid || data.card_status === 'Offline-Zeitraum abgelaufen' || data.reason_code === 'OFFLINE_EXPIRED');

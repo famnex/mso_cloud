@@ -65,11 +65,21 @@ Die Gültigkeit eines echten Schülerausweises wird strikt und zentral serversei
    - Trennt `username`, `mediothek_number` und `user_id` strikt.
    - Numerische String-Benutzernamen (z. B. `"8001"`) werden **nicht** als Integer-IDs interpretiert.
    - Sekundäre Lookups (z. B. über Mediotheksnummer) verifizieren zwingend, dass der gefundene Grant zur Primäridentität (Username / User-ID) passt; bei Konflikten wird der Sekundärtreffer verworfen.
-4. **Persistenter Ausfallpuffer & QR-Kompatible Versionsprüfung (`student_card_grants`)**:
+4. **Persistenter Ausfallpuffer, Datumsprüfung & QR-Freigabestand (`student_card_grants`)**:
    - Bei tatsächlicher Verbindungsstörung (LDAP oder MySQL) darf eine zuvor erfolgreich bestätigte Gültigkeit zeitlich begrenzt weiterverwendet werden.
    - Der Puffer gilt maximal 30 Tage seit der letzten erfolgreichen Vollprüfung (`offline_valid_until`) und niemals über das bestätigte Schuljahresende (31. Juli) hinaus.
+   - **Robuste Datumsprüfung**: Beide Zeitwerte (`offline_valid_until` und `school_year_expires_at`) werden mit `Number.isFinite(date.getTime())` validiert. Sind Zeitstempel ungültig oder korrupt, wird der Puffer sofort als abgelaufen abgewiesen (`OFFLINE_EXPIRED`, `valid: false`).
+   - **Exaktes Fristende (`>=`)**: Beim Erreichen des Fristendes gilt `now >= expiry` (sekunden- und millisekundengenau abgelaufen).
    - Wiederholte Abrufe während einer Störung verlängern die Frist **nicht**.
-   - **QR-Kompatibilität (`isQrVerification: true`)**: Im QR-Prüfpfad wird der Berechtigungsstatus und die Versionsintegrität des Grants geprüft, ohne den Hash eines temporären SVG-Platzhalterbildes gegen den Vollversions-Hash zu vergleichen. Dadurch werden Fehlalarme (`VERSION_MISMATCH`) während Ausfällen vermieden. Unvollständige Altfreigaben (`v0` oder leere Version) werden abgelehnt.
+   - **QR-Freigabestand & Revisionsabsicherung (`isQrVerification: true`)**:
+     - Der öffentliche QR-Prüfendpunkt (`/verify-check`) arbeitet nach dem Prinzip der Datensparsamkeit und lädt keine Passbild-Blobs.
+     - Im regulären Live-Betrieb erfolgt die Prüfung stets live gegen MySQL und LDAP.
+     - Bei einem Ausfall von MySQL/LDAP stützt sich die QR-Verifikation auf den zuvor kryptografisch abgesicherten Freigabestand in `student_card_grants`:
+       1. Freigabe existiert und ist nicht widerrufen (`is_revoked === 0`).
+       2. Beide Fristen sind valide, finiten Datums und liegen in der Zukunft (`now < offline_valid_until` und `now < school_year_expires_at`).
+       3. Der hinterlegte Versionshash ist intakt und valide (`card_version` beginnt mit `v_`, Länge >= 10, nicht `v0` oder leer).
+       4. Strikte Identitätsbindung: Mediotheksnummer und Benutzername stimmen exakt mit dem Grant überein.
+     - **Sofortige Invalidierung bei Änderungen**: Jede Änderung an Schülerdaten (neues Foto, Fotoentfernung, Statusänderung auf ungenehmigt/gesperrt, Kontodeaktivierung im LDAP) invalidiert den Grant im Live-Betrieb sofort über `revokePersistentGrant()`. Dadurch ist sichergestellt, dass bei einem nachfolgenden Ausfall kein veralteter oder aberkannter Ausweis verifiziert werden kann.
 5. **Widerruf bei Bedingungsverlust**:
    - Sobald im Live-Betrieb festgestellt wird, dass Profil, Foto, Genehmigung oder LDAP-Konto fehlen oder deaktiviert sind, wird der persistente Grant sofort widerrufen (`is_revoked = 1`).
    - Spätere Serverausfälle können widerrufene Freigaben nicht wieder aufleben lassen.

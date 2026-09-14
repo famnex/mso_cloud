@@ -47,6 +47,23 @@ function getSchoolYearExpirationDate(now = new Date()) {
 }
 
 /**
+ * Parst und validiert Datumsangaben robust (unterstützt ISO, SQLite datetime und Date-Objekte).
+ */
+function parseDateSafely(val) {
+  if (!val) return null;
+  if (val instanceof Date) return Number.isFinite(val.getTime()) ? val : null;
+  let str = String(val).trim();
+  if (!str) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    str += 'T23:59:59.999Z';
+  } else if (str.includes(' ') && !str.includes('T')) {
+    str = str.replace(' ', 'T') + (str.endsWith('Z') ? '' : 'Z');
+  }
+  const d = new Date(str);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+/**
  * Berechnet eine konsistente Versionskennung für das Profil / Foto.
  */
 function computeCardVersion(profile) {
@@ -236,7 +253,7 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
   }
 
   const { expiresAt, expiryDate } = getSchoolYearExpirationDate(now);
-  const isExpired = now > expiryDate;
+  const isExpired = now >= expiryDate;
   
   // Identitätsattribute strikt auflösen
   const targetUsername = (user && user.username) ? String(user.username).trim() : ((profile && profile.username) ? String(profile.username).trim() : '');
@@ -569,10 +586,29 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
       };
     }
 
-    const grantOfflineExpiry = new Date(existingGrant.offline_valid_until);
-    const grantSchoolYearExpiry = new Date(existingGrant.school_year_expires_at + 'T23:59:59.999Z');
+    const grantOfflineExpiry = parseDateSafely(existingGrant.offline_valid_until);
+    const grantSchoolYearExpiry = parseDateSafely(existingGrant.school_year_expires_at);
 
-    if (now > grantOfflineExpiry || now > grantSchoolYearExpiry) {
+    // 1. Beide Zeitwerte mit Number.isFinite(date.getTime()) prüfen und bei ungültigen Werten ablehnen
+    if (!grantOfflineExpiry || !grantSchoolYearExpiry) {
+      return {
+        valid: false,
+        reasonCode: 'OFFLINE_EXPIRED',
+        statusSummary: 'Ungültiges Freigabedatum (erneute Online-Prüfung erforderlich)',
+        rawStatus: rawStatus,
+        expiresAt: existingGrant.school_year_expires_at || expiresAt,
+        offlineValidUntil: existingGrant.offline_valid_until || null,
+        is_buffered: true,
+        cardVersion: existingGrant.card_version || cardVersion
+      };
+    }
+
+    const offlineExpiryTime = grantOfflineExpiry.getTime();
+    const schoolYearExpiryTime = grantSchoolYearExpiry.getTime();
+    const nowTime = (now instanceof Date && Number.isFinite(now.getTime())) ? now.getTime() : (new Date(now).getTime() || Date.now());
+
+    // 2. Beim erreichten Fristende >= statt > verwenden
+    if (nowTime >= offlineExpiryTime || nowTime >= schoolYearExpiryTime) {
       return {
         valid: false,
         reasonCode: 'OFFLINE_EXPIRED',
@@ -600,7 +636,8 @@ function evaluateCardEligibility(userOrOptions, profileArg, nowArg) {
         };
       }
     } else {
-      if (!existingGrant.card_version || existingGrant.card_version === 'v0') {
+      const grantVer = String(existingGrant.card_version || '').trim();
+      if (!grantVer || grantVer === 'v0' || !grantVer.startsWith('v_') || grantVer.length < 10) {
         return {
           valid: false,
           reasonCode: 'VERSION_MISMATCH',

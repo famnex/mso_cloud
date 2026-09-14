@@ -13,7 +13,7 @@ const studentDb = require('../src/student_db');
 console.log('=== START REGRESSION TEST SUITE: ALL 20+ STUDENT CARD SCENARIOS ===\n');
 
 let passedTests = 0;
-const totalTests = 41;
+const totalTests = 43;
 
 async function runTest(num, name, fn) {
   try {
@@ -1001,6 +1001,84 @@ async function runAllTests() {
 
     assert.strictEqual(resAuthErr.valid, false, 'Bei Authentifizierungsfehlern darf kein Puffer greifen');
     assert.strictEqual(resAuthErr.reasonCode, 'DATABASE_ERROR');
+  });
+
+  // 42. Ungültige/korrupte serverseitige Ablaufdaten im Grant werden sicher als abgelaufen abgewiesen
+  await runTest(42, 'Ungültige serverseitige Ablaufdaten werden mit Number.isFinite geprüft und sicher abgewiesen', () => {
+    const testUser = { id: 8096, username: 'student.invalid_dates', is_active: 1 };
+    const prof = { first_name: 'Invalid', last_name: 'Dates', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+    const validVer = computeCardVersion(prof, 'BIB-8096');
+
+    // 1. offline_valid_until ist ein ungültiger String ('invalid-date')
+    db.prepare(`
+      INSERT INTO student_card_grants (user_id, username, mediothek_number, last_ldap_success_at, offline_valid_until, school_year_expires_at, is_revoked, card_version)
+      VALUES (8096, 'student.invalid_dates', 'BIB-8096', datetime('now'), 'invalid-date-string', '2027-07-31', 0, ?)
+      ON CONFLICT(username) DO UPDATE SET offline_valid_until = 'invalid-date-string', school_year_expires_at = '2027-07-31', is_revoked = 0, card_version = ?
+    `).run(validVer, validVer);
+
+    const resInvalidOffline = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'unavailable', active: false, error: 'Timeout' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' }
+    });
+    assert.strictEqual(resInvalidOffline.valid, false, 'Ungültiges offline_valid_until muss sicher als ungültig abgewiesen werden');
+    assert.strictEqual(resInvalidOffline.reasonCode, 'OFFLINE_EXPIRED');
+
+    // 2. school_year_expires_at ist ein ungültiger String ('corrupted-year')
+    db.prepare(`
+      UPDATE student_card_grants 
+      SET offline_valid_until = datetime('now', '+10 days'), school_year_expires_at = 'corrupted-year'
+      WHERE username = 'student.invalid_dates'
+    `).run();
+
+    const resInvalidSchoolYear = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'unavailable', active: false, error: 'Timeout' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' }
+    });
+    assert.strictEqual(resInvalidSchoolYear.valid, false, 'Ungültiges school_year_expires_at muss sicher als ungültig abgewiesen werden');
+    assert.strictEqual(resInvalidSchoolYear.reasonCode, 'OFFLINE_EXPIRED');
+  });
+
+  // 43. Erreichtes Fristende (>=) gilt sofort als abgelaufen
+  await runTest(43, 'Erreichtes Fristende (now >= offline_valid_until / school_year) gilt sofort als abgelaufen', () => {
+    const testUser = { id: 8097, username: 'student.exact_deadline', is_active: 1 };
+    const prof = { first_name: 'Exact', last_name: 'Deadline', card_status: 'Bild genehmigt', card_image: samplePhotoBase64 };
+    const validVer = computeCardVersion(prof, 'BIB-8097');
+
+    const exactTimestamp = new Date('2026-06-15T12:00:00.000Z');
+    const exactIso = exactTimestamp.toISOString();
+
+    db.prepare(`
+      INSERT INTO student_card_grants (user_id, username, mediothek_number, last_ldap_success_at, offline_valid_until, school_year_expires_at, is_revoked, card_version)
+      VALUES (8097, 'student.exact_deadline', 'BIB-8097', datetime('now'), ?, '2027-07-31', 0, ?)
+      ON CONFLICT(username) DO UPDATE SET offline_valid_until = ?, school_year_expires_at = '2027-07-31', is_revoked = 0, card_version = ?
+    `).run(exactIso, validVer, exactIso, validVer);
+
+    // 1. Exakt auf die Millisekunde des Fristendes -> muss abgelaufen sein (>=)
+    const resExact = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'unavailable', active: false, error: 'Timeout' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' },
+      now: exactTimestamp
+    });
+    assert.strictEqual(resExact.valid, false, 'Exakt erreichtes Fristende (>=) muss abgelaufen sein');
+    assert.strictEqual(resExact.reasonCode, 'OFFLINE_EXPIRED');
+
+    // 2. 1 Millisekunde VOR dem Fristende -> noch gültig
+    const oneMsBefore = new Date(exactTimestamp.getTime() - 1);
+    const resBefore = evaluateCardEligibility({
+      user: testUser,
+      profile: prof,
+      ldapStatus: { status: 'unavailable', active: false, error: 'Timeout' },
+      mysqlStatus: { status: 'connection_error', source: 'mysql_unavailable' },
+      now: oneMsBefore
+    });
+    assert.strictEqual(resBefore.valid, true, '1 Millisekunde vor Fristende muss noch gültig sein');
+    assert.strictEqual(resBefore.reasonCode, 'VALID_BUFFERED');
   });
 
   console.log(`\n=== RESULT: ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY! ===`);
