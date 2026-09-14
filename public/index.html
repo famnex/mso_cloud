@@ -95,13 +95,13 @@
   <!-- MAIN MAINVIEW -->
   <main id="main-view">
     <!-- TILES SEARCH & FILTER -->
-    <div class="tiles-search-bar" id="tiles-search-container" style="max-width: 440px; margin: 0 auto 26px auto; position: relative;">
+    <form role="search" class="tiles-search-bar" id="tiles-search-container" action="javascript:void(0);" method="post" autocomplete="off" onsubmit="event.preventDefault(); return false;" style="max-width: 440px; margin: 0 auto 26px auto; position: relative;">
       <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none;"></i>
-      <input type="search" id="tiles-search-input" name="mso_tiles_search_field" placeholder="Dienste durchsuchen..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" data-1p-ignore="true" oninput="filterTilesLive(this.value)" style="width: 100%; padding: 12px 42px 12px 44px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg); color: var(--text-primary); font-size: 0.95rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box;" onfocus="this.style.borderColor='var(--accent-color)'" onblur="this.style.borderColor='var(--panel-border)'">
-      <button id="tiles-search-clear" onclick="clearTileSearch()" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer; display: none; padding: 4px;" title="Suche leeren">
+      <input type="search" id="tiles-search-input" name="search_tiles_query" placeholder="Dienste durchsuchen..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="searchbox" aria-label="Dienste durchsuchen" readonly onfocus="this.removeAttribute('readonly'); this.style.borderColor='var(--accent-color)'" onpointerdown="this.removeAttribute('readonly')" ontouchstart="this.removeAttribute('readonly')" onkeydown="this.removeAttribute('readonly')" onblur="if(!this.value) this.setAttribute('readonly','readonly'); this.style.borderColor='var(--panel-border)'" data-lpignore="true" data-form-type="other" data-1p-ignore="true" data-bwignore="true" oninput="filterTilesLive(this.value)" style="width: 100%; padding: 12px 42px 12px 44px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg); color: var(--text-primary); font-size: 0.95rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box;">
+      <button type="button" id="tiles-search-clear" onclick="clearTileSearch()" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer; display: none; padding: 4px;" title="Suche leeren">
         <i class="fa-solid fa-xmark"></i>
       </button>
-    </div>
+    </form>
 
     <!-- TILES GRID -->
     <div class="tiles-grid" id="tiles-container">
@@ -1538,15 +1538,16 @@
       
       <div id="reset-password-alert" class="alert" style="display:none; padding: 10px; border-radius: 8px; margin-bottom: 15px;"></div>
 
-      <form id="reset-password-form" onsubmit="handlePasswordResetExecute(event)">
+      <form id="reset-password-form" autocomplete="off" onsubmit="handlePasswordResetExecute(event)">
+        <input type="text" name="username" autocomplete="username" style="display:none;" aria-hidden="true" tabindex="-1">
         <input type="hidden" id="reset-token-field">
         <div class="form-group">
           <label for="reset-new-password">Neues Passwort</label>
-          <input type="password" id="reset-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number', 'reset-new-password-confirm', 'reset-req-match')">
+          <input type="password" id="reset-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="new-password" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number', 'reset-new-password-confirm', 'reset-req-match')">
         </div>
         <div class="form-group">
           <label for="reset-new-password-confirm">Neues Passwort bestätigen</label>
-          <input type="password" id="reset-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number', 'reset-new-password-confirm', 'reset-req-match')">
+          <input type="password" id="reset-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="new-password" oninput="validatePasswordInput('reset-new-password', 'reset-submit-btn', 'reset-req-length', 'reset-req-letter', 'reset-req-number', 'reset-new-password-confirm', 'reset-req-match')">
         </div>
 
         <div class="password-requirements" style="margin-top: 10px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 5px; text-align: left; background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px;">
@@ -1583,14 +1584,15 @@
 
       <div id="change-password-alert" class="alert" style="display:none; padding: 10px; border-radius: 8px; margin-bottom: 15px;"></div>
 
-      <form id="change-password-form" onsubmit="handleChangePassword(event)">
+      <form id="change-password-form" autocomplete="off" onsubmit="handleChangePassword(event)">
+        <input type="text" name="username" autocomplete="username" style="display:none;" aria-hidden="true" tabindex="-1">
         <div class="form-group">
           <label for="change-new-password">Neues Passwort</label>
-          <input type="password" id="change-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="off" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number', 'change-new-password-confirm', 'change-req-match')">
+          <input type="password" id="change-new-password" class="form-control" placeholder="Neues Passwort" required autocomplete="new-password" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number', 'change-new-password-confirm', 'change-req-match')">
         </div>
         <div class="form-group">
           <label for="change-new-password-confirm">Passwort bestätigen</label>
-          <input type="password" id="change-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="off" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number', 'change-new-password-confirm', 'change-req-match')">
+          <input type="password" id="change-new-password-confirm" class="form-control" placeholder="Passwort bestätigen" required autocomplete="new-password" oninput="validatePasswordInput('change-new-password', 'change-submit-btn', 'change-req-length', 'change-req-letter', 'change-req-number', 'change-new-password-confirm', 'change-req-match')">
         </div>
 
         <div class="password-requirements" style="margin-top: 10px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 5px; text-align: left; background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 15px;">

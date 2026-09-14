@@ -64,12 +64,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Tooltip initialisieren
   initTooltips();
 
-  // Suchfeld beim Starten leeren und Entsperren
-  const searchInput = document.getElementById('tiles-search-input');
-  if (searchInput) {
-    searchInput.value = '';
-    filterTilesLive('');
-  }
+  // Suchfeld-Schutz gegen Chrome-Autofill initialisieren
+  initTilesSearchProtection();
 
   // 8. Hash-basiertes Routing beim Laden auflösen
   handleHashRoute();
@@ -705,6 +701,15 @@ async function loadTiles(isSilentHeartbeat = false) {
       }
     });
 
+    // Wenn der Nutzer aktiv einen Suchbegriff eingegeben hat, Filter anwenden; sonst sicherstellen, dass alle Kacheln sichtbar sind
+    const searchInput = document.getElementById('tiles-search-input');
+    if (searchInput && isUserTypingInTileSearch && searchInput.value) {
+      filterTilesLive(searchInput.value);
+    } else if (searchInput && !isUserTypingInTileSearch) {
+      searchInput.value = '';
+      searchInput.setAttribute('readonly', 'readonly');
+    }
+
   } catch (err) {
     if (!isSilentHeartbeat) {
       tilesContainer.innerHTML = `
@@ -1265,8 +1270,85 @@ function closeModal(id) {
   }
 }
 
-// Live Search Filter for Tiles
+// Live Search Filter for Tiles mit aktivem Schutz vor Browser-Autofill
+let isUserTypingInTileSearch = false;
+
+function initTilesSearchProtection() {
+  const input = document.getElementById('tiles-search-input');
+  if (!input) return;
+
+  const unlockSearchInput = () => {
+    isUserTypingInTileSearch = true;
+    if (input.hasAttribute('readonly')) {
+      input.removeAttribute('readonly');
+    }
+  };
+
+  ['keydown', 'keyup', 'keypress', 'paste', 'cut'].forEach(evt => {
+    input.addEventListener(evt, unlockSearchInput, { passive: true });
+  });
+
+  input.addEventListener('focus', () => {
+    input.removeAttribute('readonly');
+  });
+
+  input.addEventListener('pointerdown', () => {
+    input.removeAttribute('readonly');
+  });
+
+  input.addEventListener('blur', () => {
+    if (!input.value) {
+      input.setAttribute('readonly', 'readonly');
+      isUserTypingInTileSearch = false;
+    }
+  });
+
+  // Bereinigt fehlerhaft von Chrome automatisch eingefügte Werte
+  const sanitizeAutofill = () => {
+    if (!isUserTypingInTileSearch && input.value) {
+      input.value = '';
+      input.setAttribute('readonly', 'readonly');
+      filterTilesLive('');
+    }
+  };
+
+  input.addEventListener('animationstart', (e) => {
+    if (e.animationName === 'onAutoFillStart' || (e.animationName && e.animationName.toLowerCase().includes('autofill'))) {
+      sanitizeAutofill();
+    }
+  });
+
+  input.addEventListener('input', (e) => {
+    if (!isUserTypingInTileSearch && document.activeElement !== input) {
+      input.value = '';
+      filterTilesLive('');
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    }
+  });
+
+  // Mehrstufige Prüfung in den ersten 2 Sekunden nach Laden gegen verzögerten Chrome-Autofill
+  input.value = '';
+  filterTilesLive('');
+  [50, 150, 300, 600, 1200, 2000].forEach(ms => {
+    setTimeout(sanitizeAutofill, ms);
+  });
+}
+
 function filterTilesLive(query) {
+  const input = document.getElementById('tiles-search-input');
+  // Sicherheitsprüfung: Wenn das Suchfeld ohne Nutzerinteraktion mit dem Benutzernamen gefüllt wurde
+  if (input && document.activeElement !== input && currentUser) {
+    const rawVal = (input.value || '').trim().toLowerCase();
+    const uname = (currentUser.username || '').toLowerCase();
+    const email = (currentUser.email || '').toLowerCase();
+    const dname = (currentUser.display_name || '').toLowerCase();
+    if (rawVal && (rawVal === uname || rawVal === email || (dname && rawVal === dname))) {
+      input.value = '';
+      input.setAttribute('readonly', 'readonly');
+      query = '';
+    }
+  }
+
   const q = (query || '').toLowerCase().trim();
   const clearBtn = document.getElementById('tiles-search-clear');
   if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
@@ -1303,8 +1385,10 @@ function filterTilesLive(query) {
 function clearTileSearch() {
   const input = document.getElementById('tiles-search-input');
   if (input) {
+    isUserTypingInTileSearch = false;
     input.value = '';
     filterTilesLive('');
+    input.removeAttribute('readonly');
     input.focus();
   }
 }
