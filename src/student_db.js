@@ -79,6 +79,21 @@ async function testMySQLConnection(config) {
 reconnectMySQL();
 
 /**
+ * Normalisiert einen String für sicheren Namensvergleich (Umlaute, NFC, Whitespace, Lowercase).
+ */
+function normalizeName(str) {
+  return String(str || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/\s+/g, ' ');
+}
+
+/**
  * Hilfsfunktion zum Mappen der MySQL dynamic fieldvalues Zeilen in ein flaches Profil-Objekt.
  */
 function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
@@ -137,35 +152,38 @@ function buildProfileFromMySQL(userId, applicationId, rows, photoFile) {
         const lowerRaw = rawVal.toLowerCase();
         const lowerSub = subVal.toLowerCase();
 
-        // 1133: Ausweis gedruckt / Plastikkarte produziert (Gültig & Aktiv)
+        // 1. ZUERST explizite Sperr-/Ablehnungsstatus prüfen (1134 / deaktiviert / abgelehnt)
+        const isRejected = lowerRaw === '1134' || lowerVal === '1134' || lowerRaw.includes('1134') ||
+                           lowerSub.includes('abgelehnt') || lowerVal.includes('abgelehnt') ||
+                           lowerSub.includes('deaktiviert') || lowerVal.includes('deaktiviert') ||
+                           lowerSub.includes('gesperrt') || lowerVal.includes('gesperrt');
+
+        // 2. 1133: Ausweis gedruckt / Plastikkarte produziert (Gültig & Aktiv)
         const isPrinted = lowerRaw === '1133' || lowerVal === '1133' || lowerRaw.includes('1133') ||
                           lowerSub.includes('ausgegeben') || lowerVal.includes('ausgegeben') ||
                           lowerSub.includes('gedruckt') || lowerVal.includes('gedruckt');
 
-        // 1134: Bild abgelehnt
-        const isRejected = lowerRaw === '1134' || lowerVal === '1134' || lowerRaw.includes('1134') ||
-                           lowerSub.includes('abgelehnt') || lowerVal.includes('abgelehnt');
-
-        // 1131: Bild in Stufe 1 akzeptiert / eingereicht -> WEITERHIN IN PRÜFUNG (Ausweis gesperrt)
+        // 3. 1131: Bild in Stufe 1 akzeptiert / eingereicht -> WEITERHIN IN PRÜFUNG (Ausweis gesperrt)
         const isPendingStage1 = lowerRaw === '1131' || lowerVal === '1131' || lowerRaw.includes('1131') ||
                                 lowerSub.includes('akzeptiert') || lowerVal.includes('akzeptiert') ||
                                 lowerSub.includes('eingereicht') || lowerVal.includes('eingereicht');
 
-        // 1132: Bild final genehmigt & verifiziert (Gültig & Aktiv)
-        const isApproved = lowerRaw === '1132' || lowerVal === '1132' || lowerRaw.includes('1132') ||
-                           lowerSub.includes('genehmigt') || lowerVal.includes('genehmigt') ||
-                           lowerSub.includes('verifiziert') || lowerVal.includes('verifiziert') ||
-                           lowerSub.includes('aktiviert') || lowerVal.includes('aktiviert') ||
-                           lowerSub.includes('freigegeben') || lowerVal.includes('freigegeben');
+        // 4. 1132: Bild final genehmigt & verifiziert (Gültig & Aktiv) - Nur wenn NICHT deaktiviert/abgelehnt!
+        const isApproved = !isRejected && (
+          lowerRaw === '1132' || lowerVal === '1132' || lowerRaw.includes('1132') ||
+          lowerSub.includes('genehmigt') || lowerVal.includes('genehmigt') ||
+          lowerSub.includes('verifiziert') || lowerVal.includes('verifiziert') ||
+          lowerSub.includes('freigegeben') || lowerVal.includes('freigegeben') ||
+          lowerSub === 'aktiviert' || lowerVal === 'aktiviert'
+        );
 
-        if (isPrinted) {
-          profile.card_status = 'Ausweis gedruckt';
-          profile.card_status_code = '1133';
-        } else if (isRejected) {
+        if (isRejected) {
           profile.card_status = 'Bild abgelehnt';
           profile.card_status_code = '1134';
+        } else if (isPrinted) {
+          profile.card_status = 'Ausweis gedruckt';
+          profile.card_status_code = '1133';
         } else if (isPendingStage1) {
-          // 1131 / Bild akzeptiert: Ist Stufe 1, also WEITERHIN IN PRÜFUNG!
           profile.card_status = 'Bild eingereicht';
           profile.card_status_code = '1131';
         } else if (isApproved) {
@@ -205,16 +223,18 @@ function getLocalProfile(userId) {
   const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(userId);
   if (profile) {
     const s = String(profile.card_status || '').toLowerCase();
-    if (s.includes('ausgegeben') || s.includes('gedruckt') || s === '1133') {
-      profile.card_status = 'Ausweis gedruckt';
-      profile.card_status_code = '1133';
-    } else if (s.includes('abgelehnt') || s === '1134') {
+    
+    // Zuerst Sperr-/Ablehnungsstatus prüfen
+    if (s.includes('abgelehnt') || s.includes('deaktiviert') || s.includes('gesperrt') || s === '1134') {
       profile.card_status = 'Bild abgelehnt';
       profile.card_status_code = '1134';
+    } else if (s.includes('ausgegeben') || s.includes('gedruckt') || s === '1133') {
+      profile.card_status = 'Ausweis gedruckt';
+      profile.card_status_code = '1133';
     } else if (s.includes('eingereicht') || s.includes('akzeptiert') || s === '1131') {
       profile.card_status = 'Bild eingereicht';
       profile.card_status_code = '1131';
-    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s.includes('aktiviert') || s === '1132') {
+    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s === 'aktiviert' || s === '1132') {
       profile.card_status = 'Bild genehmigt';
       profile.card_status_code = '1132';
     } else {
@@ -226,8 +246,9 @@ function getLocalProfile(userId) {
         profile.card_status_code = '1130';
       }
     }
+    return profile;
   }
-  return profile;
+  return null;
 }
 
 function getLocalAllStudents() {
@@ -241,8 +262,12 @@ function getLocalAllStudents() {
 
 /**
  * Holt das Schülerprofil wahlweise aus MySQL oder SQLite.
+ * 
+ * @param {Object|number} user 
+ * @param {Object} options
+ * @param {boolean} options.isCardPath - Wenn true, wird bei erreichbarer MySQL-DB mit 0 Treffern kein SQLite-Fallback verwendet.
  */
-async function getStudentProfile(user) {
+async function getStudentProfile(user, { isCardPath = false } = {}) {
   let userObj = (typeof user === 'object' && user !== null) ? { ...user } : { id: user };
   
   if (!userObj.username && userObj.id) {
@@ -255,7 +280,9 @@ async function getStudentProfile(user) {
     } catch (e) {}
   }
 
-  if (pool) {
+  const config = getMySQLConfig();
+
+  if (config.enabled && pool) {
     try {
       let applicationId = null;
       
@@ -299,8 +326,21 @@ async function getStudentProfile(user) {
         }
       }
       
+      // Wenn MySQL erreichbar ist, aber kein Antrag existiert:
       if (!applicationId) {
+        if (isCardPath) {
+          // FEHLER 3: Bei erreichbarem MySQL und keinem Treffer im Ausweispfad KEIN SQLite-Fallback
+          return null;
+        }
         return getLocalProfile(userObj.id);
+      }
+
+      // Prüfen, ob der Antrag den Status >= 10 hat (im Ausweispfad zwingend)
+      const [appRows] = await pool.query('SELECT status FROM applications WHERE ID = ?', [applicationId]);
+      if (appRows.length === 0 || (isCardPath && appRows[0].status < 10)) {
+        if (isCardPath) {
+          return null;
+        }
       }
 
       const [fieldRows] = await pool.query(`
@@ -335,32 +375,32 @@ async function getStudentProfile(user) {
       }
       return mysqlProf;
     } catch (err) {
-      console.error('MySQL Error in getStudentProfile:', err);
-      return getLocalProfile(userObj.id);
+      console.error('[StudentDB] MySQL Verbindungsfehler in getStudentProfile:', err.message);
+      // Nur bei echtem MySQL-Verbindungsfehler im Ausweispfad lokalen Cache für den Pufferpfad liefern
+      return getLocalProfile(userObj.id) || null;
     }
   } else {
-    return getLocalProfile(userObj.id);
+    return getLocalProfile(userObj.id) || null;
   }
 }
 
 function convertBlobToDataUrl(rawFile) {
   if (!rawFile) return null;
-  // Buffer in String umwandeln falls nötig
   const str = Buffer.isBuffer(rawFile) ? rawFile.toString('utf-8') : rawFile;
-  // Vollständige Data-URL zurückgeben (enthält data:image/...;base64,... Präfix)
   return str;
 }
 
 /**
  * Hilfsfunktion zur Ermittlung der Antrags-ID aus der E-Mail oder einer virtuellen User-ID (>= 1000).
  */
-async function getApplicationId(userId, email) {
-  if (pool) {
-    // 1. Primär über den Benutzernamen (aus der SQLite-DB anhand der userId geladen) suchen
+async function getApplicationId(userId, email, conn = null) {
+  const queryExecutor = conn || pool;
+  if (queryExecutor) {
+    // 1. Primär über den Benutzernamen suchen
     if (userId) {
       const localUser = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
       if (localUser && localUser.username) {
-        const [rows] = await pool.query(
+        const [rows] = await queryExecutor.query(
           'SELECT application FROM fieldvalues WHERE field = 146 AND value = ?',
           [localUser.username.trim()]
         );
@@ -370,10 +410,10 @@ async function getApplicationId(userId, email) {
       }
     }
 
-    // 2. Sekundär über die E-Mail suchen (nur wenn valide, aktive Anträge mit Status >= 10 bevorzugen)
+    // 2. Sekundär über die E-Mail suchen
     const trimmedEmail = (email || '').trim();
     if (trimmedEmail && trimmedEmail.includes('@')) {
-      const [rows] = await pool.query(`
+      const [rows] = await queryExecutor.query(`
         SELECT fv.application, app.status 
         FROM fieldvalues fv
         JOIN applications app ON fv.application = app.ID
@@ -393,20 +433,38 @@ async function getApplicationId(userId, email) {
 }
 
 /**
- * Speichert ein Passbild ab.
+ * Speichert ein Passbild transaktional in MySQL und synchronisiert SQLite.
  */
 async function updateStudentPhoto(userId, email, base64Image) {
   const debugLog = [];
   debugLog.push(`Start updateStudentPhoto für userId=${userId}, email=${email}`);
   
+  if (!userId) {
+    return {
+      success: false,
+      mysqlSuccess: false,
+      sqliteSuccess: false,
+      error: 'Keine gültige Benutzer-ID angegeben.',
+      debugLog
+    };
+  }
+  
   let mysqlSuccess = false;
   let sqliteSuccess = false;
 
   if (pool) {
-    debugLog.push("MySQL-Pool ist aktiv. Versuche, Application-ID zu ermitteln...");
+    debugLog.push("MySQL-Pool ist aktiv. Beziehe dedizierte Verbindung für Transaktion...");
+    let conn;
     try {
-      const applicationId = await getApplicationId(userId, email);
+      conn = (pool.getConnection && typeof pool.getConnection === 'function') ? await pool.getConnection() : pool;
+      if (conn.beginTransaction && typeof conn.beginTransaction === 'function') {
+        await conn.beginTransaction();
+      }
+
+      const applicationId = await getApplicationId(userId, email, conn);
       if (!applicationId) {
+        if (conn.rollback && typeof conn.rollback === 'function') await conn.rollback();
+        if (conn.release && typeof conn.release === 'function') conn.release();
         debugLog.push("FEHLER: Keine Application-ID für diesen Benutzer in MySQL gefunden.");
         return {
           success: false,
@@ -419,30 +477,41 @@ async function updateStudentPhoto(userId, email, base64Image) {
 
       debugLog.push(`Application-ID in MySQL ermittelt: ${applicationId}`);
       
-      // Den vollständigen data:image/...;base64,... String speichern (so wie andere Apps es erwarten)
-      const imageToStore = base64Image;
-      debugLog.push(`Bild für MySQL vorbereitet. Zeichenlänge: ${imageToStore.length}, Präfix: ${imageToStore.substring(0, 30)}...`);
-
-      debugLog.push("Führe MySQL aus: INSERT INTO images (file, application, field = 37) ON DUPLICATE KEY UPDATE...");
-      await pool.query(`
+      // Foto in images speichern
+      await conn.query(`
         INSERT INTO images (file, application, field)
         VALUES (?, ?, 37)
         ON DUPLICATE KEY UPDATE file = ?
-      `, [imageToStore, applicationId, imageToStore]);
+      `, [base64Image, applicationId, base64Image]);
       debugLog.push("MySQL: INSERT INTO images erfolgreich.");
 
-      debugLog.push(`Führe MySQL aus: INSERT INTO fieldvalues (field = 158, application = ${applicationId}, value = '1130', subset = 0) ON DUPLICATE KEY UPDATE...`);
-      const [result] = await pool.query(`
+      // Status in fieldvalues auf 1130 zurücksetzen
+      const [resStatus] = await conn.query(`
         INSERT INTO fieldvalues (field, application, value, subset)
         VALUES (158, ?, '1130', 0)
         ON DUPLICATE KEY UPDATE value = '1130'
       `, [applicationId]);
-      debugLog.push(`MySQL: INSERT/UPDATE fieldvalues erfolgreich. Betroffene Zeilen: ${result.affectedRows}`);
-      
+      debugLog.push(`MySQL: Status auf 1130 zurückgesetzt. Affected: ${resStatus ? resStatus.affectedRows : 1}`);
+
+      if (conn.commit && typeof conn.commit === 'function') {
+        await conn.commit();
+      }
+      if (conn.release && typeof conn.release === 'function') {
+        conn.release();
+      }
       mysqlSuccess = true;
+      debugLog.push("MySQL: Transaktion erfolgreich committet.");
     } catch (err) {
-      debugLog.push(`FEHLER bei MySQL-Operationen: ${err.message}`);
-      console.error('MySQL Error in updateStudentPhoto:', err);
+      if (conn) {
+        if (conn.rollback && typeof conn.rollback === 'function') {
+          try { await conn.rollback(); } catch (rbErr) {}
+        }
+        if (conn.release && typeof conn.release === 'function') {
+          try { conn.release(); } catch (relErr) {}
+        }
+      }
+      debugLog.push(`FEHLER bei MySQL-Transaktion: ${err.message}`);
+      console.error('MySQL Transaction Error in updateStudentPhoto:', err);
       return {
         success: false,
         mysqlSuccess: false,
@@ -545,21 +614,44 @@ async function getAllStudents() {
 }
 
 /**
- * Genehmigt das Foto.
+ * Genehmigt das Foto transaktional.
  */
 async function approvePhoto(userId, email) {
   if (pool) {
+    let conn;
     try {
-      const applicationId = await getApplicationId(userId, email);
+      conn = (pool.getConnection && typeof pool.getConnection === 'function') ? await pool.getConnection() : pool;
+      if (conn.beginTransaction && typeof conn.beginTransaction === 'function') {
+        await conn.beginTransaction();
+      }
+
+      const applicationId = await getApplicationId(userId, email, conn);
       if (!applicationId) {
+        if (conn.rollback && typeof conn.rollback === 'function') await conn.rollback();
+        if (conn.release && typeof conn.release === 'function') conn.release();
         return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
       }
-      await pool.query(`
+      await conn.query(`
         INSERT INTO fieldvalues (field, application, value, subset)
         VALUES (158, ?, '1132', 0)
         ON DUPLICATE KEY UPDATE value = '1132'
       `, [applicationId]);
+
+      if (conn.commit && typeof conn.commit === 'function') {
+        await conn.commit();
+      }
+      if (conn.release && typeof conn.release === 'function') {
+        conn.release();
+      }
     } catch (err) {
+      if (conn) {
+        if (conn.rollback && typeof conn.rollback === 'function') {
+          try { await conn.rollback(); } catch (rb) {}
+        }
+        if (conn.release && typeof conn.release === 'function') {
+          try { conn.release(); } catch (rel) {}
+        }
+      }
       console.error('MySQL Error in approvePhoto:', err);
       return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
@@ -574,21 +666,44 @@ async function approvePhoto(userId, email) {
 }
 
 /**
- * Lehnt das Foto ab.
+ * Lehnt das Foto transaktional ab.
  */
 async function rejectPhoto(userId, email) {
   if (pool) {
+    let conn;
     try {
-      const applicationId = await getApplicationId(userId, email);
+      conn = (pool.getConnection && typeof pool.getConnection === 'function') ? await pool.getConnection() : pool;
+      if (conn.beginTransaction && typeof conn.beginTransaction === 'function') {
+        await conn.beginTransaction();
+      }
+
+      const applicationId = await getApplicationId(userId, email, conn);
       if (!applicationId) {
+        if (conn.rollback && typeof conn.rollback === 'function') await conn.rollback();
+        if (conn.release && typeof conn.release === 'function') conn.release();
         return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
       }
-      await pool.query(`
+      await conn.query(`
         INSERT INTO fieldvalues (field, application, value, subset)
         VALUES (158, ?, '1134', 0)
         ON DUPLICATE KEY UPDATE value = '1134'
       `, [applicationId]);
+
+      if (conn.commit && typeof conn.commit === 'function') {
+        await conn.commit();
+      }
+      if (conn.release && typeof conn.release === 'function') {
+        conn.release();
+      }
     } catch (err) {
+      if (conn) {
+        if (conn.rollback && typeof conn.rollback === 'function') {
+          try { await conn.rollback(); } catch (rb) {}
+        }
+        if (conn.release && typeof conn.release === 'function') {
+          try { conn.release(); } catch (rel) {}
+        }
+      }
       console.error('MySQL Error in rejectPhoto:', err);
       return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
@@ -603,26 +718,49 @@ async function rejectPhoto(userId, email) {
 }
 
 /**
- * Löscht das Foto.
+ * Löscht das Foto transaktional.
  */
 async function deletePhoto(userId, email) {
   if (pool) {
+    let conn;
     try {
-      const applicationId = await getApplicationId(userId, email);
+      conn = (pool.getConnection && typeof pool.getConnection === 'function') ? await pool.getConnection() : pool;
+      if (conn.beginTransaction && typeof conn.beginTransaction === 'function') {
+        await conn.beginTransaction();
+      }
+
+      const applicationId = await getApplicationId(userId, email, conn);
       if (!applicationId) {
+        if (conn.rollback && typeof conn.rollback === 'function') await conn.rollback();
+        if (conn.release && typeof conn.release === 'function') conn.release();
         return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
       }
-      await pool.query(
+      await conn.query(
         'UPDATE images SET file = NULL WHERE application = ? AND field = 37',
         [applicationId]
       );
 
-      await pool.query(`
+      await conn.query(`
         INSERT INTO fieldvalues (field, application, value, subset)
         VALUES (158, ?, '1130', 0)
         ON DUPLICATE KEY UPDATE value = '1130'
       `, [applicationId]);
+
+      if (conn.commit && typeof conn.commit === 'function') {
+        await conn.commit();
+      }
+      if (conn.release && typeof conn.release === 'function') {
+        conn.release();
+      }
     } catch (err) {
+      if (conn) {
+        if (conn.rollback && typeof conn.rollback === 'function') {
+          try { await conn.rollback(); } catch (rb) {}
+        }
+        if (conn.release && typeof conn.release === 'function') {
+          try { conn.release(); } catch (rel) {}
+        }
+      }
       console.error('MySQL Error in deletePhoto:', err);
       return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
@@ -637,13 +775,21 @@ async function deletePhoto(userId, email) {
 }
 
 /**
- * Aktualisiert ein Profil.
+ * Aktualisiert ein Profil transaktional.
  */
 async function updateStudentProfile(userId, email, data) {
   if (pool) {
+    let conn;
     try {
-      const applicationId = await getApplicationId(userId, email);
+      conn = (pool.getConnection && typeof pool.getConnection === 'function') ? await pool.getConnection() : pool;
+      if (conn.beginTransaction && typeof conn.beginTransaction === 'function') {
+        await conn.beginTransaction();
+      }
+
+      const applicationId = await getApplicationId(userId, email, conn);
       if (!applicationId) {
+        if (conn.rollback && typeof conn.rollback === 'function') await conn.rollback();
+        if (conn.release && typeof conn.release === 'function') conn.release();
         return { success: false, error: 'Keine zugehörige Antrags-ID in der Schul-Datenbank (MySQL) gefunden.' };
       }
       const updates = [
@@ -657,14 +803,29 @@ async function updateStudentProfile(userId, email, data) {
 
       for (const update of updates) {
         if (update.value !== undefined) {
-          await pool.query(`
+          await conn.query(`
             INSERT INTO fieldvalues (application, field, value)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE value = ?
           `, [applicationId, update.field, update.value, update.value]);
         }
       }
+
+      if (conn.commit && typeof conn.commit === 'function') {
+        await conn.commit();
+      }
+      if (conn.release && typeof conn.release === 'function') {
+        conn.release();
+      }
     } catch (err) {
+      if (conn) {
+        if (conn.rollback && typeof conn.rollback === 'function') {
+          try { await conn.rollback(); } catch (rb) {}
+        }
+        if (conn.release && typeof conn.release === 'function') {
+          try { conn.release(); } catch (rel) {}
+        }
+      }
       console.error('MySQL Error in updateStudentProfile:', err);
       return { success: false, error: `MySQL-Fehler: ${err.message}` };
     }
@@ -702,7 +863,6 @@ async function getStudentByEmail(email) {
       `, [trimmedEmail]);
       
       if (rows.length > 0) {
-        // Falls mindestens eine Anmeldung mit Status 10 (oder >= 10) existiert, gilt das Konto als freigeschaltet (Altanträge/Papierkorb ignorieren!)
         const activeApp = rows.find(r => r.status === 10 || r.status >= 10);
         const selectedApp = activeApp || rows[0];
 
@@ -757,7 +917,6 @@ async function createStudentToken(email, token, ip) {
         const activeApp = rows.find(r => r.status === 10 || r.status >= 10) || rows[0];
         const applicationId = activeApp.application;
         
-        // Versuchen, das Token auch in MySQL zu loggen, damit andere Altsysteme synchron sind.
         try {
           await pool.query(
             'INSERT INTO schueleremailtokens (token, IDapplication, state, datetime) VALUES (?, ?, 0, NOW())',
@@ -771,7 +930,6 @@ async function createStudentToken(email, token, ip) {
           console.warn('MySQL-Token-Logging fehlgeschlagen:', mysqlErr.message);
         }
 
-        // Lokalen SQLite-Nutzer prüfen/anlegen
         let localUser = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(email.trim());
         if (!localUser) {
           let firstName = '';
@@ -795,15 +953,12 @@ async function createStudentToken(email, token, ip) {
           }
 
           try {
-            // Prüfen, ob bereits ein lokaler Benutzer mit diesem Username existiert
             let userByUsername = db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').get(username);
 
             if (userByUsername) {
-              // Aktualisiere die E-Mail-Adresse des existierenden Benutzers
               db.prepare('UPDATE users SET email = ? WHERE id = ?').run(email.trim(), userByUsername.id);
               userId = userByUsername.id;
             } else {
-              // Lege neuen Benutzer an
               const isLdapVal = getConfig('ldap_enabled') === '1' ? 1 : 0;
               const info = db.prepare(`
                 INSERT INTO users (username, email, role, groups, is_ldap)
@@ -859,7 +1014,6 @@ async function createStudentToken(email, token, ip) {
  * Verifiziert das E-Mail-Token und gibt das zugehörige Benutzer-Objekt zurück.
  */
 async function verifyStudentToken(token, ip) {
-  // SQLite Prüfung (immer primär)
   const nowStr = new Date().toISOString();
   const row = db.prepare(`
     SELECT * FROM student_tokens 
@@ -869,7 +1023,6 @@ async function verifyStudentToken(token, ip) {
   if (row) {
     db.prepare('UPDATE student_tokens SET used = 1 WHERE id = ?').run(row.id);
 
-    // Synchronisation mit MySQL (falls aktiv)
     if (pool) {
       try {
         await pool.query(
@@ -909,10 +1062,9 @@ async function verifyStudentToken(token, ip) {
     }
   }
 
-  // Fallback: Versuche, das Token direkt aus MySQL zu lesen (falls es von externen Systemen wie PHP erstellt wurde)
+  // Fallback: Token aus MySQL lesen
   if (pool) {
     try {
-      // Veraltete Tokens löschen (> 20 Min)
       await pool.query(
         'DELETE FROM schueleremailtokens WHERE datetime < NOW() - INTERVAL 20 MINUTE'
       );
@@ -949,7 +1101,6 @@ async function verifyStudentToken(token, ip) {
           let groupsJson = '["Schueler"]';
 
           if (!localUser) {
-            // Seede den Benutzer temporär in der lokalen SQLite
             const [fieldRows] = await pool.query(
               'SELECT field, value FROM fieldvalues WHERE application = ? AND field IN (1, 2, 146)',
               [applicationId]
@@ -1002,107 +1153,254 @@ async function verifyStudentToken(token, ip) {
 }
 
 /**
- * Sucht gezielt nach einem Schüler für die Ausweisverifizierung (per Bibliotheksnummer, ID oder Username).
- * Vermeidet lineare Schleifen über alle Konten und nutzt direkte O(1) Index-Abfragen.
+ * Gezielte, datensparsame Abfrage für die QR-Code Verifikation (FEHLER 4 & 5).
+ * 
+ * WICHTIG:
+ * - Sucht AUSSCHLIESSLICH über Mediotheksnummer (Feld 145) + vollständigen Namen.
+ * - Lädt KEIN Foto-Blob, kein Geburtsdatum, keine Zugangsdaten.
+ * - Prüft lediglich die Existenz eines Fotos (COUNT > 0) und den Status.
+ * - Gibt null zurück, wenn keine exakte Übereinstimmung vorliegt.
+ * 
+ * @param {string} bib - Mediotheksnummer (Feld 145)
+ * @param {string} name - Vollständiger Name
+ * @returns {Object|null} Minimales Prüfobjekt
  */
-async function findStudentByVerificationReference(bib, id, name) {
+async function findStudentForVerification(bib, name) {
+  const cleanBib = String(bib || '').trim();
+  const cleanName = String(name || '').trim();
+
+  if (!cleanBib || !cleanName) {
+    return null;
+  }
+
+  const normQueryName = normalizeName(cleanName);
   const config = getMySQLConfig();
 
-  // 1. Falls MySQL aktiviert ist: Gezielte Live-MySQL-Abfrage über fieldvalues (Feld 145 = Mediotheksnummer)
+  // 1. Wenn MySQL aktiv ist: Gezielte minimale Live-Abfrage
   if (config.enabled && pool) {
     try {
-      let appIds = [];
-      if (bib) {
-        // field 145 = mediothek_number
-        const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 145 AND value = ? LIMIT 1', [bib]);
-        if (rows.length > 0) {
-          appIds.push(rows[0].application);
+      const [fvRows] = await pool.query(
+        'SELECT application FROM fieldvalues WHERE field = 145 AND value = ?',
+        [cleanBib]
+      );
+
+      if (fvRows.length === 0) {
+        return null;
+      }
+
+      const matchingCandidates = [];
+
+      for (const row of fvRows) {
+        const appId = row.application;
+
+        // Status des Antrags prüfen (muss aktiv / status >= 10 sein)
+        const [appRows] = await pool.query('SELECT status FROM applications WHERE ID = ?', [appId]);
+        if (appRows.length === 0 || appRows[0].status < 10) {
+          continue;
+        }
+
+        // Minimal benötigte Felder abfragen: Vorname (1), Nachname (2), Username (146), Status (158), Mediotheksnummer (145)
+        let fieldRows = [];
+        try {
+          const [fRows] = await pool.query(`
+            SELECT fv.field, f.type,
+                   CASE WHEN f.type IN ('select', 'radio', 'checkboxes') THEN sf.value ELSE fv.value END AS value,
+                   fv.value AS raw_value,
+                   sf.value AS subfield_value
+            FROM fieldvalues fv
+            JOIN fields f ON fv.field = f.ID
+            LEFT JOIN subfields sf ON sf.ID = fv.value
+            WHERE fv.application = ?
+          `, [appId]);
+          if (fRows && fRows.length > 0) {
+            fieldRows = fRows;
+          } else {
+            const [plainRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
+            fieldRows = plainRows || [];
+          }
+        } catch (e) {
+          const [plainRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
+          fieldRows = plainRows || [];
+        }
+
+        let firstName = '';
+        let lastName = '';
+        let username = '';
+        let rawStatus = 'Bild ungeprüft / Kein Bild';
+        let statusCode = '1130';
+
+        for (const fr of fieldRows) {
+          const val = String(fr.value || '').trim();
+          const rawVal = String(fr.raw_value || '').trim();
+          const subVal = String(fr.subfield_value || '').trim();
+
+          switch (Number(fr.field)) {
+            case 1: firstName = val; break;
+            case 2: lastName = val; break;
+            case 146: username = val; break;
+            case 158: {
+              const lowerVal = val.toLowerCase();
+              const lowerRaw = rawVal.toLowerCase();
+              const lowerSub = subVal.toLowerCase();
+
+              const isRejected = lowerRaw === '1134' || lowerVal === '1134' || lowerRaw.includes('1134') ||
+                                 lowerSub.includes('abgelehnt') || lowerVal.includes('abgelehnt') ||
+                                 lowerSub.includes('deaktiviert') || lowerVal.includes('deaktiviert') ||
+                                 lowerSub.includes('gesperrt') || lowerVal.includes('gesperrt');
+
+              const isPrinted = lowerRaw === '1133' || lowerVal === '1133' || lowerRaw.includes('1133') ||
+                                lowerSub.includes('ausgegeben') || lowerVal.includes('ausgegeben') ||
+                                lowerSub.includes('gedruckt') || lowerVal.includes('gedruckt');
+
+              const isPendingStage1 = lowerRaw === '1131' || lowerVal === '1131' || lowerRaw.includes('1131') ||
+                                      lowerSub.includes('akzeptiert') || lowerVal.includes('akzeptiert') ||
+                                      lowerSub.includes('eingereicht') || lowerVal.includes('eingereicht');
+
+              const isApproved = !isRejected && (
+                lowerRaw === '1132' || lowerVal === '1132' || lowerRaw.includes('1132') ||
+                lowerSub.includes('genehmigt') || lowerVal.includes('genehmigt') ||
+                lowerSub.includes('verifiziert') || lowerVal.includes('verifiziert') ||
+                lowerSub.includes('freigegeben') || lowerVal.includes('freigegeben') ||
+                lowerSub === 'aktiviert' || lowerVal === 'aktiviert'
+              );
+
+              if (isRejected) {
+                rawStatus = 'Bild abgelehnt';
+                statusCode = '1134';
+              } else if (isPrinted) {
+                rawStatus = 'Ausweis gedruckt';
+                statusCode = '1133';
+              } else if (isPendingStage1) {
+                rawStatus = 'Bild eingereicht';
+                statusCode = '1131';
+              } else if (isApproved) {
+                rawStatus = 'Bild genehmigt';
+                statusCode = '1132';
+              } else {
+                rawStatus = 'Bild ungeprüft / Kein Bild';
+                statusCode = '1130';
+              }
+              break;
+            }
+          }
+        }
+
+        // Namensabgleich durchführen
+        const normFirst = normalizeName(firstName);
+        const normLast = normalizeName(lastName);
+        const normFullName1 = `${normFirst} ${normLast}`.trim();
+        const normFullName2 = `${normLast} ${normFirst}`.trim();
+
+        if (normQueryName === normFullName1 || normQueryName === normFullName2) {
+          // Datensparsam: Nur Existenz des Fotos prüfen (COUNT(*) bzw. 1) ohne Blob
+          const [imgCount] = await pool.query(
+            'SELECT 1 FROM images WHERE application = ? AND field = 37 AND file IS NOT NULL AND LENGTH(file) > 20 LIMIT 1',
+            [appId]
+          );
+          const hasImage = imgCount.length > 0;
+
+          matchingCandidates.push({
+            applicationId: appId,
+            username: username,
+            mediothek_number: cleanBib,
+            first_name: firstName,
+            last_name: lastName,
+            card_status: rawStatus,
+            card_status_code: statusCode,
+            has_photo: hasImage
+          });
         }
       }
 
-      if (appIds.length === 0 && id) {
-        const cleanId = String(id).replace(/^S-/, '').trim();
-        if (/^\d+$/.test(cleanId)) {
-          appIds.push(parseInt(cleanId, 10));
-        } else {
-          const [rows] = await pool.query('SELECT application FROM fieldvalues WHERE field = 146 AND value = ? LIMIT 1', [cleanId]);
-          if (rows.length > 0) {
-            appIds.push(rows[0].application);
-          }
-        }
+      if (matchingCandidates.length === 1) {
+        return matchingCandidates[0];
       }
-
-      for (const appId of appIds) {
-        const [appRows] = await pool.query('SELECT ID, status FROM applications WHERE ID = ?', [appId]);
-        if (appRows.length > 0 && appRows[0].status >= 10) {
-          const [fRows] = await pool.query('SELECT field, value FROM fieldvalues WHERE application = ?', [appId]);
-          const [imgRows] = await pool.query('SELECT file FROM images WHERE application = ? AND field = 37 LIMIT 1', [appId]);
-          const photo = imgRows.length > 0 ? imgRows[0].file : null;
-          const prof = buildProfileFromMySQL(null, appId, fRows, photo);
-
-          let localUser = null;
-          if (prof.email) {
-            localUser = db.prepare('SELECT id, username, email, role, is_active FROM users WHERE LOWER(email) = LOWER(?)').get(prof.email);
-          }
-          if (!localUser && prof.username) {
-            localUser = db.prepare('SELECT id, username, email, role, is_active FROM users WHERE username = ?').get(prof.username);
-          }
-
-          return {
-            user: localUser || { id: null, username: prof.username || prof.email, email: prof.email, role: 'user', is_active: 1 },
-            profile: prof
-          };
-        }
+      if (matchingCandidates.length > 1) {
+        // Bei Mehrdeutigkeit (> 1 Treffer) keine willkürliche Freigabe
+        console.warn(`[StudentDB] Mehrdeutiger Treffer bei QR-Verifizierung für Bib ${cleanBib}`);
+        return null;
       }
-    } catch (mysqlErr) {
-      console.error('[StudentDB] Fehler bei MySQL findStudentByVerificationReference:', mysqlErr.message);
+      return null;
+    } catch (err) {
+      console.error('[StudentDB] MySQL Fehler in findStudentForVerification:', err.message);
+      // Bei Verbindungsfehler Fallback auf lokalen Cache
     }
   }
 
-  // 2. Fallback auf lokale SQLite (für Offline-Betrieb oder lokale Test-Konten)
-  if (bib) {
-    const localProfile = db.prepare(`
-      SELECT u.id as user_id, u.username, u.email, u.role, u.is_active,
-             sp.first_name, sp.last_name, sp.birth_date, sp.birth_place, sp.mediothek_number,
-             sp.card_status, sp.card_image
-      FROM student_profiles sp
-      JOIN users u ON sp.user_id = u.id
-      WHERE sp.mediothek_number = ? AND u.is_active = 1
-    `).get(bib);
+  // 2. SQLite Fallback (nur bei Offline-Betrieb oder Verbindungsstörung)
+  const localProf = db.prepare(`
+    SELECT sp.user_id, sp.first_name, sp.last_name, sp.mediothek_number, sp.card_status,
+           u.username, u.is_active,
+           CASE WHEN sp.card_image IS NOT NULL AND LENGTH(sp.card_image) > 20 THEN 1 ELSE 0 END as has_photo
+    FROM student_profiles sp
+    JOIN users u ON sp.user_id = u.id
+    WHERE sp.mediothek_number = ? AND u.is_active = 1
+  `).all(cleanBib);
 
-    if (localProfile) {
-      return {
-        user: { id: localProfile.user_id, username: localProfile.username, email: localProfile.email, role: localProfile.role, is_active: localProfile.is_active },
-        profile: localProfile
-      };
+  const matched = localProf.filter(p => {
+    const normFirst = normalizeName(p.first_name);
+    const normLast = normalizeName(p.last_name);
+    return normQueryName === `${normFirst} ${normLast}`.trim() || normQueryName === `${normLast} ${normFirst}`.trim();
+  });
+
+  if (matched.length === 1) {
+    const p = matched[0];
+    const s = String(p.card_status || '').toLowerCase();
+    let rawStatus = 'Bild ungeprüft / Kein Bild';
+    let statusCode = '1130';
+
+    if (s.includes('abgelehnt') || s.includes('deaktiviert') || s.includes('gesperrt') || s === '1134') {
+      rawStatus = 'Bild abgelehnt';
+      statusCode = '1134';
+    } else if (s.includes('ausgegeben') || s.includes('gedruckt') || s === '1133') {
+      rawStatus = 'Ausweis gedruckt';
+      statusCode = '1133';
+    } else if (s.includes('eingereicht') || s.includes('akzeptiert') || s === '1131') {
+      rawStatus = 'Bild eingereicht';
+      statusCode = '1131';
+    } else if (s.includes('genehmigt') || s.includes('verifiziert') || s === 'aktiviert' || s === '1132') {
+      rawStatus = 'Bild genehmigt';
+      statusCode = '1132';
     }
-  }
 
-  if (id) {
-    const cleanId = String(id).replace(/^S-/, '').trim();
-    const localProfile = db.prepare(`
-      SELECT u.id as user_id, u.username, u.email, u.role, u.is_active,
-             sp.first_name, sp.last_name, sp.birth_date, sp.birth_place, sp.mediothek_number,
-             sp.card_status, sp.card_image
-      FROM student_profiles sp
-      JOIN users u ON sp.user_id = u.id
-      WHERE (u.username = ? OR CAST(u.id AS TEXT) = ?) AND u.is_active = 1
-    `).get(cleanId, cleanId);
-
-    if (localProfile) {
-      return {
-        user: { id: localProfile.user_id, username: localProfile.username, email: localProfile.email, role: localProfile.role, is_active: localProfile.is_active },
-        profile: localProfile
-      };
-    }
+    return {
+      userId: p.user_id,
+      username: p.username,
+      mediothek_number: p.mediothek_number,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      card_status: rawStatus,
+      card_status_code: statusCode,
+      has_photo: p.has_photo === 1
+    };
   }
 
   return null;
 }
 
+async function findStudentByVerificationReference(bib, id, name) {
+  const match = await findStudentForVerification(bib, name);
+  if (match) {
+    return {
+      user: { id: match.userId || null, username: match.username, is_active: 1 },
+      profile: {
+        first_name: match.first_name,
+        last_name: match.last_name,
+        mediothek_number: match.mediothek_number,
+        card_status: match.card_status,
+        card_status_code: match.card_status_code,
+        card_image: match.has_photo ? 'data:image/jpeg;base64,mock' : null
+      }
+    };
+  }
+  return null;
+}
+
 module.exports = {
   getStudentProfile,
+  findStudentForVerification,
   findStudentByVerificationReference,
+  normalizeName,
   updateStudentPhoto,
   getAllStudents,
   approvePhoto,
@@ -1115,4 +1413,3 @@ module.exports = {
   reconnectMySQL,
   testMySQLConnection
 };
-

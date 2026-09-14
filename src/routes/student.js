@@ -3,10 +3,32 @@ const router = express.Router();
 const { db, getConfig, logEvent } = require('../db');
 const studentDb = require('../student_db');
 const ldap = require('../ldap');
-const { evaluateCardEligibility } = require('../services/cardEligibility');
+const {
+  evaluateCardEligibility,
+  getPersistentGrant,
+  revokePersistentGrant
+} = require('../services/cardEligibility');
+
+// Einfaches In-Memory IP-Rate-Limiting für öffentliche QR-Verifikation
+const verifyRateLimits = new Map();
+function checkVerifyRateLimit(ip) {
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 Minute
+  const maxRequests = 60; // Max 60 Anfragen pro Minute
+
+  const record = verifyRateLimits.get(ip) || { count: 0, resetAt: now + windowMs };
+  if (now > record.resetAt) {
+    record.count = 1;
+    record.resetAt = now + windowMs;
+  } else {
+    record.count++;
+  }
+  verifyRateLimits.set(ip, record);
+  return record.count <= maxRequests;
+}
 
 /**
- * Holt die Ausweis-Daten des aktuell eingeloggten Schülers und protokolliert den Zugriff.
+ * Holt die Ausweis-Daten des aktuell eingeloggten Schülers.
  */
 router.get('/card', async (req, res) => {
   const user = req.session.user;
@@ -22,6 +44,7 @@ router.get('/card', async (req, res) => {
     console.log(`[Express /card] Lokales Konto für Benutzer ${user.username} ist inaktiv oder existiert nicht mehr.`);
     req.session.destroy(() => {});
     db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+    revokePersistentGrant(user.username);
     if (typeof logEvent === 'function') {
       logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} existiert nicht mehr oder wurde deaktiviert`, { userId: user.id }, clientIp);
     }
@@ -38,63 +61,49 @@ router.get('/card', async (req, res) => {
     return res.status(401).json({ error: 'Sitzung wurde widerrufen (Passwort oder Berechtigungen geändert). Bitte erneut anmelden.', session_revoked: true });
   }
 
-  // 2. LDAP-Live-Prüfung oder periodische tägliche Prüfung (für LDAP-Konten)
-  const liveCheckEnabled = getConfig('ldap_live_check_enabled', '0') === '1';
-  const ldapEnabled = getConfig('ldap_enabled', '0') === '1';
-
+  // 2. LDAP-Live-Prüfung ausführen
   const now = new Date();
-  const lastCheck = user.lastLdapCheck || 0;
-  const checkInterval = 24 * 60 * 60 * 1000; // 24 Stunden in ms
-  const periodicCheckNeeded = ldapEnabled && (now.getTime() - lastCheck > checkInterval);
+  let ldapStatus = null;
+  try {
+    ldapStatus = await ldap.isUserActiveInLdap(user.username);
+  } catch (err) {
+    console.error(`[Express /card] Kritischer Fehler bei LDAP-Prüfung für ${user.username}:`, err);
+    ldapStatus = { active: false, error: 'Verbindungsfehler: ' + err.message };
+  }
 
-  if ((dbUser.is_ldap === 1 || user.isLdap === true) && (liveCheckEnabled || periodicCheckNeeded)) {
-    let ldapStatus = { active: true, error: null };
-    try {
-      ldapStatus = await ldap.isUserActiveInLdap(user.username);
-    } catch (err) {
-      console.error(`[Express /card] Kritischer Fehler bei LDAP-Live-Prüfung für ${user.username}:`, err);
-      ldapStatus = { active: true, error: 'Routenfehler: ' + err.message };
+  // Bei explizitem LDAP-Negativbefund Sitzung sofort terminieren & Grant widerrufen
+  if (ldapStatus && !ldapStatus.error && !ldapStatus.active) {
+    console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
+    req.session.destroy(() => {});
+    db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
+    revokePersistentGrant(user.username);
+    if (typeof logEvent === 'function') {
+      logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
     }
-
-    if (ldapStatus.error) {
-      console.warn(`[Express /card] LDAP-Live-Prüfung fehlgeschlagen: ${ldapStatus.error}. Verwende Fallback.`);
-      if (typeof logEvent === 'function') {
-        logEvent('error', 'ldap_live_check_failed', `LDAP-Verbindung fehlgeschlagen bei Ausweis-Prüfung für Benutzer ${user.username}: ${ldapStatus.error}`, { userId: user.id }, clientIp);
-      }
-      req.session.user.lastLdapCheck = now.getTime() - (23 * 60 * 60 * 1000); 
-    } else if (!ldapStatus.active) {
-      console.log(`[Express /card] Kicke Benutzer ${user.username} aus Session da inaktives/gelöschtes LDAP-Konto.`);
-      req.session.destroy(() => {});
-      db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(user.id);
-      if (typeof logEvent === 'function') {
-        logEvent('warn', 'student_card_account_deleted', `Schülerausweis-Abruf verweigert: Konto für User ${user.username} ist im LDAP deaktiviert oder gelöscht`, { userId: user.id }, clientIp);
-      }
-      return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
-    } else {
-      req.session.user.lastLdapCheck = now.getTime();
-    }
+    return res.status(401).json({ error: 'Konto existiert nicht mehr oder wurde im LDAP/System deaktiviert.', account_deleted: true });
   }
 
   try {
-    let profile = await studentDb.getStudentProfile(user);
-    const disableCheck = getConfig('disable_student_check', '0') === '1';
+    // 3. Schülerprofil laden (mit Ausweispfad-Prüfung)
+    let profile = await studentDb.getStudentProfile(user, { isCardPath: true });
     let isAdminPreview = false;
 
     if (!profile) {
-      if (disableCheck || user.role === 'admin') {
+      if (user.role === 'admin') {
         isAdminPreview = true;
         const nameParts = (user.display_name || user.username).split(' ');
         const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" width="147" height="196" viewBox="0 0 147 196"><rect width="147" height="196" fill="#1e293b"/><path d="M73.5 98c15.46 0 28-12.54 28-28s-12.54-28-28-28-28 12.54-28 28 12.54 28 28 28zm0 14c-18.67 0-56 9.36-56 28v14h112v-14c0-18.64-37.33-28-56-28z" fill="#38bdf8"/><text x="73.5" y="170" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="sans-serif" font-weight="bold">ADMIN VORSCHAU</text></svg>`;
         const dummyPassphotoBase64 = 'data:image/svg+xml;base64,' + Buffer.from(dummySvg).toString('base64');
 
         profile = {
-          first_name: user.role === 'admin' ? 'Max (Vorschau)' : (nameParts[0] || user.username),
-          last_name: user.role === 'admin' ? 'Mustermann' : (nameParts.slice(1).join(' ') || 'Test-Account'),
+          first_name: 'Max (Vorschau)',
+          last_name: 'Mustermann',
           birth_date: '2008-05-15',
           birth_place: 'Bad Hersfeld',
           mediothek_number: '123456789',
           card_image: dummyPassphotoBase64,
-          card_status: 'Bild verifiziert'
+          card_status: 'Bild verifiziert',
+          card_status_code: '1132'
         };
       } else {
         if (typeof logEvent === 'function') {
@@ -103,7 +112,7 @@ router.get('/card', async (req, res) => {
         return res.status(404).json({ error: 'Kein Schülerprofil vorhanden.' });
       }
     } else {
-      // Profil in lokaler SQLite synchronisieren, damit es offline geladen werden kann
+      // Profil in lokaler SQLite synchronisieren für Offline-Puffer
       db.prepare(`
         INSERT INTO student_profiles (
           user_id, first_name, last_name, birth_date, birth_place, 
@@ -134,24 +143,28 @@ router.get('/card', async (req, res) => {
       );
     }
 
-    // Zentrale Gültigkeits- & Statusauswertung
-    const eligibility = evaluateCardEligibility(dbUser, profile, now);
+    // 4. Zentrale Gültigkeits- & Pufferbewertung
+    const eligibility = evaluateCardEligibility({
+      user: dbUser,
+      profile: profile,
+      ldapStatus: ldapStatus,
+      now: now,
+      isAdminPreview: isAdminPreview
+    });
+
     let statusSummary = eligibility.statusSummary;
     let logLevel = eligibility.valid ? 'info' : 'warn';
 
     if (isAdminPreview) {
-      statusSummary += ' [Admin-Vorschau]';
+      statusSummary = 'Admin-Vorschau (Muster - Kein echter Ausweis)';
     }
 
-    // Abruf-Quelle ermitteln (PWA App, Service Worker oder Web-Browser)
     const reqSource = req.query.source || req.headers['x-pwa-source'] || req.headers['x-pwa-request'];
     let sourceLabel = 'Web-Browser';
     if (reqSource === 'pwa' || reqSource === 'standalone') {
       sourceLabel = 'PWA App (Homescreen)';
     } else if (reqSource === 'sw' || reqSource === 'service-worker') {
       sourceLabel = 'PWA Service Worker';
-    } else if (reqSource) {
-      sourceLabel = `PWA (${reqSource})`;
     }
 
     if (typeof logEvent === 'function') {
@@ -166,6 +179,8 @@ router.get('/card', async (req, res) => {
           name: studentName,
           card_status: eligibility.rawStatus,
           expires_at: eligibility.expiresAt,
+          offline_valid_until: eligibility.offlineValidUntil,
+          is_buffered: eligibility.is_buffered,
           status_summary: statusSummary,
           source: sourceLabel,
           is_admin_preview: isAdminPreview
@@ -190,6 +205,8 @@ router.get('/card', async (req, res) => {
       valid: eligibility.valid,
       reason_code: eligibility.reasonCode,
       status_summary: statusSummary,
+      is_buffered: eligibility.is_buffered,
+      card_version: eligibility.cardVersion,
       server_time: now.toISOString(),
       card_primary_color: getConfig('card_primary_color', '#3b82f6'),
       card_secondary_color: getConfig('card_secondary_color', '#8b5cf6'),
@@ -219,7 +236,7 @@ router.get('/card', async (req, res) => {
 });
 
 /**
- * Liefert das konfigurierte PWA App-Icon (oder ein Standardbild als Fallback) aus.
+ * Liefert das konfigurierte PWA App-Icon aus.
  */
 router.get('/pwa-icon', (req, res) => {
   const icon = getConfig('card_pwa_icon', '');
@@ -237,54 +254,84 @@ router.get('/pwa-icon', (req, res) => {
 });
 
 /**
- * Prüft anonym, ob ein Benutzername im System und im LDAP noch aktiv ist.
- * Wird von PWAs ohne aktive Session verwendet, um zu prüfen, ob der Ausweis gesperrt werden muss.
+ * Prüft anonym den Status eines Schülerausweises (wird von PWAs im Hintergrund aufgerufen).
  */
 router.get('/status-check', async (req, res) => {
-  const username = req.query.username;
+  const username = String(req.query.username || '').trim();
   if (!username) {
     return res.status(400).json({ error: 'Username ist erforderlich.' });
   }
 
   try {
-    // 1. Prüfen, ob der Benutzer in der lokalen DB existiert und aktiv ist
+    const now = new Date();
+
+    // 1. Lokales Konto prüfen
     const dbUser = db.prepare('SELECT id, username, email, display_name, role, is_active, auth_version FROM users WHERE username = ?').get(username);
     if (!dbUser || dbUser.is_active === 0) {
-      return res.json({ active: false, account_deleted: true, reason: 'Konto deaktiviert oder gelöscht.' });
+      revokePersistentGrant(username);
+      return res.json({
+        active: false,
+        valid: false,
+        account_deleted: true,
+        reason_code: 'ACCOUNT_INACTIVE',
+        status_summary: 'Konto deaktiviert oder gelöscht.',
+        card_status: 'Ausweis gesperrt',
+        is_buffered: false
+      });
     }
 
-    // 2. Prüfen, ob der Benutzer im LDAP aktiv ist
-    const ldapStatus = await ldap.isUserActiveInLdap(username);
+    // 2. Admin-Prüfung: Admin ist kein echter Schülerausweis
+    if (dbUser.role === 'admin') {
+      return res.json({
+        active: false,
+        valid: false,
+        reason_code: 'ADMIN_PREVIEW',
+        status_summary: 'Admin-Vorschau (Kein gültiger Schülerausweis)',
+        card_status: 'Vorschau',
+        is_admin_preview: true,
+        is_buffered: false
+      });
+    }
+
+    // 3. LDAP-Status prüfen
+    let ldapStatus = null;
+    try {
+      ldapStatus = await ldap.isUserActiveInLdap(username);
+    } catch (err) {
+      console.error(`[Express /status-check] LDAP-Prüfungsfehler für ${username}:`, err);
+      ldapStatus = { active: false, error: 'Verbindungsfehler: ' + err.message };
+    }
+
     if (ldapStatus && !ldapStatus.error && !ldapStatus.active) {
       db.prepare('UPDATE users SET is_active = 0, auth_version = auth_version + 1 WHERE id = ?').run(dbUser.id);
       db.prepare('DELETE FROM student_profiles WHERE user_id = ?').run(dbUser.id);
-      return res.json({ active: false, account_deleted: true, reason: 'Konto im LDAP deaktiviert oder gelöscht.' });
+      revokePersistentGrant(username);
+      return res.json({
+        active: false,
+        valid: false,
+        account_deleted: true,
+        reason_code: 'ACCOUNT_INACTIVE',
+        status_summary: 'Konto im LDAP deaktiviert oder gelöscht.',
+        card_status: 'Ausweis gesperrt',
+        is_buffered: false
+      });
     }
 
-    // 3. Schülerprofil in Schulanmeldungs-Datenbank (MySQL / SQLite) abfragen
+    // 4. Schülerprofil laden
     let profile = null;
     try {
-      profile = await studentDb.getStudentProfile(dbUser);
+      profile = await studentDb.getStudentProfile(dbUser, { isCardPath: true });
     } catch (e) {
       console.error('[Express /status-check] Fehler beim Abrufen des Schülerprofils:', e);
     }
 
-    const disableCheck = getConfig('disable_student_check', '0') === '1';
-    if (!profile && (disableCheck || dbUser.role === 'admin')) {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const expiresAt = `${(now >= new Date(currentYear, 7, 1) ? currentYear + 1 : currentYear)}-07-31`;
-      return res.json({ 
-        active: true, 
-        valid: true,
-        reason_code: 'VALID',
-        status_summary: 'Gültig [Admin-Vorschau]',
-        card_status: 'Bild verifiziert', 
-        expires_at: expiresAt 
-      });
-    }
-
-    const eligibility = evaluateCardEligibility(dbUser, profile);
+    // 5. Zentrale Gültigkeits- & Pufferbewertung
+    const eligibility = evaluateCardEligibility({
+      user: dbUser,
+      profile: profile,
+      ldapStatus: ldapStatus,
+      now: now
+    });
 
     return res.json({
       active: eligibility.valid,
@@ -293,98 +340,123 @@ router.get('/status-check', async (req, res) => {
       status_summary: eligibility.statusSummary,
       card_status: eligibility.rawStatus,
       expires_at: eligibility.expiresAt,
-      offline_valid_until: eligibility.offlineValidUntil
+      offline_valid_until: eligibility.offlineValidUntil,
+      is_buffered: eligibility.is_buffered,
+      card_version: eligibility.cardVersion
     });
   } catch (err) {
     console.error('[Express /status-check] Fehler:', err);
-    return res.json({ active: false, error: err.message });
+    return res.json({
+      active: false,
+      valid: false,
+      error: err.message,
+      reason_code: 'INTERNAL_ERROR',
+      is_buffered: false
+    });
   }
 });
 
 /**
  * Öffentlicher Endpunkt zur Online-Verifizierung eines Schülerausweis-QR-Codes.
- * Prüft in der Datenbank (student_profiles / Schulanmeldung MySQL), ob der Name
- * und die Bibliotheksnummer (bib) bzw. Kennung exakt übereinstimmen und das Profil gültig ist.
+ * 
+ * DATENSCHUTZ- UND SICHERHEITSREGELN (FEHLER 1, 4, 5):
+ * - Verlangt zwingend b/bib (Mediotheksnummer aus Feld 145) UND n/name (vollständiger Name).
+ * - Keine Auswertung von Antrags-IDs oder internen Datenbank-IDs.
+ * - Lädt minimalste Daten ohne Passbild-Blob und ohne vertrauliche Stammdaten.
+ * - Führt eine LDAP-Prüfung des Inhabers durch.
+ * - Liefert nach außen bei JEDEM Fehler eine neutrale, einheitliche Antwort ohne Rückschlüsse auf die Existenz von Nummern.
  */
 router.get('/verify-check', async (req, res) => {
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
+
+  if (!checkVerifyRateLimit(clientIp)) {
+    return res.status(429).json({
+      verified: false,
+      status: 'Ungültig',
+      message: 'Zu viele Verifizierungsanfragen. Bitte warten Sie einen Moment.'
+    });
+  }
+
   const name = String(req.query.n || req.query.name || '').trim();
   const bib = String(req.query.b || req.query.bib || '').trim();
-  const id = String(req.query.id || '').trim();
 
-  if (!name || (!bib && !id)) {
+  // Name UND Bibliotheksnummer/Mediotheksnummer müssen zwingend vorliegen
+  if (!name || !bib) {
     return res.status(400).json({ 
       verified: false, 
-      reasonCode: 'MISSING_PARAMS',
-      reason: 'Name und Bibliotheksnummer / Schülernummer sind erforderlich.' 
+      status: 'Ungültig',
+      message: 'Name und Bibliotheksnummer sind zwingend erforderlich.' 
     });
   }
 
   try {
-    // 1. Suche nach Schülerprofil über den O(1)-gezielten Index-Finder
-    const match = await studentDb.findStudentByVerificationReference(bib, id, name);
+    // 1. Gezielter, datensparsamer Finder (Feld 145 + Name)
+    const match = await studentDb.findStudentForVerification(bib, name);
 
-    if (!match || !match.profile) {
+    if (!match) {
       return res.json({ 
         verified: false, 
-        reasonCode: 'PROFILE_NOT_FOUND',
-        reason: 'Kein übereinstimmender Datensatz in der Schulanmeldungs-Datenbank gefunden.' 
+        status: 'Ungültig',
+        message: 'Schülerausweis konnte nicht verifiziert werden.' 
       });
     }
 
-    const matchingUser = match.user;
-    const matchingProfile = match.profile;
-
-    // 2. Strenger Namensabgleich (Vorname + Nachname case-insensitive & Umlaute-tolerant)
-    const normalize = (str) => String(str || '').trim().toLowerCase()
-      .normalize('NFC')
-      .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
-      .replace(/\s+/g, ' ');
-
-    const normQueryName = normalize(name);
-    const normFirst = normalize(matchingProfile.first_name);
-    const normLast = normalize(matchingProfile.last_name);
-    const normFullName1 = `${normFirst} ${normLast}`.trim();
-    const normFullName2 = `${normLast} ${normFirst}`.trim();
-
-    const nameMatches = normQueryName === normFullName1 || normQueryName === normFullName2;
-
-    if (!nameMatches) {
-      return res.json({ 
-        verified: false, 
-        reasonCode: 'NAME_MISMATCH',
-        reason: 'Der angegebene Name stimmt nicht mit dem in der Datenbank hinterlegten Inhaber überein.' 
-      });
+    // 2. LDAP-Live-Prüfung für den gefundenen Inhaber
+    let ldapStatus = null;
+    if (match.username) {
+      try {
+        ldapStatus = await ldap.isUserActiveInLdap(match.username);
+      } catch (err) {
+        console.error('[Express /verify-check] LDAP-Fehler:', err.message);
+        ldapStatus = { active: false, error: 'Verbindungsfehler: ' + err.message };
+      }
+    } else {
+      ldapStatus = { active: false, error: 'Kein LDAP-Benutzername zugeordnet.' };
     }
 
-    // 3. Zentrale Gültigkeitsauswertung
-    const eligibility = evaluateCardEligibility(matchingUser, matchingProfile);
+    // 3. Zentrale Gültigkeitsprüfung
+    const dummyUser = { id: match.userId || 1001, username: match.username, is_active: 1 };
+    const minimalProfile = {
+      username: match.username,
+      first_name: match.first_name,
+      last_name: match.last_name,
+      mediothek_number: match.mediothek_number,
+      card_status: match.card_status,
+      card_status_code: match.card_status_code,
+      card_image: match.has_photo ? 'data:image/jpeg;base64,PHOTO_EXISTS' : null
+    };
+
+    const eligibility = evaluateCardEligibility({
+      user: dummyUser,
+      profile: minimalProfile,
+      ldapStatus: ldapStatus,
+      now: new Date()
+    });
 
     if (!eligibility.valid) {
       return res.json({
         verified: false,
-        reasonCode: eligibility.reasonCode,
-        status: eligibility.statusSummary,
-        reason: `Ausweisprüfung nicht erfolgreich: ${eligibility.statusSummary}`
+        status: 'Ungültig',
+        message: 'Schülerausweis konnte nicht verifiziert werden.'
       });
     }
 
-    const fullName = `${matchingProfile.first_name || ''} ${matchingProfile.last_name || ''}`.trim();
+    const sanitizedFullName = `${match.first_name || ''} ${match.last_name || ''}`.trim();
 
     return res.json({
       verified: true,
-      reasonCode: 'VALID',
-      name: fullName,
       status: 'Gültig',
+      name: sanitizedFullName,
       expires_at: eligibility.expiresAt,
-      message: 'Ausweis erfolgreich in der Schul-Datenbank verifiziert.'
+      message: 'Ausweis erfolgreich verifiziert.'
     });
 
   } catch (error) {
     console.error('Fehler bei /verify-check:', error);
-    return res.status(500).json({ 
+    return res.json({ 
       verified: false, 
-      reasonCode: 'INTERNAL_ERROR',
-      reason: 'Interner Serverfehler bei der Verifizierung.' 
+      status: 'Ungültig',
+      message: 'Schülerausweis konnte nicht verifiziert werden.' 
     });
   }
 });

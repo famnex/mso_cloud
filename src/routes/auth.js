@@ -1104,9 +1104,19 @@ router.post('/student-photo', async (req, res) => {
 
   try {
     const result = await studentDb.updateStudentPhoto(user.id, user.email, image);
+    if (!result || !result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result?.error || 'Fehler beim Speichern des Passbilds in der Datenbank.',
+        mysqlSuccess: result?.mysqlSuccess || false,
+        sqliteSuccess: result?.sqliteSuccess || false,
+        debugLog: result?.debugLog
+      });
+    }
+
     logEvent('info', 'student_photo_uploaded', `Benutzer ${user.username} hat sein Passbild aktualisiert (wartet auf Prüfung)`, null, req.ip);
     res.json({
-      success: result.success,
+      success: true,
       mysqlSuccess: result.mysqlSuccess,
       sqliteSuccess: result.sqliteSuccess,
       message: 'Passbild erfolgreich hochgeladen und zur Prüfung eingereicht.',

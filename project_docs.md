@@ -45,23 +45,32 @@
 ## 3. Schülerausweis & Verifizierung
 
 ### 3.1 Regelwerk für Gültigkeit (`src/services/cardEligibility.js`)
-Die Gültigkeit eines Schülerausweises wird zentral berechnet:
-1. **Benutzerstatus**: `is_active === 1` und Benutzer existiert.
-2. **Passbild**: Bild vorhanden und Status = `Bild genehmigt` / `genehmigt` / `1132` / `1133`.
-3. **Schuljahres-Stichtag**: Ausweise sind bis zum 31. Juli des aktuellen/kommenden Schuljahres gültig (`getSchoolYearExpirationDate()`).
-4. **Offline-Zeitraum**: Im PWA-Modus ist ein gecachter Ausweis maximal 30 Tage ohne erneuten Serverkontakt gültig.
+Die Gültigkeit eines echten Schülerausweises wird strikt und zentral serverseitig ermittelt:
+1. **LDAP-Verpflichtung**: Ein echter Schülerausweis setzt zwingend ein aktives Konto im Schul-LDAP voraus.
+   - Meldet LDAP eindeutig „Konto fehlt“ oder „Konto deaktiviert“, wird der Ausweis sofort gesperrt und der Grant widerrufen (`is_revoked = 1`).
+   - Lokale Administratoren können sich im Verwaltungsportal anmelden; ihre Ausweisansicht ist als ungültiges Muster (`is_admin_preview = true`, `valid = false`) deklariert.
+2. **Persistenter Ausfallpuffer (`student_card_grants`)**:
+   - Bei tatsächlicher LDAP-Verbindungsstörung darf eine zuvor erfolgreich bestätigte Gültigkeit zeitlich begrenzt weiterverwendet werden.
+   - Der Puffer gilt maximal 30 Tage seit der letzten erfolgreichen LDAP-Prüfung (`offline_valid_until`) und niemals über das bestätigte Schuljahresende (31. Juli) hinaus.
+   - Wiederholte Abrufe während einer Störung verlängern die Frist NICHT.
+   - Ohne vorherige erfolgreiche LDAP-Prüfung oder nach Widerruf entsteht kein Puffer.
+3. **Datenbankkonsistenz & Transaktionen (`src/student_db.js`)**:
+   - Unterscheidung zwischen „MySQL erreichbar, kein Treffer“ (keine Freigabe aus SQLite) vs. „MySQL-Verbindungsfehler“ (nur begrenzter Puffer).
+   - Foto-Upload, Genehmigung, Ablehnung und Löschung erfolgen in echten MySQL-Transaktionen (`beginTransaction`, `commit`, `rollback`).
+   - Statusbeurteilung: Exakte Trennung von `1134` / `deaktiviert` / `abgelehnt` vor positiven Statuswerten.
 
-### 3.2 Verifizierungs-Endpoints
-*   `GET /v?n=<name>&b=<bib>` (Ultrakurz-Schema für QR-Codes)
-*   `GET /verify?name=<name>&bib=<bib>`
-*   `GET /api/student/verify-check` (JSON-API)
-*   Die Suche nutzt den Index `idx_student_profiles_mediothek` auf `student_profiles (mediothek_number)` und `users (last_name, first_name)` für $O(1)$-Abfragen.
+### 3.2 Datenschutzkonforme Verifizierungs-Endpoints (`/verify-check`, `/v`, `/verify`)
+*   **Datensparsame Abfrage**: Akzeptiert ausschließlich Mediotheksnummer (Feld 145) und vollständigen Namen (`b`/`bib` und `n`/`name`).
+*   **Keine ID-Interpretation**: Numerische Parameter werden nicht als Antrags-ID interpretiert.
+*   **Minimales Laden**: Lädt vor dem Namensabgleich weder Fotos, noch Geburtsdaten, Passwörter oder Vollprofile.
+*   **Einheitliche Fehlerantwort**: Falsche Namen, nicht gefundene Nummern und ungültige Ausweise liefern nach außen die identische Antwort `{ verified: false, status: 'Ungültig', message: 'Schülerausweis konnte nicht verifiziert werden.' }` (keine Enumeration-Leaks).
 
-### 3.3 Status-Zustände im Frontend
-*   **Online geprüft**: Frische Server-Antwort im Online-Betrieb.
-*   **Offline gespeichert**: Innerhalb des 30-Tage-Fensters aus dem lokalen Speicher geladen (mit Resttage-Countdown).
-*   **Erneute Onlineprüfung erforderlich**: Offline-Cache älter als 30 Tage.
-*   **Ausweis gesperrt**: Server hat Ausweis gesperrt oder Konto deaktiviert/gelöscht.
+### 3.3 Status-Zustände im Frontend & PWA
+*   **Online geprüft**: Frische Server-Antwort im Online-Betrieb (`is_buffered: false`).
+*   **Ausfallpuffer aktiv**: Innerhalb des unveränderlichen 30-Tage-Fensters bei Server-/LDAP-Störung (`is_buffered: true`).
+*   **Erneute Onlineprüfung erforderlich**: Offline-Cache oder Puffer älter als 30 Tage / nach Schuljahresende.
+*   **Ausweis gesperrt**: Server hat Ausweis gesperrt oder LDAP-Konto deaktiviert.
+*   **Versionsprüfung**: Bei Profil-/Fotoänderung invalidiert eine veränderte `card_version` veraltete Offline-Caches.
 
 ---
 

@@ -2555,29 +2555,66 @@
               const statusRes = await fetch(`api/student/status-check?username=${encodeURIComponent(storedUsername)}`);
               if (statusRes.ok) {
                 const statusData = await statusRes.json();
-                if (statusData.active && statusData.card_status !== 'Ausweis gesperrt' && statusData.card_status !== 'gesperrt' && statusData.card_status !== 'Ungültig') {
-                  // Ausweis ist online weiterhin GÜLTIG! Zeitstempel erneuern -> bleibt dauerhaft über 30 Tage hinaus online verifiziert
-                  localStorage.setItem('mso_cached_card_time', Date.now().toString());
-                  localStorage.setItem('mso_card_offline_blocked', 'false');
-                  
-                  if (tempCached) {
-                    cardData = tempCached;
-                    if (statusData.card_status) cardData.card_status = statusData.card_status;
-                    if (statusData.expires_at) cardData.expires_at = statusData.expires_at;
-                  }
-                  
-                  renderCard(cardData, false); // Normal online verifiziert (isOffline = false)
-                  updateControlsState(false);  // Resttage-Badge ausblenden
+                
+                // Prüfen, ob die Profil-/Foto-Version noch mit dem Cache übereinstimmt (FEHLER 7)
+                if (tempCached && statusData.card_version && tempCached.card_version && statusData.card_version !== tempCached.card_version) {
+                  console.warn('[PWA Card] Ausweis-Version hat sich geändert. Authentifizierte Aktualisierung erforderlich.');
+                  localStorage.setItem('mso_card_offline_blocked', 'true');
+                  localStorage.removeItem('mso_cached_card');
+                  localStorage.removeItem('mso_cached_card_time');
+                  const blockedData = {
+                    card_status: 'Ausweis aktualisiert – Login erforderlich',
+                    valid: false,
+                    reason_code: 'VERSION_MISMATCH',
+                    first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
+                  };
+                  renderCard(blockedData, false);
+                  updateControlsState(false);
                   isFreshOnlineLoaded = true;
                   stopAutoRetry();
                   return;
-                } else if (statusData.active === false || statusData.account_deleted === true) {
+                }
+
+                if (statusData.valid === true && statusData.active === true) {
+                  // Ausweis ist online weiterhin GÜLTIG!
+                  // Zeitstempel NUR erneuern, wenn es eine echte Live-Bestätigung war (kein Puffer)
+                  if (!statusData.is_buffered) {
+                    localStorage.setItem('mso_cached_card_time', Date.now().toString());
+                  }
+                  localStorage.setItem('mso_card_offline_blocked', 'false');
+                  
+                  if (tempCached) {
+                    cardData = {
+                      ...tempCached,
+                      card_status: statusData.card_status || tempCached.card_status,
+                      card_status_code: statusData.card_status_code || tempCached.card_status_code,
+                      expires_at: statusData.expires_at || tempCached.expires_at,
+                      offline_valid_until: statusData.offline_valid_until || tempCached.offline_valid_until,
+                      valid: statusData.valid,
+                      reason_code: statusData.reason_code,
+                      status_summary: statusData.status_summary,
+                      is_buffered: statusData.is_buffered,
+                      card_version: statusData.card_version || tempCached.card_version
+                    };
+                    localStorage.setItem('mso_cached_card', JSON.stringify(cardData));
+                  }
+                  
+                  renderCard(cardData, false);
+                  updateControlsState(false);
+                  isFreshOnlineLoaded = true;
+                  stopAutoRetry();
+                  return;
+                } else {
+                  // Ausweis ist gesperrt, gelöscht oder Frist abgelaufen
                   localStorage.setItem('mso_card_offline_blocked', 'true');
                   localStorage.removeItem('mso_cached_card');
                   localStorage.removeItem('mso_cached_card_time');
                   
                   const blockedData = {
                     card_status: statusData.card_status || 'Ausweis gesperrt',
+                    valid: false,
+                    reason_code: statusData.reason_code || 'CARD_REVOKED',
+                    status_summary: statusData.status_summary || 'Ausweis gesperrt',
                     first_name: '', last_name: '', birth_date: null, birth_place: '', mediothek_number: '', card_image: null
                   };
                   renderCard(blockedData, false);
@@ -2600,7 +2637,7 @@
         if (data && !data.username && data.user) data.username = data.user;
         cardData = data;
         
-        const isRevoked = data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
+        const isRevoked = data.valid === false || data.card_status === 'Ausweis gesperrt' || data.card_status === 'gesperrt' || data.card_status === 'Ungültig';
         const now = new Date();
         const expiry = new Date(data.expires_at ? (data.expires_at.includes('T') ? data.expires_at : data.expires_at + 'T23:59:59') : '2099-12-31T23:59:59');
         const isExpired = now > expiry;
@@ -2618,7 +2655,9 @@
           startAutoRetry();
         } else {
           localStorage.setItem('mso_cached_card', JSON.stringify(data));
-          localStorage.setItem('mso_cached_card_time', Date.now().toString());
+          if (!data.is_buffered) {
+            localStorage.setItem('mso_cached_card_time', Date.now().toString());
+          }
           if (data.username) localStorage.setItem('mso_cached_card_user', data.username);
           
           renderCard(data, false);

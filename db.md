@@ -408,5 +408,25 @@ Erstellt gezielte Performance- und Abfrage-Indizes für Schülerausweis-Verifizi
 *   `CREATE INDEX IF NOT EXISTS idx_users_active_role ON users(is_active, role);`
 *   **Zweck**: Beschleunigt die Echtheitsprüfung von Schülerausweisen (`/v` und `/api/student/verify-check`) von $O(N)$ Tabellenscans auf $O(1)$ direkte Index-Lookups.
 
+---
 
+### Tabelle: `student_card_grants` (Migration 024_student_card_grants.sql)
+Speichert persistente Freigaben, verifizierte Ausfallpuffer und Sperrstatus von Schülerausweisen.
 
+| Spalte | Datentyp | Beschreibung |
+| :--- | :--- | :--- |
+| `user_id` (PK) | INTEGER | Lokale User-ID (Referenz auf `users.id`) |
+| `username` (UNIQUE) | TEXT | Eindeutiger LDAP- / Systembenutzername |
+| `mediothek_number` | TEXT | Mediotheksnummer / Lesenummer (aus Feld 145) |
+| `last_ldap_success_at` | DATETIME | Zeitstempel der letzten erfolgreichen LDAP-Prüfung |
+| `offline_valid_until` | DATETIME | Feste Ablaufzeit des 30-Tage-Ausfallpuffers (max. bis Schuljahresende) |
+| `school_year_expires_at` | DATETIME | Stichtags-Ablaufdatum des Schuljahres (31. Juli) |
+| `is_revoked` | INTEGER | Sperrflag (`0` = aktiv/gültig, `1` = widerrufen/gesperrt) |
+| `card_version` | TEXT | Hash-/Versionskennung über Stammdaten und Passbild |
+| `created_at` | DATETIME | Erstellungszeitpunkt |
+| `updated_at` | DATETIME | Letzte Aktualisierung |
+
+*   **Indizes**:
+    *   `idx_student_card_grants_username` auf `username`
+    *   `idx_student_card_grants_mediothek` auf `mediothek_number`
+*   **Zweck**: Gewährleistet, dass Ausfallpuffer bei LDAP-/MySQL-Störungen unverändert bis zum festgelegten Fristende weitergelten, ohne bei wiederholten Abrufen künstlich verlängert zu werden oder widerrufene Ausweise zu reaktivieren.
