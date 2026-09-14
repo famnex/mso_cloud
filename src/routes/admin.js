@@ -953,6 +953,18 @@ router.get('/system/update/status', (req, res) => {
   res.json(updater.getUpdateStatus());
 });
 
+/**
+ * Fragt aktuelle Systeminformationen (Version, Git-Commit-Hash, Node-Version, OS) ab.
+ */
+router.get('/system/info', (req, res) => {
+  try {
+    const info = updater.getSystemInfo();
+    res.json(info);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /* ==========================================================================
    7. News und Nachrichten (Messages)
    ========================================================================== */

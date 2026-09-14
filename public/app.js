@@ -3851,8 +3851,33 @@ async function deleteUser(id) {
 }
 
 /* --- TAB: System & Updater --- */
-function loadSystemInfo() {
-  document.getElementById('info-node-version').innerText = 'v22.20.0'; // Statisch oder von API
+async function loadSystemInfo() {
+  const commitEl = document.getElementById('info-commit-hash');
+  const detailsEl = document.getElementById('info-commit-details');
+  const nodeEl = document.getElementById('info-node-version');
+  const progEl = document.getElementById('info-program-version');
+
+  try {
+    const res = await fetch('api/admin/system/info');
+    if (!res.ok) throw new Error('System-Informationen konnten nicht geladen werden.');
+    const info = await res.json();
+
+    if (nodeEl) nodeEl.innerText = info.node_version || '-';
+    if (progEl && info.version) progEl.innerText = `v${info.version} (Modernized Edition)`;
+    if (commitEl) {
+      commitEl.innerText = info.commit_hash_short || info.commit_hash || '-';
+      commitEl.title = info.commit_hash ? `Vollständiger Commit-Hash: ${info.commit_hash}` : '';
+    }
+    if (detailsEl) {
+      const extra = [];
+      if (info.branch) extra.push(`Branch: ${escapeHtml(info.branch)}`);
+      if (info.commit_date) extra.push(escapeHtml(info.commit_date));
+      detailsEl.innerText = extra.length > 0 ? `(${extra.join(' • ')})` : '';
+    }
+  } catch (err) {
+    if (commitEl) commitEl.innerText = 'Fehler beim Laden';
+    if (nodeEl) nodeEl.innerText = '-';
+  }
 }
 
 async function triggerSystemUpdate() {

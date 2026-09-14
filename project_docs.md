@@ -75,6 +75,7 @@ Die Gültigkeit eines Schülerausweises wird zentral berechnet:
 *   Asynchroner Update-Mechanismus (`src/updater.js` & `src/routes/admin.js`):
     *   `POST /api/admin/system/update` -> Startet Job im Hintergrund, antwortet mit HTTP 202 Accepted.
     *   `GET /api/admin/system/update/status` -> Liefert aktuellen Status (`running`, `succeeded`, `failed`) und Log-Puffer.
+    *   `GET /api/admin/system/info` -> Liefert aktuelle System-Informationen inkl. Git-Commit-Hash (`commit_hash`, `commit_hash_short`, `commit_date`, `branch`), Node.js Version und Plattform.
     *   Erstellt vor jeder Migration ein SQLite-Backup unter `data/backups/backup_pre_update_<timestamp>.sqlite`.
 
 ## Betriebsanleitung: Anmeldung und Dienststatus (Korrektur September 2026)

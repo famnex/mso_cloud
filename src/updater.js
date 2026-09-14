@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -149,6 +149,77 @@ async function performUpdate() {
   return results;
 }
 
+/**
+ * Ermittelt aktuelle System- und Versionsinformationen inkl. Git Commit-Hash.
+ */
+function getSystemInfo() {
+  const projectRoot = path.join(__dirname, '..');
+  let pkgVersion = '1.0.0';
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+    pkgVersion = pkg.version || '1.0.0';
+  } catch (e) {
+    // Fallback
+  }
+
+  let commitHash = '';
+  let commitHashShort = '';
+  let commitDate = '';
+  let commitMessage = '';
+  let branch = '';
+
+  try {
+    commitHash = execSync('git rev-parse HEAD', { cwd: projectRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    commitHashShort = execSync('git rev-parse --short HEAD', { cwd: projectRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    commitDate = execSync('git log -1 --format=%ci', { cwd: projectRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    commitMessage = execSync('git log -1 --format=%s', { cwd: projectRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+  } catch (err) {
+    try {
+      const gitHeadPath = path.join(projectRoot, '.git', 'HEAD');
+      if (fs.existsSync(gitHeadPath)) {
+        const headContent = fs.readFileSync(gitHeadPath, 'utf8').trim();
+        if (headContent.startsWith('ref: ')) {
+          const refRelative = headContent.replace('ref: ', '').trim();
+          branch = refRelative.split('/').pop() || '';
+          const refPath = path.join(projectRoot, '.git', refRelative);
+          if (fs.existsSync(refPath)) {
+            commitHash = fs.readFileSync(refPath, 'utf8').trim();
+            commitHashShort = commitHash.substring(0, 7);
+          } else {
+            const packedRefsPath = path.join(projectRoot, '.git', 'packed-refs');
+            if (fs.existsSync(packedRefsPath)) {
+              const packed = fs.readFileSync(packedRefsPath, 'utf8');
+              const match = packed.split('\n').find(line => line.endsWith(refRelative));
+              if (match) {
+                commitHash = match.split(' ')[0].trim();
+                commitHashShort = commitHash.substring(0, 7);
+              }
+            }
+          }
+        } else {
+          commitHash = headContent;
+          commitHashShort = headContent.substring(0, 7);
+        }
+      }
+    } catch (fsErr) {
+      // ignore
+    }
+  }
+
+  return {
+    version: pkgVersion,
+    commit_hash: commitHash || 'Unbekannt',
+    commit_hash_short: commitHashShort || (commitHash ? commitHash.substring(0, 7) : 'Unbekannt'),
+    commit_date: commitDate || '',
+    commit_message: commitMessage || '',
+    branch: branch || 'main',
+    node_version: process.version,
+    platform: process.platform,
+    arch: process.arch
+  };
+}
+
 // Ermöglicht es, das Skript direkt über die CLI auszuführen (z.B. npm run update)
 if (require.main === module) {
   performUpdate().then(results => {
@@ -162,5 +233,6 @@ if (require.main === module) {
 
 module.exports = {
   performUpdate,
-  getUpdateStatus
+  getUpdateStatus,
+  getSystemInfo
 };

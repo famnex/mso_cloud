@@ -157,6 +157,16 @@ async function runTests() {
   assert.strictEqual(baseUrl, 'https://portal.schule.de', 'getOidcBaseUrl muss Proxy-Header respektieren');
   console.log('  ✓ OIDC Base URL unterstützt dynamische Header und Domains');
 
+  // 8. System-Informationen & Git Commit-Hash
+  console.log('\n[Test 8] System-Informationen & Git Commit-Hash...');
+  const { getSystemInfo } = require('../src/updater');
+  const sysInfo = getSystemInfo();
+  assert.ok(sysInfo.version, 'Versionsnummer muss vorhanden sein');
+  assert.ok(sysInfo.commit_hash, 'Commit-Hash muss vorhanden sein');
+  assert.ok(sysInfo.commit_hash_short, 'Kurzer Commit-Hash muss vorhanden sein');
+  assert.ok(sysInfo.node_version, 'Node-Version muss vorhanden sein');
+  console.log(`  ✓ System-Info erfolgreich abgerufen: Version v${sysInfo.version}, Commit ${sysInfo.commit_hash_short} (${sysInfo.commit_hash}), Node ${sysInfo.node_version}`);
+
   // Cleanup test user
   db.prepare("DELETE FROM users WHERE username = 'test_security_user'").run();
 

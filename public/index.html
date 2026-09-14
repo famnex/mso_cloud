@@ -604,9 +604,10 @@
           </div>
 
           <div class="glass-panel" style="padding: 25px; background: rgba(0,0,0,0.15); margin-bottom: 25px;">
-            <h4 style="font-weight:600; margin-bottom:15px;">System-Informationen</h4>
+            <h4 style="font-weight:600; margin-bottom:15px;"><i class="fa-solid fa-server" style="margin-right:8px; color:var(--accent-color);"></i> System-Informationen</h4>
             <div style="display:flex; flex-direction:column; gap:10px; font-size:0.95rem;">
-              <div><span style="color:var(--text-secondary);">Programmversion:</span> <strong style="color:var(--accent-color);">v1.0.0 (Modernized Edition)</strong></div>
+              <div><span style="color:var(--text-secondary);">Programmversion:</span> <strong id="info-program-version" style="color:var(--accent-color);">v1.0.0 (Modernized Edition)</strong></div>
+              <div><span style="color:var(--text-secondary);">Aktueller Git-Commit:</span> <strong id="info-commit-hash" style="font-family: monospace; color: var(--accent-color);">-</strong> <span id="info-commit-details" style="color:var(--text-secondary); font-size:0.85rem; margin-left:6px;"></span></div>
               <div><span style="color:var(--text-secondary);">Node.js Version:</span> <strong id="info-node-version">-</strong></div>
               <div><span style="color:var(--text-secondary);">Prozess-Manager:</span> <strong>PM2 (Eco-Mode: Fork)</strong></div>
               <div><span style="color:var(--text-secondary);">Datenbank-Engine:</span> <strong>SQLite (WAL Mode)</strong></div>
